@@ -183,22 +183,22 @@ export default function SubmissionsGrading({ onSync, loading: parentLoading = fa
       
       {/* List Panel (Sidebar) */}
       <div className="w-full lg:w-1/3 flex flex-col gap-4 bg-white/80 backdrop-blur-xl border border-slate-200 p-5 rounded-[2rem] shadow-xl flex-shrink-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 uppercase italic">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 uppercase italic leading-none mb-1">
               Manual Grading
             </h1>
-            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-0.5">
+            <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
               Review & Score Subjective Submissions
             </p>
           </div>
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
             <SyncDataButton 
               onSync={onSync || (() => loadSubmissions(true))} 
               isLoading={parentLoading || loading} 
               className="h-8 px-3 rounded-xl border-slate-200 hover:bg-slate-100 text-slate-600 font-extrabold text-[10px] uppercase tracking-wider transition-all"
             />
-            <Badge className="h-6 gap-1 bg-indigo-50 text-indigo-600 border border-indigo-200 font-black text-[10px] rounded-lg shadow-sm">
+            <Badge className="h-8 px-3 flex items-center justify-center bg-indigo-50 text-indigo-600 border border-indigo-200 font-black text-[10px] rounded-xl shadow-sm whitespace-nowrap tracking-wider">
               {submissions.length} Pending
             </Badge>
           </div>

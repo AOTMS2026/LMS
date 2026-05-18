@@ -82,7 +82,7 @@ const io = new Server(httpServer, {
     cors: {
         origin: (origin, callback) => {
             // Allow all origins in dev, or specific ones in prod
-            callback(null, true); 
+            callback(null, true);
         },
         methods: ["GET", "POST"],
         credentials: true
@@ -102,7 +102,7 @@ io.on('connection', (socket) => {
         }
         userSockets.get(userId).add(socket.id);
         onlineUsers.add(userId);
-        
+
         console.log(`[Socket] User ${userId} connected (${socket.id})`);
         io.emit('user_status', { userId, status: 'online' });
     });
@@ -113,17 +113,17 @@ io.on('connection', (socket) => {
     });
 
     socket.on('typing', ({ conversationId, isTyping }) => {
-        socket.to(conversationId).emit('typing_status', { 
-            userId: socket.userId, 
+        socket.to(conversationId).emit('typing_status', {
+            userId: socket.userId,
             isTyping,
-            conversationId 
+            conversationId
         });
     });
 
     socket.on('mark_read', async ({ conversationId, messageIds }) => {
         try {
             if (!messageIds || messageIds.length === 0) return;
-            
+
             // Update DB
             await Message.updateMany(
                 { _id: { $in: messageIds }, conversation_id: conversationId },
@@ -131,10 +131,10 @@ io.on('connection', (socket) => {
             );
 
             // Emit to sender that messages are read
-            io.to(conversationId).emit('messages_read', { 
-                conversationId, 
+            io.to(conversationId).emit('messages_read', {
+                conversationId,
                 messageIds,
-                readBy: socket.userId 
+                readBy: socket.userId
             });
         } catch (err) {
             console.error('Error marking messages read:', err);
@@ -215,8 +215,8 @@ app.use(express.urlencoded({ limit: '50mb', extended: true }));
 // Standard Error Handler
 const handleError = (res, err, context = '') => {
     console.error(`[Error ${context}]`, err);
-    res.status(err.status || 500).json({ 
-        error: err.message || 'Internal Server Error', 
+    res.status(err.status || 500).json({
+        error: err.message || 'Internal Server Error',
         context,
         stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
@@ -262,7 +262,7 @@ const ROLE_CACHE_TTL = 30 * 1000;
 const getUserRole = async (userId) => {
     if (!userId) return null;
     const strId = userId.toString();
-    
+
     if (roleCache.has(strId)) {
         const { role, timestamp } = roleCache.get(strId);
         if (Date.now() - timestamp < ROLE_CACHE_TTL) return role;
@@ -286,10 +286,10 @@ const requireRole = (allowedRoles) => async (req, res, next) => {
             console.warn(`[Auth] No role found for user ID: ${req.user.id}`);
             return res.status(401).json({ error: 'User role not found' });
         }
-        
+
         // Attach role to req.user for use in routes
         req.user.role = role;
-        
+
         if (!allowedRoles.includes(role)) {
             console.warn(`[Auth] Access Denied for user ${req.user.id}. Role: ${role}. Required one of: ${allowedRoles}`);
             return res.status(403).json({ error: `Access denied. Your role is '${role}'. Required: ${allowedRoles.join(', ')}` });
@@ -412,9 +412,9 @@ app.post('/api/zoom/signature', (req, res) => {
 
         console.log(`[Zoom Signature] Generated for meeting: ${meetingNumber}`);
         // Return BOTH the signature and the sdkKey to ensure frontend syncs correctly
-        res.json({ 
-            signature, 
-            sdkKey: sdkKey 
+        res.json({
+            signature,
+            sdkKey: sdkKey
         });
 
     } catch (err) {
@@ -431,7 +431,7 @@ app.put('/api/admin/update-enrollment-payment', authenticateToken, requireAdminO
         if (!enrollment) return res.status(404).json({ error: 'Enrollment not found' });
 
         enrollment.category = 'approve'; // Auto-approve visibility when payment progresses
-        
+
         if (payment_term === 'full') {
             enrollment.payment_term = 'full';
             enrollment.remaining_balance = 0;
@@ -446,34 +446,34 @@ app.put('/api/admin/update-enrollment-payment', authenticateToken, requireAdminO
                 if (p) { p.status = 'approved'; p.approved_at = new Date(); }
             }
         } else if (payment_term === 'term1') {
-             enrollment.payment_term = 'term1';
-             enrollment.remaining_balance = Math.round((enrollment.final_price || 0) * 0.4);
-             if (enrollment.status !== 'active') {
-                 enrollment.enrolled_at = new Date();
-             }
-             enrollment.status = 'active';
-             // Mark term1 payment as approved if exists
-             if (enrollment.payment && enrollment.payment.length > 0) {
-                 const p = enrollment.payment.find(r => (r.term === 'term1' || !r.term) && r.status === 'pending');
-                 if (p) { p.status = 'approved'; p.approved_at = new Date(); }
-             }
+            enrollment.payment_term = 'term1';
+            enrollment.remaining_balance = Math.round((enrollment.final_price || 0) * 0.4);
+            if (enrollment.status !== 'active') {
+                enrollment.enrolled_at = new Date();
+            }
+            enrollment.status = 'active';
+            // Mark term1 payment as approved if exists
+            if (enrollment.payment && enrollment.payment.length > 0) {
+                const p = enrollment.payment.find(r => (r.term === 'term1' || !r.term) && r.status === 'pending');
+                if (p) { p.status = 'approved'; p.approved_at = new Date(); }
+            }
         } else if (payment_term === 'term2') {
-             // Admin triggers Term 2 payment requirement OR clears final pay
-             if (enrollment.payment_term === 'term2' && enrollment.status === 'pending') {
-                 enrollment.status = 'active';
-                 enrollment.remaining_balance = 0;
-                 if (enrollment.payment && enrollment.payment.length > 0) {
-                     const p = enrollment.payment.find(r => r.term === 'term2' && r.status === 'pending');
-                     if (p) { p.status = 'approved'; p.approved_at = new Date(); }
-                 }
-             } else {
-                 // Trigger Term 2 requirement - KEEP payment_term as what it is (likely term1)
-                 enrollment.remaining_balance = Math.round((enrollment.final_price || 0) * 0.4);
-                 enrollment.status = 'deactivate'; 
-                 enrollment.category = 'approve';
-             }
+            // Admin triggers Term 2 payment requirement OR clears final pay
+            if (enrollment.payment_term === 'term2' && enrollment.status === 'pending') {
+                enrollment.status = 'active';
+                enrollment.remaining_balance = 0;
+                if (enrollment.payment && enrollment.payment.length > 0) {
+                    const p = enrollment.payment.find(r => r.term === 'term2' && r.status === 'pending');
+                    if (p) { p.status = 'approved'; p.approved_at = new Date(); }
+                }
+            } else {
+                // Trigger Term 2 requirement - KEEP payment_term as what it is (likely term1)
+                enrollment.remaining_balance = Math.round((enrollment.final_price || 0) * 0.4);
+                enrollment.status = 'deactivate';
+                enrollment.category = 'approve';
+            }
         }
-        
+
         enrollment.updated_at = new Date();
         await enrollment.save();
 
@@ -521,7 +521,7 @@ app.post('/api/zoom/webhook', async (req, res) => {
                 .createHmac('sha256', secretToken)
                 .update(message)
                 .digest('hex');
-            
+
             const expectedSignature = `v0=${hash}`;
             if (signature !== expectedSignature) {
                 console.error('[Zoom Webhook] Invalid signature');
@@ -531,7 +531,7 @@ app.post('/api/zoom/webhook', async (req, res) => {
 
         // 3. Handle specific events
         console.log(`[Zoom Webhook] Event Received: ${event}`);
-        
+
         switch (event) {
             case 'meeting.started':
                 await LiveClass.findOneAndUpdate(
@@ -559,7 +559,7 @@ app.post('/api/zoom/webhook', async (req, res) => {
 app.post('/api/manager/generate-questions', authenticateToken, requireInstructor, async (req, res) => {
     console.log('[API] Generate Questions Request:', req.body.topic, req.body.type);
     const { topic, type, count, difficulty, prompt } = req.body;
-    
+
     // Determine webhook URL based on type
     const N8N_MCQ_WEBHOOK = process.env.N8N_MCQ_GENERATOR_URL || 'https://aotms.app.n8n.cloud/webhook/generate-quiz';
     const N8N_TRUE_FALSE_WEBHOOK = process.env.N8N_TRUE_FALSE_GENERATOR_URL || 'https://aotms.app.n8n.cloud/webhook/true';
@@ -567,7 +567,7 @@ app.post('/api/manager/generate-questions', authenticateToken, requireInstructor
     const N8N_LONG_ANSWER_WEBHOOK = process.env.N8N_LONG_ANSWER_GENERATOR_URL || 'https://aotms.app.n8n.cloud/webhook/generate-long-answer';
     const N8N_FILL_BLANK_WEBHOOK = process.env.N8N_FILL_BLANK_GENERATOR_URL || 'https://aotms.app.n8n.cloud/webhook/generate-fill-blank';
     const N8N_CODING_WEBHOOK = process.env.N8N_CODING_GENERATOR_URL || 'https://aotms.app.n8n.cloud/webhook/generate-coding';
-    
+
     let webhookUrl;
     switch (type) {
         case 'mcq':
@@ -626,7 +626,7 @@ const JUDGE0_HOST = process.env.JUDGE0_HOST || 'judge0-extra-ce.p.rapidapi.com';
 
 const executeCode = async (language, sourceCode, stdin = '') => {
     const lang = language?.toLowerCase();
-    
+
     // 1. Local JavaScript Execution (Fallback/Fast Path)
     if (lang === 'javascript' || lang === 'js' || lang === 'node') {
         // ... (Keep existing local VM logic for JS as standard)
@@ -700,7 +700,7 @@ const executeCode = async (language, sourceCode, stdin = '') => {
         const { stdout, stderr, compile_output, message, status } = submitResponse.data;
 
         const decodedStdout = stdout ? Buffer.from(stdout, 'base64').toString() : '';
-        const decodedStderr = (stderr || compile_output || message) ? 
+        const decodedStderr = (stderr || compile_output || message) ?
             Buffer.from(stderr || compile_output || message, 'base64').toString() : '';
 
         return {
@@ -722,7 +722,7 @@ const executeCode = async (language, sourceCode, stdin = '') => {
 // --- Piston Code Execution (Run Code) ---
 app.post('/api/run-code', authenticateToken, async (req, res) => {
     const { language, version, files, stdin } = req.body;
-    
+
     console.log(`[API] Run Code Request: ${language}`);
 
     if (!language || !files || !Array.isArray(files) || files.length === 0) {
@@ -773,12 +773,12 @@ app.post('/api/auth/resend-otp', async (req, res) => {
     // Reuse logic, maybe separate if needed differently
     const { email, full_name } = req.body;
     if (!email) return res.status(400).json({ error: 'Email is required' });
-    
+
     try {
-         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-         const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-         
-         await OTP.findOneAndUpdate(
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+        await OTP.findOneAndUpdate(
             { email },
             { otp, full_name, expires_at: expiresAt },
             { upsert: true, returnDocument: 'after' }
@@ -827,11 +827,11 @@ app.post('/api/auth/refresh', async (req, res) => {
     const { refresh_token } = req.body;
     if (!refresh_token) return res.status(400).json({ error: 'Refresh token required' });
     // In a real app, verify refresh_token in DB. For now, we just mock success if token exists.
-    res.json({ 
-        session: { 
+    res.json({
+        session: {
             access_token: 'new_mock_token_' + Date.now(),
             refresh_token: 'new_mock_refresh_' + Date.now()
-        } 
+        }
     });
 });
 
@@ -857,7 +857,7 @@ app.post('/api/auth/signup', async (req, res) => {
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
         const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random&color=fff`;
-        
+
         // Generate 12-hour registration timestamp
         const now = new Date();
         const registrationDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -880,7 +880,7 @@ app.post('/api/auth/signup', async (req, res) => {
             email,
             full_name: fullName,
             avatar_url: avatarUrl,
-            mobile_number: phone, 
+            mobile_number: phone,
             college_name: collegeName,
             institute_name: instituteName,
             registration_date: registrationDate,
@@ -928,14 +928,14 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const isMatch = await bcrypt.compare(password, user.password_hash);
-        
+
         if (!isMatch) {
             // Brute force protection
             user.failed_login_attempts = (user.failed_login_attempts || 0) + 1;
             await user.save();
 
             let errorMessage = 'Invalid credentials';
-            
+
             if (user.failed_login_attempts >= 3) {
                 await Profile.findOneAndUpdate({ user_id: user._id }, { approval_status: 'suspended' });
                 await SecurityEvent.create({
@@ -1012,8 +1012,8 @@ app.post('/api/auth/login', async (req, res) => {
                 time: loginTime,
                 message: 'Your Admin Login OTP'
             })
-            .then(() => console.log(`[Security] Admin OTP webhook SUCCESS for ${email}`))
-            .catch(e => console.error(`[Security] Admin OTP webhook ERROR:`, e.message));
+                .then(() => console.log(`[Security] Admin OTP webhook SUCCESS for ${email}`))
+                .catch(e => console.error(`[Security] Admin OTP webhook ERROR:`, e.message));
 
             console.log(`[Security] Admin OTP sent to ${email}: ${otp}`);
             return res.json({ requiresOtp: true, message: 'OTP sent to your admin email' });
@@ -1131,8 +1131,8 @@ app.post('/api/auth/admin-resend-otp', async (req, res) => {
             time: new Date().toISOString(),
             message: 'Your Admin Login OTP (Resent)'
         })
-        .then(() => console.log(`[Security] Admin OTP resend webhook SUCCESS for ${email}`))
-        .catch(e => console.error(`[Security] Admin OTP resend webhook ERROR:`, e.message));
+            .then(() => console.log(`[Security] Admin OTP resend webhook SUCCESS for ${email}`))
+            .catch(e => console.error(`[Security] Admin OTP resend webhook ERROR:`, e.message));
 
         console.log(`[Security] Admin OTP resent to ${email}: ${otp}`);
         res.json({ message: 'OTP resent successfully' });
@@ -1150,11 +1150,11 @@ app.post('/api/student/pulse-rating', authenticateToken, async (req, res) => {
 
         await CourseRating.findOneAndUpdate(
             { user_id: req.user.id, course_id },
-            { 
-                user_id: req.user.id, 
-                course_id, 
+            {
+                user_id: req.user.id,
+                course_id,
                 instructor_id,
-                rating, 
+                rating,
                 review,
                 created_at: new Date()
             },
@@ -1174,7 +1174,7 @@ app.get('/api/instructor/pulse-ratings', authenticateToken, async (req, res) => 
         }
 
         const filter = role === 'instructor' ? { instructor_id: req.user.id } : {};
-        
+
         const ratings = await CourseRating.find(filter)
             .populate('user_id', 'full_name avatar_url email')
             .populate('course_id', 'title thumbnail_url')
@@ -1287,7 +1287,7 @@ app.put('/api/admin/update-user-status', authenticateToken, requireAdmin, async 
 
     try {
         let updateData = { approval_status: status, updated_at: new Date() };
-        
+
         if (status === 'suspended' && req.body.suspensionDays) {
             const suspendedUntil = new Date();
             suspendedUntil.setDate(suspendedUntil.getDate() + parseInt(req.body.suspensionDays));
@@ -1304,8 +1304,8 @@ app.put('/api/admin/update-user-status', authenticateToken, requireAdmin, async 
 
         // Notify user via socket for real-time suspension/approval
         if (status === 'suspended') {
-            io.to(userId.toString()).emit('user_suspended', { 
-                suspended_until: updateData.suspended_until 
+            io.to(userId.toString()).emit('user_suspended', {
+                suspended_until: updateData.suspended_until
             });
         } else if (status === 'approved') {
             io.to(userId.toString()).emit('user_approved');
@@ -1364,7 +1364,7 @@ app.post('/api/admin/send-student-email', authenticateToken, requireAdminOrManag
         };
 
         console.log(`[Admin Email] Triggering n8n sequence for ${profile.email}`);
-        
+
         await axios.post(n8nUrl, payload, {
             timeout: 10000 // 10s timeout
         });
@@ -1376,10 +1376,10 @@ app.post('/api/admin/send-student-email', authenticateToken, requireAdminOrManag
             console.error('[Admin Email Details]:', err.response.status, err.response.data);
             // If n8n returns 404, it means the workflow is likely deactivated in n8n
             if (err.response.status === 404) {
-                 return res.status(404).json({ 
+                return res.status(404).json({
                     error: 'Mail workflow is inactive or path incorrect in n8n.',
                     details: 'Ensure n8n workflow is "ACTIVE" for production webhooks.'
-                 });
+                });
             }
         }
         handleError(res, err, 'send-student-email');
@@ -1409,11 +1409,11 @@ app.put('/api/admin/toggle-course-active', authenticateToken, requireAdminOrMana
 
     try {
         const course = await Course.findByIdAndUpdate(
-            courseId, 
-            { is_active, updated_at: new Date() }, 
+            courseId,
+            { is_active, updated_at: new Date() },
             { returnDocument: 'after' }
         );
-        
+
         if (!course) return res.status(404).json({ error: 'Course not found' });
 
         // Log action
@@ -1444,7 +1444,7 @@ app.put('/api/admin/approve-question-bank', authenticateToken, requireAdmin, asy
         };
 
         const result = await QuestionBank.updateMany({ topic }, updateData);
-        
+
         // Log action
         await SystemLog.create({
             log_type: 'audit',
@@ -1501,8 +1501,8 @@ app.delete('/api/admin/question-bank/:topic', authenticateToken, requireInstruct
             log_type: 'audit',
             module: 'QuestionBank',
             action: `Question Bank & Associated Exams & Student Access Permanently Removed for topic: ${topic}`,
-            details: { 
-                topic, 
+            details: {
+                topic,
                 qb_deleted_count: qbResult.deletedCount,
                 exam_deleted_count: examResult.deletedCount,
                 mock_deleted_count: mockResult.deletedCount,
@@ -1512,8 +1512,8 @@ app.delete('/api/admin/question-bank/:topic', authenticateToken, requireInstruct
             user_id: req.user.id
         });
 
-        res.json({ 
-            message: `Question Bank, Exams, and Access for ${topic} permanently removed`, 
+        res.json({
+            message: `Question Bank, Exams, and Access for ${topic} permanently removed`,
             deleted_count: qbResult.deletedCount,
             exam_deleted_count: examResult.deletedCount,
             mock_deleted_count: mockResult.deletedCount,
@@ -1529,8 +1529,8 @@ app.delete('/api/admin/question-bank/:topic', authenticateToken, requireInstruct
 
 app.get('/api/admin/courses-with-instructors', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
-        const courses = await Course.find({ 
-            instructor_ids: { $exists: true, $not: { $size: 0 } } 
+        const courses = await Course.find({
+            instructor_ids: { $exists: true, $not: { $size: 0 } }
         })
             .sort({ updated_at: -1, created_at: -1 })
             .lean();
@@ -1567,7 +1567,7 @@ app.get('/api/admin/courses-with-instructors', authenticateToken, requireAdminOr
         const flatData = [];
         courses.forEach(course => {
             const instructorIdsArr = (course.instructor_ids || []);
-            
+
             if (instructorIdsArr.length === 0) {
                 flatData.push({
                     ...course,
@@ -1581,9 +1581,9 @@ app.get('/api/admin/courses-with-instructors', authenticateToken, requireAdminOr
                     const idStr = id.toString();
                     const p = profileMap[idStr] || {};
                     const u = userMap[idStr] || {};
-                    
-                    const sessionBatch = batches.find(b => 
-                        b.course_id.toString() === course._id.toString() && 
+
+                    const sessionBatch = batches.find(b =>
+                        b.course_id.toString() === course._id.toString() &&
                         b.instructor_id?.toString() === idStr
                     );
 
@@ -1596,7 +1596,7 @@ app.get('/api/admin/courses-with-instructors', authenticateToken, requireAdminOr
                         // row_id is used as key in the frontend
                         row_id: `${course._id}_${idStr}`,
                         course_id: course._id,
-                        id: course._id, 
+                        id: course._id,
                         instructor_id: idStr,
                         status: rowStatus, // INDIVIDUAL STATUS (pending, approved, rejected)
                         instructor_name: p.full_name || u.full_name || 'System Instructor',
@@ -1650,12 +1650,12 @@ app.put('/api/admin/approve-course', authenticateToken, requireAdminOrManager, a
 
             // TARGETED BATCH UPDATE
             const batchUpdate = await Batch.findOneAndUpdate(
-                { 
-                    course_id: new mongoose.Types.ObjectId(courseId), 
-                    instructor_id: new mongoose.Types.ObjectId(instructorId) 
+                {
+                    course_id: new mongoose.Types.ObjectId(courseId),
+                    instructor_id: new mongoose.Types.ObjectId(instructorId)
                 },
-                { 
-                    status: status, 
+                {
+                    status: status,
                     is_active: status === 'approved',
                     processed_at: new Date(),
                     processed_by: req.user.id,
@@ -1664,7 +1664,7 @@ app.put('/api/admin/approve-course', authenticateToken, requireAdminOrManager, a
                 { returnDocument: 'after' }
             );
             console.log(`[BatchUpdate] Result: ${batchUpdate ? 'Found' : 'NotFound - creating new'}`);
-            
+
             if (!batchUpdate && status === 'approved') {
                 console.log(`[Approve] Creating missing batch record for instructor ${instructorId}`);
                 await Batch.create({
@@ -1687,19 +1687,19 @@ app.put('/api/admin/approve-course', authenticateToken, requireAdminOrManager, a
         // This fixes the "Grant Access still showing" bug for the platform view.
         let course;
         if (status === 'approved') {
-            course = await Course.findByIdAndUpdate(courseId, { 
+            course = await Course.findByIdAndUpdate(courseId, {
                 status: 'approved',
                 reviewed_at: new Date(),
                 reviewed_by: req.user.id
             }, { returnDocument: 'after' });
         } else if (!instructorId) {
-             const updateData = {
+            const updateData = {
                 status: status,
                 reviewed_at: new Date(),
                 reviewed_by: req.user.id,
                 rejection_reason: status === 'rejected' ? rejectionReason : null
-             };
-             course = await Course.findByIdAndUpdate(courseId, updateData, { returnDocument: 'after' });
+            };
+            course = await Course.findByIdAndUpdate(courseId, updateData, { returnDocument: 'after' });
         } else {
             course = await Course.findById(courseId).lean();
         }
@@ -1735,7 +1735,7 @@ app.delete('/api/admin/revoke-instructor-access/:courseId/:instructorId', authen
 
         // 2. Cascade delete that specific instructor's batches and data
         const deletedBatchIds = (await Batch.find({ course_id: courseId, instructor_id: instructorId }).select('_id')).map(b => b._id);
-        
+
         await Promise.all([
             Batch.deleteMany({ course_id: courseId, instructor_id: instructorId }),
             StudentBatch.deleteMany({ batch_id: { $in: deletedBatchIds } }),
@@ -1851,7 +1851,7 @@ app.post('/api/admin/assign-course', authenticateToken, requireAdminOrManager, a
         };
 
         const course = await Course.findByIdAndUpdate(courseId, updateData, { returnDocument: 'after' });
-        
+
         // Log action
         await SystemLog.create({
             log_type: 'audit',
@@ -1876,14 +1876,14 @@ app.delete('/api/admin/clear-course-instructors/:courseId', authenticateToken, r
 
         const course = await Course.findByIdAndUpdate(
             courseId,
-            { 
-                $set: { instructor_ids: [], instructor_id: null }, 
+            {
+                $set: { instructor_ids: [], instructor_id: null },
                 status: 'draft',
                 updated_at: new Date()
             },
             { returnDocument: 'after' }
         );
-        
+
         // CASCADING DELETION: Remove batches, student assignments, and requests
         // associated with this course when instructor access is revoked
         await Promise.all([
@@ -1897,8 +1897,8 @@ app.delete('/api/admin/clear-course-instructors/:courseId', authenticateToken, r
             log_type: 'audit',
             module: 'Course',
             action: 'Instructors & Batches Cleared',
-            details: { 
-                course_id: courseId, 
+            details: {
+                course_id: courseId,
                 previous_instructors: courseBefore.instructor_ids,
                 cascaded_deletions: ['Batches']
             },
@@ -1945,7 +1945,7 @@ app.delete('/api/admin/delete-user/:userId', authenticateToken, requireAdmin, as
             { instructor_id: userId },
             { $unset: { instructor_id: "" }, status: 'draft' }
         );
-        
+
         // Delete User Data
         await Promise.all([
             User.findByIdAndDelete(userId),
@@ -1963,11 +1963,11 @@ app.delete('/api/admin/delete-user/:userId', authenticateToken, requireAdmin, as
 app.get('/api/admin/data-summary', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
         const [
-            users, 
-            courses, 
-            enrollments, 
-            questionBanks, 
-            exams, 
+            users,
+            courses,
+            enrollments,
+            questionBanks,
+            exams,
             securityEvents,
             pendingCourses,
             pendingEnrollments,
@@ -2021,7 +2021,7 @@ app.get('/api/admin/student-performance/:studentId', authenticateToken, requireA
         const profile = await Profile.findOne({ user_id: studentId }).lean();
         const enrollmentsRaw = await Enrollment.find({ user_id: studentId }).populate('course_id', 'title').lean();
         const resultsRaw = await ExamResult.find({ user_id: studentId }).populate('exam_id', 'title').lean();
-        
+
         const performanceData = {
             enrollments: enrollmentsRaw.map(e => ({
                 course_name: e.course_id?.title || 'Unknown Course',
@@ -2038,7 +2038,7 @@ app.get('/api/admin/student-performance/:studentId', authenticateToken, requireA
             github_url: profile?.github_url || null,
             resume_url: profile?.resume_url || null
         };
-        
+
         res.json(performanceData);
     } catch (err) {
         handleError(res, err, 'student-performance');
@@ -2051,7 +2051,7 @@ app.get('/api/admin/exams-list', authenticateToken, requireInstructor, async (re
             .sort({ created_at: -1 })
             .limit(100)
             .lean();
-        
+
         // Transformed for frontend compatibility
         const transformedExams = exams.map(e => ({ ...e, id: e._id }));
         res.json(transformedExams);
@@ -2103,7 +2103,7 @@ app.get('/api/admin/enrollments-list', authenticateToken, requireAdminOrManager,
 // Quality Assurance - Permanent Delete
 app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAdmin, async (req, res) => {
     const { dataType } = req.params;
-    
+
     const validTypes = ['users', 'courses', 'enrollments', 'questionBanks', 'exams', 'conversations'];
     if (!validTypes.includes(dataType)) {
         return res.status(400).json({ error: 'Invalid data type' });
@@ -2111,13 +2111,13 @@ app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAd
 
     try {
         let result = { deletedCount: 0 };
-        
+
         switch (dataType) {
             case 'users':
                 // Delete all user-related data
                 const userIds = await User.find().select('_id').lean();
                 const ids = userIds.map(u => u._id);
-                
+
                 await Promise.all([
                     User.deleteMany({}),
                     Profile.deleteMany({ user_id: { $in: ids } }),
@@ -2132,7 +2132,7 @@ app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAd
             case 'courses':
                 const courseIds = await Course.find().select('_id').lean();
                 const cIds = courseIds.map(c => c._id);
-                
+
                 await Promise.all([
                     Course.deleteMany({}),
                     Topic.deleteMany({ course_id: { $in: cIds } }),
@@ -2154,7 +2154,7 @@ app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAd
             case 'exams':
                 const examIds = await Exam.find().select('_id').lean();
                 const eIds = examIds.map(e => e._id);
-                
+
                 await Promise.all([
                     Exam.deleteMany({}),
                     // ExamSchedule.deleteMany({ exam_id: { $in: eIds } }), // Removed
@@ -2168,7 +2168,7 @@ app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAd
             case 'conversations':
                 const convIds = await Conversation.find().select('_id').lean();
                 const convIdList = convIds.map(c => c._id);
-                
+
                 await Promise.all([
                     Conversation.deleteMany({}),
                     Message.deleteMany({ conversation_id: { $in: convIdList } })
@@ -2186,7 +2186,7 @@ app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAd
             user_id: req.user.id
         });
 
-        res.json({ 
+        res.json({
             message: `${dataType} data permanently deleted`,
             deletedCount: result.deletedCount
         });
@@ -2233,7 +2233,7 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
         console.log("==> PROFILE PUT RECEIVED FOR:", req.user.id);
         console.log("==> PAYLOAD:", req.body);
         const updates = { ...req.body, updated_at: new Date() };
-        
+
         // Update Profile
         await Profile.findOneAndUpdate(
             { user_id: req.user.id },
@@ -2245,7 +2245,7 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
         const userUpdates = {};
         if (updates.full_name) userUpdates.full_name = updates.full_name;
         if (updates.avatar_url) userUpdates.avatar_url = updates.avatar_url;
-        
+
         if (Object.keys(userUpdates).length > 0) {
             await User.findByIdAndUpdate(req.user.id, userUpdates);
         }
@@ -2260,11 +2260,11 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
 app.post('/api/user/profile/image', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        
+
         // Convert buffer to base64
         const b64 = Buffer.from(req.file.buffer).toString('base64');
         const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-        
+
         // 1. Upload to Cloudinary
         const result = await cloudinary.uploader.upload(dataURI, {
             folder: 'profile_pics',
@@ -2277,7 +2277,7 @@ app.post('/api/user/profile/image', authenticateToken, upload.single('file'), as
         await Promise.all([
             User.findByIdAndUpdate(req.user.id, { avatar_url: imageUrl }),
             Profile.findOneAndUpdate(
-                { user_id: req.user.id }, 
+                { user_id: req.user.id },
                 { avatar_url: imageUrl, updated_at: new Date() }
             )
         ]);
@@ -2304,13 +2304,13 @@ app.get('/api/admin/conversations', authenticateToken, requireAdminOrManager, as
         // Get profiles to check approval_status (blocked/active)
         const userIds = [];
         conversations.forEach(c => {
-             if (c.participants) {
-                 c.participants.forEach(p => {
-                     if (p._id) userIds.push(p._id);
-                 });
-             }
+            if (c.participants) {
+                c.participants.forEach(p => {
+                    if (p._id) userIds.push(p._id);
+                });
+            }
         });
-        
+
         const profiles = await Profile.find({ user_id: { $in: userIds } }).select('user_id approval_status').lean();
         const statusMap = profiles.reduce((acc, p) => {
             acc[p.user_id.toString()] = p.approval_status;
@@ -2349,7 +2349,7 @@ app.get('/api/admin/conversations/:id/messages', authenticateToken, requireAdmin
             .populate('sender', 'full_name avatar_url email')
             .sort({ created_at: 1 })
             .lean();
-            
+
         res.json(messages.map(m => ({
             id: m._id,
             content: m.content,
@@ -2405,7 +2405,7 @@ app.get('/api/users/:id/public-profile', authenticateToken, async (req, res) => 
 app.post('/api/chat/start', authenticateToken, async (req, res) => {
     const { participantId, recipientId } = req.body;
     const targetId = participantId || recipientId;
-    
+
     if (!targetId) return res.status(400).json({ error: 'Missing participantId' });
 
     try {
@@ -2431,7 +2431,7 @@ app.post('/api/chat/start', authenticateToken, async (req, res) => {
             .lean();
 
         const otherUser = populatedConv.participants.find(p => p._id.toString() !== req.user.id);
-        
+
         const formattedConv = {
             id: populatedConv._id,
             user: otherUser ? {
@@ -2502,7 +2502,7 @@ app.get('/api/chat/messages/:conversationId', authenticateToken, async (req, res
             .populate('sender', 'full_name avatar_url email')
             .sort({ created_at: 1 })
             .lean();
-        
+
         // Mark as read (simple implementation: assume viewing marks all as read for now)
         // Ideally handled via specific socket event or batch update
         await Message.updateMany(
@@ -2538,24 +2538,24 @@ app.get('/api/chat/contacts', authenticateToken, async (req, res) => {
 
         if (role?.toLowerCase() === 'student') {
             // Students see instructors of courses they are enrolled in
-            const enrollments = await Enrollment.find({ 
-                user_id: req.user.id, 
-                status: 'active' 
+            const enrollments = await Enrollment.find({
+                user_id: req.user.id,
+                status: 'active'
             }).lean();
-            
+
             const courseIds = enrollments.map(e => e.course_id);
-            const courses = await Course.find({ 
-                _id: { $in: courseIds }, 
-                instructor_ids: { $exists: true, $not: { $size: 0 } } 
+            const courses = await Course.find({
+                _id: { $in: courseIds },
+                instructor_ids: { $exists: true, $not: { $size: 0 } }
             }).lean();
-            
+
             const instructorIds = courses.reduce((acc, c) => {
                 if (c.instructor_ids && Array.isArray(c.instructor_ids)) {
                     c.instructor_ids.forEach(id => acc.add(id.toString()));
                 }
                 return acc;
             }, new Set());
-            
+
             const instructors = await User.find({ _id: { $in: Array.from(instructorIds) } })
                 .select('full_name avatar_url email')
                 .lean();
@@ -2572,13 +2572,13 @@ app.get('/api/chat/contacts', authenticateToken, async (req, res) => {
             // Instructors see students enrolled in their courses
             const myCourses = await Course.find({ instructor_ids: req.user.id }).select('_id').lean();
             const courseIds = myCourses.map(c => c._id);
-            
-            const enrollments = await Enrollment.find({ 
-                course_id: { $in: courseIds }, 
-                status: 'active' 
+
+            const enrollments = await Enrollment.find({
+                course_id: { $in: courseIds },
+                status: 'active'
             })
-            .populate('user_id', 'full_name avatar_url email')
-            .lean();
+                .populate('user_id', 'full_name avatar_url email')
+                .lean();
 
             // Deduplicate students
             const studentMap = new Map();
@@ -2593,7 +2593,7 @@ app.get('/api/chat/contacts', authenticateToken, async (req, res) => {
                     });
                 }
             });
-            
+
             contacts = Array.from(studentMap.values());
         }
 
@@ -2717,8 +2717,8 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
 
         chatConv = await Conversation.findByIdAndUpdate(
             conversationId,
-            { 
-                last_message: message._id, 
+            {
+                last_message: message._id,
                 updated_at: new Date(),
                 // We update unread counts separately below or here if we have the ID
             },
@@ -2756,8 +2756,8 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
         }
 
         console.log('Message sent successfully:', message._id);
-        res.json({ 
-            success: true, 
+        res.json({
+            success: true,
             message: {
                 ...message.toObject(),
                 id: message._id
@@ -2772,11 +2772,11 @@ app.post('/api/chat/send', authenticateToken, async (req, res) => {
 app.post('/api/chat/upload', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        
+
         // Convert buffer to base64
         const b64 = Buffer.from(req.file.buffer).toString('base64');
         let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-        
+
         const result = await cloudinary.uploader.upload(dataURI, {
             folder: 'chat_uploads',
             resource_type: 'auto'
@@ -2802,7 +2802,7 @@ app.post('/api/upload/course-resources', authenticateToken, requireInstructor, u
 
         const originalName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
         const fileName = `Resources/${Date.now()}_${originalName}`;
-        
+
         // Upload to S3
         const s3Key = await uploadFile(req.file.buffer, fileName, req.file.mimetype);
 
@@ -2811,9 +2811,9 @@ app.post('/api/upload/course-resources', authenticateToken, requireInstructor, u
         // Assuming we want to return a usable URL:
         const signedUrl = await generateViewUrl(s3Key);
 
-        res.json({ 
+        res.json({
             url: s3Key, // Store the KEY in the database, not the signed URL
-            public_id: s3Key, 
+            public_id: s3Key,
             format: req.file.mimetype.split('/')[1] || 'raw',
             original_filename: req.file.originalname,
             view_url: signedUrl // Frontend can use this immediately
@@ -2832,7 +2832,7 @@ app.post('/api/instructor/register', upload.single('resume'), async (req, res) =
         // Reuse Signup Logic (Partial)
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
-        
+
         let user = await User.findOne({ email });
         if (!user) {
             user = await User.create({ email, password_hash: passwordHash, full_name: fullName });
@@ -2881,13 +2881,13 @@ app.post('/api/instructor/choose-course', authenticateToken, requireInstructor, 
         } catch (e) {
             return res.status(400).json({ error: 'Invalid Course ID format' });
         }
-        
+
         if (!course) return res.status(404).json({ error: 'Course not found' });
-        
+
         // Ensure instructor_ids is an array and check for inclusion properly
         if (!course.instructor_ids) course.instructor_ids = [];
         const instructorId = new mongoose.Types.ObjectId(req.user.id);
-        
+
         const isAlreadyAssigned = course.instructor_ids.some(id => id.toString() === instructorId.toString());
         if (isAlreadyAssigned) {
             return res.status(400).json({ error: 'You are already assigned to this course' });
@@ -2901,8 +2901,8 @@ app.post('/api/instructor/choose-course', authenticateToken, requireInstructor, 
 
         // Automatically create a batch for this instructor/session
         if (dealing_session) {
-            const { 
-                batch_name, 
+            const {
+                batch_name,
                 capacity,
                 start_time,
                 end_time
@@ -2912,8 +2912,8 @@ app.post('/api/instructor/choose-course', authenticateToken, requireInstructor, 
 
             if (dealing_session === 'all') {
                 const totalCap = capacity || 150;
-                const m = Math.floor(totalCap/3), a = Math.floor(totalCap/3), e = totalCap - 2*m;
-                
+                const m = Math.floor(totalCap / 3), a = Math.floor(totalCap / 3), e = totalCap - 2 * m;
+
                 await Batch.create({
                     course_id: courseId,
                     instructor_id: req.user.id,
@@ -2938,7 +2938,7 @@ app.post('/api/instructor/choose-course', authenticateToken, requireInstructor, 
                     max_students: capacity || 50,
                     start_time: start_time || '09:00',
                     end_time: end_time || '11:00',
-                    is_active: false, 
+                    is_active: false,
                     status: 'pending',
                     batch_category: 'remove'
                 });
@@ -2960,24 +2960,24 @@ app.post('/api/instructor/choose-course', authenticateToken, requireInstructor, 
 app.get('/api/instructor/courses', authenticateToken, requireInstructor, async (req, res) => {
     try {
         const { all } = req.query;
-        let query = { 
+        let query = {
             $or: [
                 { instructor_id: req.user.id },
                 { instructor_ids: req.user.id }
-            ] 
+            ]
         };
-        
+
         if (all === 'true' || req.user.role === 'admin' || req.user.role === 'manager') {
-            query = {}; 
+            query = {};
         }
-        
+
         const courses = await Course.find(query).sort({ updated_at: -1 }).lean();
         const courseIds = courses.map(c => c._id);
 
         // Fetch ALL batches to see locks
-        const allBatches = await Batch.find({ 
+        const allBatches = await Batch.find({
             course_id: { $in: courseIds },
-            status: { $in: ['pending', 'approved'] } 
+            status: { $in: ['pending', 'approved'] }
         }).select('course_id batch_type').lean();
 
         // Fetch SPECIFIC batches for this instructor to see THEIR assignment
@@ -2991,9 +2991,9 @@ app.get('/api/instructor/courses', authenticateToken, requireInstructor, async (
             const courseIdStr = course._id.toString();
             const locks = allBatches.filter(b => b.course_id.toString() === courseIdStr);
             const myMatch = myBatches.find(b => b.course_id.toString() === courseIdStr);
-            
+
             const occupiedSessions = [...new Set(locks.map(b => b.batch_type))];
-            
+
             return {
                 ...course,
                 id: course._id,
@@ -3002,7 +3002,7 @@ app.get('/api/instructor/courses', authenticateToken, requireInstructor, async (
                 is_approved: myMatch?.status === 'approved'
             };
         });
-        
+
         res.json(data);
     } catch (err) {
         handleError(res, err, 'instructor-courses');
@@ -3014,19 +3014,19 @@ app.get('/api/instructor/courses/:id/batch/:batchType/students', authenticateTok
         const { id, batchType } = req.params;
         const { batch_id } = req.query;
         const role = await getUserRole(req.user.id);
-        
+
         let batchIds = [];
-        
+
         if (batch_id) {
             // Fetch students for a SPECIFIC batch card
             batchIds = [batch_id];
         } else {
             // Find all batches of this type (session) for this course
-            const batchQuery = { 
-                course_id: id, 
-                batch_type: batchType === 'any' ? { $exists: true } : batchType.toLowerCase() 
+            const batchQuery = {
+                course_id: id,
+                batch_type: batchType === 'any' ? { $exists: true } : batchType.toLowerCase()
             };
-            
+
             // SECURITY: If instructor, only show students from their OWN assigned batches
             if (role === 'instructor') {
                 batchQuery.instructor_id = req.user.id;
@@ -3107,15 +3107,15 @@ app.get('/api/courses/enrollments', authenticateToken, requireAdminOrManager, as
 app.post('/api/upload', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        
+
         const b64 = Buffer.from(req.file.buffer).toString('base64');
         let dataURI = 'data:' + req.file.mimetype + ';base64,' + b64;
-        
+
         const result = await cloudinary.uploader.upload(dataURI, {
             resource_type: 'auto',
             folder: 'payment_proofs'
         });
-        
+
         res.json({ url: result.secure_url, public_id: result.public_id });
     } catch (err) {
         handleError(res, err, 'upload-file');
@@ -3149,13 +3149,13 @@ app.post('/api/upload/course-resources', authenticateToken, upload.single('file'
 app.post('/api/upload/live-posters', authenticateToken, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        
+
         // Convert buffer to base64 for Cloudinary
         const b64 = Buffer.from(req.file.buffer).toString('base64');
         const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
-        
+
         console.log(`[System] Instructor ${req.user.id} uploading live poster...`);
-        
+
         const result = await cloudinary.uploader.upload(dataURI, {
             folder: 'live_posters',
             resource_type: 'image'
@@ -3172,8 +3172,8 @@ app.post('/api/upload/live-posters', authenticateToken, upload.single('file'), a
             secure: true
         });
 
-        res.json({ 
-            url: optimizedUrl, 
+        res.json({
+            url: optimizedUrl,
             public_id: result.public_id,
             original_url: result.secure_url
         });
@@ -3217,9 +3217,9 @@ app.post('/api/courses/enroll', authenticateToken, async (req, res) => {
 
         await Enrollment.findOneAndUpdate(
             { user_id: req.user.id, course_id: finalCourseId },
-            { 
+            {
                 $set: {
-                    status: 'pending', 
+                    status: 'pending',
                     enrolled_at: new Date(),
                     progress_percentage: 0,
                     payment_proof_url: payment_proof_url || null,
@@ -3282,9 +3282,9 @@ app.post('/api/courses/enroll', authenticateToken, async (req, res) => {
 
 app.get('/api/courses/enrollment/:courseId', authenticateToken, async (req, res) => {
     try {
-        const enrollment = await Enrollment.findOne({ 
-            user_id: req.user.id, 
-            course_id: req.params.courseId 
+        const enrollment = await Enrollment.findOne({
+            user_id: req.user.id,
+            course_id: req.params.courseId
         });
         res.json({ enrolled: !!enrollment });
     } catch (err) {
@@ -3305,10 +3305,10 @@ app.get('/api/student/my-courses', authenticateToken, async (req, res) => {
                 .lean(),
             StudentBatch.find({ student_id: req.user.id }).lean()
         ]);
-        
+
         const batchMap = new Map();
         studentBatches.forEach(sb => {
-             if (sb.course_id) batchMap.set(sb.course_id.toString(), sb.assigned_session);
+            if (sb.course_id) batchMap.set(sb.course_id.toString(), sb.assigned_session);
         });
 
         // Filter out enrollments for courses that are missing or deactivated
@@ -3355,7 +3355,7 @@ app.delete('/api/courses/enrollment/:id', authenticateToken, requireAdminOrManag
     try {
         const { id } = req.params;
         const result = await Enrollment.findByIdAndDelete(id);
-        
+
         if (!result) {
             return res.status(404).json({ error: 'Enrollment not found' });
         }
@@ -3380,15 +3380,15 @@ app.get('/api/student/dashboard-data', authenticateToken, async (req, res) => {
         }
 
         // 1. Get Recent Resources (top 5 across all active courses)
-        const resources = await Resource.find({ 
-            course_id: { $in: activeCourseIds } 
+        const resources = await Resource.find({
+            course_id: { $in: activeCourseIds }
         }).sort({ created_at: -1 }).limit(5).lean();
 
         // 2. Generate Real Activity Data (last 7 days)
         // Groups updated_at counts from VideoProgress
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        
+
         // Video progress tracking removed
         const videoProgress = [];
 
@@ -3399,9 +3399,9 @@ app.get('/api/student/dashboard-data', authenticateToken, async (req, res) => {
 
         // Video progress tracking removed
         // Weight: Every 1% watched is 1 "intensity unit", plus base for interaction
-        
-        const activity = weekdays.map(day => ({ 
-            name: day, 
+
+        const activity = weekdays.map(day => ({
+            name: day,
             intensity: Math.min(100, activityMap[day] || 0)
         }));
 
@@ -3427,10 +3427,10 @@ app.get('/api/student/dashboard-data', authenticateToken, async (req, res) => {
             .limit(5)
             .lean();
 
-        res.json({ 
-            resources, 
-            activity, 
-            skills, 
+        res.json({
+            resources,
+            activity,
+            skills,
             results: recentResults.map(r => ({
                 id: r._id,
                 title: r.exam_id?.title || r.mock_paper_id?.title || 'Assessment',
@@ -3452,25 +3452,25 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
         const userId = req.user.id;
         console.log(`[ATS Scan] Request from User ID: ${userId}`);
         const profile = await Profile.findOne({ user_id: userId });
-        
+
         if (!profile) {
             console.error(`[ATS Scan] Profile not found for User ID: ${userId}`);
             return res.status(404).json({ error: 'Profile not found' });
         }
-        
+
         if (!req.file && !req.body.text) {
             return res.status(400).json({ error: 'Please upload a resume file or provide resume text.' });
         }
 
         let resumeText = req.body.text || "";
         let scanResult;
-        
+
         // 2. OCR Conversion: Extract text from PDF if file is uploaded
         if (req.file) {
             console.log(`[ATS Scan] Received file: ${req.file.originalname} (Size: ${req.file.size} bytes)`);
-            
+
             const isPdf = req.file.mimetype === 'application/pdf' || req.file.originalname.toLowerCase().endsWith('.pdf');
-            
+
             if (!isPdf) {
                 console.warn(`[ATS Scan] Rejected non-PDF file: ${req.file.originalname}`);
                 return res.status(400).json({ error: 'Only PDF documents are supported for ATS scanning. Please upload a PDF file.' });
@@ -3489,8 +3489,8 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
 
         // 3. Integration: Call n8n Webhook
         const N8N_URL = process.env.N8N_ATS_WEBHOOK_URL;
-        const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY; 
-        
+        const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
+
         console.log(`[ATS Scan] Calling integration... N8N_URL set: ${!!N8N_URL}`);
 
         if (N8N_URL) {
@@ -3502,7 +3502,7 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
                     userEmail: req.user.email,
                     userName: profile.full_name || req.user.full_name
                 };
-                
+
                 let response;
                 if (req.file) {
                     const form = new FormData();
@@ -3514,7 +3514,7 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
                     form.append('text', resumeText);
                     form.append('userEmail', req.user.email);
                     form.append('userName', profile.full_name || req.user.full_name);
-                    
+
                     console.log('[ATS Scan] Proxying multipart to n8n...');
                     response = await axios.post(N8N_URL, form, {
                         headers: { ...form.getHeaders() },
@@ -3536,17 +3536,17 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
                 console.error('[ATS Scan] n8n Integration Failed, falling back...', n8nErr.message);
                 // We will let it proceed to next option or fallback
             }
-        } 
-        
+        }
+
         // If n8n failed or was skipped, try OpenRouter or Fallback
         if (!scanResult && OPENROUTER_KEY) {
             console.log('[ATS Scan] Proxying to OpenRouter...');
             const aiResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
                 model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
                 messages: [
-                    { 
-                        role: 'system', 
-                        content: 'You are an ATS Expert. Analyze the resume and provide a score (0-100) and analysis. Return JSON: { "score": number, "analysis": { "missing_keywords": [], "formatting_issues": [], "suggestions": [] } }' 
+                    {
+                        role: 'system',
+                        content: 'You are an ATS Expert. Analyze the resume and provide a score (0-100) and analysis. Return JSON: { "score": number, "analysis": { "missing_keywords": [], "formatting_issues": [], "suggestions": [] } }'
                     },
                     { role: 'user', content: resumeText }
                 ],
@@ -3554,7 +3554,7 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
             }, {
                 headers: { 'Authorization': `Bearer ${OPENROUTER_KEY}` }
             });
-            
+
             scanResult = JSON.parse(aiResponse.data.choices[0].message.content);
         }
 
@@ -3573,7 +3573,7 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
 
         // 4. Save History
         const finalScore = scanResult.score || scanResult.overall_score || 0;
-        
+
         let finalAnalysis;
         if (scanResult.analysis) {
             finalAnalysis = { ...scanResult.analysis };
@@ -3605,7 +3605,7 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
 
     } catch (err) {
         console.error('[ATS Scan Error]:', err.message);
-        
+
         // Handle Axios specific errors (like n8n 500)
         if (err.response) {
             console.error('[ATS Scan] Integration Response Error:', err.response.data);
@@ -3614,7 +3614,7 @@ app.post('/api/student/scan-resume', authenticateToken, upload.single('resume'),
                 details: err.response.data?.message || err.message
             });
         }
-        
+
         handleError(res, err, 'ats-scan');
     }
 });
@@ -3643,7 +3643,7 @@ app.get('/api/admin/resume-scans', authenticateToken, async (req, res) => {
                 console.warn("[get-all-scans] Failed to convert instructor ID to ObjectId:", userId);
             }
 
-            const instructorCourses = await Course.find({ 
+            const instructorCourses = await Course.find({
                 $or: [
                     { instructor_id: instructorId },
                     { instructor_ids: instructorId }
@@ -3836,8 +3836,8 @@ app.put('/api/courses/enrollment-status', authenticateToken, requireAdminOrManag
 
                     await StudentBatch.findOneAndUpdate(
                         { student_id: enrollment.user_id, course_id: enrollment.course_id },
-                        { 
-                            batch_id: targetBatchId, 
+                        {
+                            batch_id: targetBatchId,
                             assigned_session: sessionType,
                             assigned_time_slot: timeSlot,
                             assigned_at: new Date(),
@@ -3893,10 +3893,10 @@ app.put('/api/admin/update-enrollment-payment', authenticateToken, requireAdminO
             balance = 0;
         }
 
-        await Enrollment.findByIdAndUpdate(enrollmentId, { 
-            payment_term, 
+        await Enrollment.findByIdAndUpdate(enrollmentId, {
+            payment_term,
             remaining_balance: balance,
-            updated_at: new Date() 
+            updated_at: new Date()
         });
 
         res.json({ success: true, message: `Payment term updated for enrollment ${enrollmentId}` });
@@ -3939,7 +3939,7 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
         };
 
         // 3. Get implicitly accessible exams (live/scheduled) and mocks via courses
-        const courseExams = await Exam.find({ 
+        const courseExams = await Exam.find({
             course_id: { $in: enrolledCourseIds },
             approval_status: 'approved',
             status: 'active'
@@ -3969,26 +3969,26 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
 
         // 6. Map Question Banks into the "topicMap" for frontend mock test interface
         const topicMap = new Map();
-        
+
         // Force explicitly-granted topics into the list regardless of whether questions exist yet
         normalizedTopics.forEach(topicKey => {
-            const explicitGrant = explicitAccess.find(a => 
+            const explicitGrant = explicitAccess.find(a =>
                 a.question_bank_topic && a.question_bank_topic.trim().toLowerCase() === topicKey.toLowerCase()
             );
             const matchingExam = qbExamMap[topicKey] || null;
-            
+
             topicMap.set(topicKey, {
                 id: `qb_${topicKey}`,
-                access_type: 'mock', 
+                access_type: 'mock',
                 granted_at: explicitGrant ? explicitGrant.granted_at : new Date(),
-                mock_paper_id: `qb_${topicKey}`, 
+                mock_paper_id: `qb_${topicKey}`,
                 is_completed: checkCompleted('qb', topicKey),
                 assigned_image: matchingExam?.assigned_image || null,
                 mock_papers: {
                     title: matchingExam ? matchingExam.title : `${topicKey} Practice Set${explicitGrant ? ' (Unlocked)' : ''}`,
                     description: matchingExam?.description || `Topic-wise questions for ${topicKey}`,
                     duration_minutes: matchingExam?.duration_minutes || 60,
-                    total_marks: matchingExam?.total_marks || 0, 
+                    total_marks: matchingExam?.total_marks || 0,
                     question_count: matchingExam?.total_questions || 0,
                     scheduled_date: explicitGrant?.scheduled_date || matchingExam?.scheduled_date || null
                 }
@@ -3999,23 +3999,23 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
             const topicKey = qb.topic.trim();
             if (!topicMap.has(topicKey)) {
                 // Find if there's an explicit grant for this topic
-                const explicitGrant = explicitAccess.find(a => 
+                const explicitGrant = explicitAccess.find(a =>
                     a.question_bank_topic && a.question_bank_topic.trim().toLowerCase() === topicKey.toLowerCase()
                 );
                 const matchingExam = qbExamMap[qb.topic] || qbExamMap[topicKey] || null;
-                
+
                 topicMap.set(topicKey, {
                     id: `qb_${topicKey}`,
-                    access_type: 'mock', 
+                    access_type: 'mock',
                     granted_at: explicitGrant ? explicitGrant.granted_at : (qb.updated_at || qb.created_at),
-                    mock_paper_id: `qb_${topicKey}`, 
+                    mock_paper_id: `qb_${topicKey}`,
                     is_completed: checkCompleted('qb', topicKey),
                     assigned_image: matchingExam?.assigned_image || null,
                     mock_papers: {
                         title: matchingExam ? matchingExam.title : `${topicKey} Practice Set${explicitGrant ? ' (Unlocked)' : ''}`,
                         description: matchingExam?.description || `Topic-wise questions for ${topicKey}`,
                         duration_minutes: matchingExam?.duration_minutes || 60,
-                        total_marks: matchingExam?.total_marks || 0, 
+                        total_marks: matchingExam?.total_marks || 0,
                         question_count: matchingExam?.total_questions || 0,
                         scheduled_date: explicitGrant?.scheduled_date || matchingExam?.scheduled_date || null
                     }
@@ -4028,7 +4028,7 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
                 item._hasCountedQuestions = true;
             }
             item._qCount++;
-            
+
             // Prefer actual counted lengths vs Exam settings if available
             item.mock_papers.question_count = Math.max(item.mock_papers.question_count || 0, item._qCount);
             if (!item.mock_papers.total_marks) {
@@ -4074,7 +4074,7 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
                 const isExamMock = access.exam_id?.exam_type !== 'live';
                 const isMockAccess = access.access_type === 'mock' || isExamMock;
                 const finalMockId = access.mock_paper_id?._id || (isMockAccess ? access.exam_id?._id : null);
-                
+
                 return {
                     id: access._id,
                     access_type: isMockAccess ? 'mock' : 'exam',
@@ -4082,7 +4082,7 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
                     exam_id: (!isMockAccess && access.exam_id) ? access.exam_id._id : null,
                     mock_paper_id: finalMockId,
                     is_completed: isMockAccess
-                        ? checkCompleted('mock', finalMockId) 
+                        ? checkCompleted('mock', finalMockId)
                         : checkCompleted('exam', access.exam_id?._id),
                     assigned_image: access.exam_id?.assigned_image || access.mock_paper_id?.assigned_image || null,
                     exam_schedules: (!isExamMock && access.exam_id) ? {
@@ -4109,14 +4109,14 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
         const existingMockIds = new Set(explicitExams.map(e => e.mock_paper_id?.toString()).filter(Boolean));
 
         implicitExams.forEach(ia => {
-             const examId = ia.exam_id?.toString();
-             const mockId = ia.mock_paper_id?.toString();
-             
-             if (examId && !existingExamIds.has(examId)) {
-                 combined.push(ia);
-             } else if (mockId && !existingMockIds.has(mockId)) {
-                 combined.push(ia);
-             }
+            const examId = ia.exam_id?.toString();
+            const mockId = ia.mock_paper_id?.toString();
+
+            if (examId && !existingExamIds.has(examId)) {
+                combined.push(ia);
+            } else if (mockId && !existingMockIds.has(mockId)) {
+                combined.push(ia);
+            }
         });
 
         res.json(combined);
@@ -4133,16 +4133,16 @@ app.get('/api/student/exam-questions/:id', authenticateToken, async (req, res) =
         // Handle prefixes often added by the accessible-exams endpoint
         const isQB = id.startsWith('qb_');
         const isImplicit = id.startsWith('implicit_');
-        
+
         if (isQB) {
             const topic = id.replace('qb_', '');
-            questions = await QuestionBank.find({ 
-                topic, 
-                approval_status: 'approved' 
+            questions = await QuestionBank.find({
+                topic,
+                approval_status: 'approved'
             }).lean();
         } else {
             const cleanId = id.replace('implicit_', '').trim();
-            
+
             // Try as Mock Paper first (Legacy Mock Paper model)
             let source = null;
             if (mongoose.Types.ObjectId.isValid(cleanId)) {
@@ -4153,27 +4153,27 @@ app.get('/api/student/exam-questions/:id', authenticateToken, async (req, res) =
                 questions = source.questions || [];
             } else {
                 // Try as Exam (Modern Unified Flow)
-                const exam = mongoose.Types.ObjectId.isValid(cleanId) 
-                    ? await Exam.findById(cleanId).lean() 
+                const exam = mongoose.Types.ObjectId.isValid(cleanId)
+                    ? await Exam.findById(cleanId).lean()
                     : null;
-                
+
                 if (exam) {
                     // Fetch by topics array OR by exam title (Sync Fallback)
-                    const searchTopics = (exam.topics && exam.topics.length > 0) 
-                        ? exam.topics 
+                    const searchTopics = (exam.topics && exam.topics.length > 0)
+                        ? exam.topics
                         : [exam.title];
 
-                    questions = await QuestionBank.find({ 
-                        topic: { $in: searchTopics }, 
-                        approval_status: 'approved' 
+                    questions = await QuestionBank.find({
+                        topic: { $in: searchTopics },
+                        approval_status: 'approved'
                     })
-                    .limit(exam.total_questions || 50)
-                    .lean();
+                        .limit(exam.total_questions || 50)
+                        .lean();
                 } else if (isImplicit) {
                     // If we still didn't find it but it's marked implicit, it might be a QB topic that leaked through
-                    questions = await QuestionBank.find({ 
-                        topic: cleanId, 
-                        approval_status: 'approved' 
+                    questions = await QuestionBank.find({
+                        topic: cleanId,
+                        approval_status: 'approved'
                     }).lean();
                 }
             }
@@ -4216,7 +4216,7 @@ app.get('/api/manager/lookup-student/:studentId', authenticateToken, requireAdmi
         if (!user) return res.status(404).json({ error: 'Student not found' });
 
         const profile = await Profile.findOne({ user_id: user._id });
-        
+
         res.json({
             id: user._id,
             full_name: user.full_name,
@@ -4234,19 +4234,19 @@ app.get('/api/admin/student-performance/:studentId', authenticateToken, requireA
     try {
         const { studentId } = req.params;
         const enrollments = await Enrollment.find({ user_id: studentId }).populate('course_id').lean();
-        
+
         const activeEnrollments = enrollments.filter(e => e.course_id && e.course_id.is_active !== false);
-        
+
         const courseProgress = activeEnrollments.map(e => ({
-             course_name: e.course_id.title,
-             progress: e.progress_percentage || 0,
-             status: e.status
+            course_name: e.course_id.title,
+            progress: e.progress_percentage || 0,
+            status: e.status
         }));
 
         const results = await ExamResult.find({ user_id: studentId }).populate('exam_id mock_paper_id').lean();
-        
+
         const profile = await Profile.findOne({ user_id: studentId }).lean();
-        
+
         res.json({
             enrollments: courseProgress,
             results: results.map(r => ({
@@ -4266,19 +4266,19 @@ app.get('/api/admin/student-performance/:studentId', authenticateToken, requireA
 
 app.post('/api/manager/grant-exam-access', authenticateToken, requireAdminOrManager, async (req, res) => {
     const { studentId, examId, mockPaperId } = req.body;
-    
+
     if (!studentId || (!examId && !mockPaperId)) {
         return res.status(400).json({ error: 'Student ID and either Exam ID or Mock Paper ID required' });
     }
 
     try {
         const accessType = examId ? 'exam' : 'mock';
-        
+
         await StudentExamAccess.findOneAndUpdate(
-            { 
-                student_id: studentId, 
-                exam_id: examId || null, 
-                mock_paper_id: mockPaperId || null 
+            {
+                student_id: studentId,
+                exam_id: examId || null,
+                mock_paper_id: mockPaperId || null
             },
             {
                 access_type: accessType,
@@ -4298,7 +4298,7 @@ app.get('/api/manager/approved-question-banks', authenticateToken, requireInstru
     try {
         const banks = await QuestionBank.aggregate([
             { $match: { approval_status: 'approved' } },
-            { 
+            {
                 $group: {
                     _id: '$topic',
                     topic: { $first: '$topic' },
@@ -4319,18 +4319,18 @@ app.get('/api/manager/approved-question-banks', authenticateToken, requireInstru
 app.get('/api/admin/question-bank-summary', authenticateToken, requireInstructor, async (req, res) => {
     try {
         const banks = await QuestionBank.aggregate([
-                { 
-                    $group: {
-                        _id: { topic: '$topic', status: '$approval_status' },
-                        topic: { $first: '$topic' },
-                        status: { $first: '$approval_status' },
-                        count: { $sum: 1 },
-                        created_by: { $first: '$created_by' },
-                        created_at: { $max: '$created_at' }
-                    }
-                },
-                { $sort: { created_at: -1 } }
-            ]);
+            {
+                $group: {
+                    _id: { topic: '$topic', status: '$approval_status' },
+                    topic: { $first: '$topic' },
+                    status: { $first: '$approval_status' },
+                    count: { $sum: 1 },
+                    created_by: { $first: '$created_by' },
+                    created_at: { $max: '$created_at' }
+                }
+            },
+            { $sort: { created_at: -1 } }
+        ]);
 
         // 2. Fetch all access records to calculate unique student counts per topic
         const allAccessRecords = await StudentExamAccess.find()
@@ -4345,7 +4345,7 @@ app.get('/api/admin/question-bank-summary', authenticateToken, requireInstructor
                 const topicKey = topicTitle.toString().trim().toLowerCase();
                 // Deduplicate by student identity per topic
                 const studentId = (a.student_id?._id || a.student_id || 'unknown').toString();
-                
+
                 if (!accessMap[topicKey]) accessMap[topicKey] = new Set();
                 accessMap[topicKey].add(studentId);
             }
@@ -4394,12 +4394,12 @@ app.get('/api/admin/question-bank-summary', authenticateToken, requireInstructor
                     created_by: e.created_by,
                     created_at: e.created_at,
                     access_count: accessMap[topicKey] || 0,
-                assigned_image: e.assigned_image || null,
-                duration: e.duration_minutes || 60,
-                total_marks: e.total_marks || 0,
-                shuffle: e.shuffle_questions ?? true,
-                retakes: e.max_attempts || 1,
-                custom_fields: []
+                    assigned_image: e.assigned_image || null,
+                    duration: e.duration_minutes || 60,
+                    total_marks: e.total_marks || 0,
+                    shuffle: e.shuffle_questions ?? true,
+                    retakes: e.max_attempts || 1,
+                    custom_fields: []
                 };
             });
 
@@ -4443,7 +4443,7 @@ app.get('/api/admin/platform-stats', authenticateToken, requireAdminOrManager, a
 app.get('/api/admin/question-bank/:topic/access-list', authenticateToken, requireInstructor, async (req, res) => {
     try {
         const { topic } = req.params;
-        
+
         // 1. Setup flexible matching
         const topicClean = topic.trim();
         const safeTopicReg = topicClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape regex chars
@@ -4456,15 +4456,15 @@ app.get('/api/admin/question-bank/:topic/access-list', authenticateToken, requir
         const mockIds = matchingMocks.map(m => m._id);
 
         // 3. Get explicit access from Grant_access
-        const explicitAccess = await StudentExamAccess.find({ 
+        const explicitAccess = await StudentExamAccess.find({
             $or: [
                 { question_bank_topic: flexibleTopicRegex },
                 { exam_id: { $in: examIds } },
                 { mock_paper_id: { $in: mockIds } }
             ]
         })
-        .populate('student_id', 'full_name email avatar_url')
-        .populate('assigned_by', 'full_name');
+            .populate('student_id', 'full_name email avatar_url')
+            .populate('assigned_by', 'full_name');
 
         // 3. Combine and Deduplicate
         const studentMap = new Map();
@@ -4491,7 +4491,7 @@ app.get('/api/admin/question-bank/:topic/access-list', authenticateToken, requir
         // 4. Enrich with Profile data
         const studentIds = Array.from(studentMap.keys());
         const profiles = await Profile.find({ user_id: { $in: studentIds } }).select('user_id college_name institute_name registration_date registration_time').lean();
-        
+
         profiles.forEach(p => {
             const sid = p.user_id.toString();
             if (studentMap.has(sid)) {
@@ -4512,7 +4512,7 @@ app.get('/api/admin/question-bank/:topic/access-list', authenticateToken, requir
 app.delete('/api/admin/question-bank/:topic/revoke-access/:studentId', authenticateToken, requireInstructor, async (req, res) => {
     try {
         const { topic, studentId } = req.params;
-        
+
         // Find matching exams/mocks for this topic to ensure complete revocation
         const matchingExams = await Exam.find({ title: topic }).select('_id').lean();
         const matchingMocks = await MockPaper.find({ title: topic }).select('_id').lean();
@@ -4523,8 +4523,8 @@ app.delete('/api/admin/question-bank/:topic/revoke-access/:studentId', authentic
         const safeTopicReg = topicClean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const flexibleTopicRegex = new RegExp(`^\\s*${safeTopicReg.replace(/\\ /g, '\\s*')}\\s*$`, 'i');
 
-        await StudentExamAccess.deleteMany({ 
-            student_id: studentId, 
+        await StudentExamAccess.deleteMany({
+            student_id: studentId,
             $or: [
                 { question_bank_topic: flexibleTopicRegex },
                 { exam_id: { $in: examIds } },
@@ -4565,8 +4565,8 @@ app.post('/api/admin/question-bank/grant-access', authenticateToken, requireInst
             student_id: studentId,
             question_bank_topic: topic,
             exam_id: matchingExam ? matchingExam._id : null,
-            access_type: matchingExam 
-                ? (matchingExam.exam_type === 'live' ? 'exam' : 'mock') 
+            access_type: matchingExam
+                ? (matchingExam.exam_type === 'live' ? 'exam' : 'mock')
                 : 'question_bank',
             assigned_by: req.user.id,
             granted_at: new Date(),
@@ -4583,7 +4583,7 @@ app.post('/api/admin/question-bank/grant-access', authenticateToken, requireInst
         }));
 
         await StudentExamAccess.bulkWrite(operations);
-        
+
         // Auto-approve the questions in the question bank for this topic 
         // because granting access implies administrative approval.
         await QuestionBank.updateMany(
@@ -4601,11 +4601,11 @@ app.post('/api/admin/question-bank/grant-access', authenticateToken, requireInst
             });
         }
 
-        res.json({ 
-            success: true, 
-            message: type === 'batch' 
-                ? `Access granted to ${studentIds.length} students in the batch.` 
-                : `Access granted to student.` 
+        res.json({
+            success: true,
+            message: type === 'batch'
+                ? `Access granted to ${studentIds.length} students in the batch.`
+                : `Access granted to student.`
         });
     } catch (err) {
         handleError(res, err, 'grant-qb-access-unified');
@@ -4626,7 +4626,7 @@ app.post('/api/manager/grant-question-bank-access', authenticateToken, requireIn
             },
             { upsert: true, returnDocument: 'after' }
         );
-        
+
         sendNotification(studentId.toString(), {
             title: "Mock Repository Access",
             message: `You have been granted access to "${topic}".`,
@@ -4643,14 +4643,14 @@ app.post('/api/manager/grant-question-bank-access', authenticateToken, requireIn
 app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
     try {
         const { examId, answers, timeSpent, totalQuestions } = req.body;
-        
+
         // Calculate score server-side
         let score = 0;
         let correctCount = 0;
         let wrongCount = 0;
         const qIds = Object.keys(answers);
         const questions = await QuestionBank.find({ _id: { $in: qIds } }).lean();
-        
+
         let hasSubjective = false;
         // Use for...of loop to allow await for async operations (grading coding questions)
         for (const q of questions) {
@@ -4661,9 +4661,9 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
 
             // Normalize question type
             const type = q.type || 'multiple_choice';
-            
+
             // Check if this exam needs manual review
-            if (['short', 'long', 'subjective', 'short_answer', 'long_answer'].includes(type)) {
+            if (['short', 'long', 'subjective', 'short_answer', 'long_answer', 'coding'].includes(type)) {
                 hasSubjective = true;
             }
 
@@ -4677,14 +4677,14 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
                         isCorrect = true;
                     }
                 }
-            } 
+            }
             else if (type === 'true_false') {
                 // Compare case-insensitive "true"/"false"
                 const correctVal = String(q.correct_answer || q.options.find(o => o.is_correct)?.text).toLowerCase();
                 if (String(studentAns).toLowerCase() === correctVal) {
                     isCorrect = true;
                 }
-            } 
+            }
             else if (type === 'fill_blank') {
                 // Compare trimmed, case-insensitive
                 const correctVal = String(q.correct_answer || q.options.find(o => o.is_correct)?.text).trim().toLowerCase();
@@ -4693,44 +4693,44 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
                 }
             }
             else if (type === 'coding') {
-                 // AUTO-GRADING FOR CODING
-                 // Strategy: Compare the OUTPUT of the student's code with the OUTPUT of the correct_answer (Solution Code).
-                 // This allows flexibility in how the student writes code, as long as the output matches.
-                 
-                 try {
-                     // 1. Execute Student Code
-                     const studentResult = await executeCode('javascript', studentAns);
-                     const studentOutput = studentResult.run ? studentResult.run.stdout.trim() : '';
-                     
-                     // 2. Execute Solution Code (stored in correct_answer)
-                     // If correct_answer is just plain text (not code), this might fail or print nothing, 
-                     // so we treat it as the expected output itself if execution produces no output/error? 
-                     // No, safer to assume it IS code.
-                     const solutionResult = await executeCode('javascript', q.correct_answer || '');
-                     const expectedOutput = solutionResult.run ? solutionResult.run.stdout.trim() : '';
-                     
-                     // 3. Compare Outputs
-                     if (studentOutput === expectedOutput && expectedOutput !== '') {
-                         isCorrect = true;
-                     } else if (expectedOutput === '' && studentOutput === '') {
-                         // If both produce no output, is it correct? Maybe.
-                         // But usually we expect some output.
-                         // Fallback: exact string match of code if output is empty
-                         if (String(studentAns).trim() === String(q.correct_answer).trim()) {
-                             isCorrect = true;
-                         }
-                     }
-                 } catch (e) {
-                     console.error(`Error grading coding question ${q._id}:`, e);
-                 }
+                // AUTO-GRADING FOR CODING
+                // Strategy: Compare the OUTPUT of the student's code with the OUTPUT of the correct_answer (Solution Code).
+                // This allows flexibility in how the student writes code, as long as the output matches.
+
+                try {
+                    // 1. Execute Student Code
+                    const studentResult = await executeCode('javascript', studentAns);
+                    const studentOutput = studentResult.run ? studentResult.run.stdout.trim() : '';
+
+                    // 2. Execute Solution Code (stored in correct_answer)
+                    // If correct_answer is just plain text (not code), this might fail or print nothing, 
+                    // so we treat it as the expected output itself if execution produces no output/error? 
+                    // No, safer to assume it IS code.
+                    const solutionResult = await executeCode('javascript', q.correct_answer || '');
+                    const expectedOutput = solutionResult.run ? solutionResult.run.stdout.trim() : '';
+
+                    // 3. Compare Outputs
+                    if (studentOutput === expectedOutput && expectedOutput !== '') {
+                        isCorrect = true;
+                    } else if (expectedOutput === '' && studentOutput === '') {
+                        // If both produce no output, is it correct? Maybe.
+                        // But usually we expect some output.
+                        // Fallback: exact string match of code if output is empty
+                        if (String(studentAns).trim() === String(q.correct_answer).trim()) {
+                            isCorrect = true;
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Error grading coding question ${q._id}:`, e);
+                }
             }
             else if (type === 'short' || type === 'long' || type === 'short_answer' || type === 'long_answer') {
-                 // Logic: If there is a strict answer key, try to match it.
-                 // Otherwise, we might mark it as 0 (pending review).
-                 // For MVP, we'll leave it as 0 but ensure it's recorded.
-                 if (q.correct_answer && String(studentAns).trim() === String(q.correct_answer).trim()) {
-                     isCorrect = true; 
-                 }
+                // Logic: If there is a strict answer key, try to match it.
+                // Otherwise, we might mark it as 0 (pending review).
+                // For MVP, we'll leave it as 0 but ensure it's recorded.
+                if (q.correct_answer && String(studentAns).trim() === String(q.correct_answer).trim()) {
+                    isCorrect = true;
+                }
             }
 
             if (isCorrect) {
@@ -4746,7 +4746,7 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
         // Resolve title and snapshot for easy viewing/grading
         let resolvedCourseId = null;
         let finalTitle = examId.startsWith('qb_') ? examId.replace('qb_', '') : "Mock Test";
-        
+
         if (!examId.startsWith('qb_')) {
             const examDoc = await Exam.findById(examId);
             if (examDoc) {
@@ -4795,7 +4795,7 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
         // Update Leaderboard stats
         await LeaderboardStat.findOneAndUpdate(
             { user_id: req.user.id },
-            { 
+            {
                 $inc: { exams_taken: 1, total_score: score },
                 $set: { last_activity: new Date() }
             },
@@ -4812,7 +4812,7 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
                 sendNotification(exam.instructor_id, {
                     type: hasSubjective ? 'exam_submission_pending' : 'exam_submission',
                     title: hasSubjective ? 'Exam Needs Grading' : 'Exam Submitted',
-                    message: hasSubjective 
+                    message: hasSubjective
                         ? `${student?.full_name || 'A student'} submitted an exam that requires manual grading: ${exam.title}`
                         : `${student?.full_name || 'A student'} submitted the exam: ${exam.title}`,
                     score,
@@ -4838,8 +4838,8 @@ app.get('/api/instructor/pending-grading', authenticateToken, async (req, res) =
         let query = { grading_status: { $in: ['pending', 'reevaluation'] } };
 
         if (userRole !== 'admin') {
-            const instructorCourses = await Course.find({ 
-                $or: [{ instructor_id: req.user.id }, { instructor_ids: req.user.id }] 
+            const instructorCourses = await Course.find({
+                $or: [{ instructor_id: req.user.id }, { instructor_ids: req.user.id }]
             }).select('_id').lean();
             const courseIds = instructorCourses.map(c => c._id);
 
@@ -4848,15 +4848,15 @@ app.get('/api/instructor/pending-grading', authenticateToken, async (req, res) =
 
             query['$or'] = [
                 { course_id: { $in: courseIds } },
-                { exam_id: { $in: examIds } }, 
+                { exam_id: { $in: examIds } },
                 { mock_paper_id: { $in: examIds } }
             ];
         }
 
         const pendingResults = await ExamResult.find(query)
-        .populate('student_id', 'full_name email avatar_url')
-        .sort({ submitted_at: -1 })
-        .lean();
+            .populate('student_id', 'full_name email avatar_url')
+            .sort({ submitted_at: -1 })
+            .lean();
 
         res.json(pendingResults);
     } catch (err) {
@@ -4879,7 +4879,7 @@ app.post('/api/instructor/grade-result/:resultId', authenticateToken, requireIns
             Object.values(subjective_grading).forEach(g => {
                 totalSubjectiveMarks += Number(g.marks || 0);
             });
-            
+
             // Score = Initial objective score + new subjective marks
             result.score = (result.objective_score || 0) + totalSubjectiveMarks;
             result.percentage = result.total_questions > 0 ? (result.score / result.total_questions) * 100 : 0;
@@ -4887,12 +4887,12 @@ app.post('/api/instructor/grade-result/:resultId', authenticateToken, requireIns
 
         if (global_feedback) result.global_feedback = global_feedback;
         if (feedback_audio_url) result.feedback_audio_url = feedback_audio_url;
-        
+
         result.grading_status = 'graded';
         result.is_reevaluation_requested = false;
-        
+
         await result.save();
-        
+
         sendNotification(result.student_id.toString(), {
             title: "Exam Graded",
             message: `Your exam "${result.test_title || 'Mock Test'}" has been graded.`,
@@ -4916,7 +4916,7 @@ app.post('/api/student/request-reevaluation/:resultId', authenticateToken, async
         result.grading_status = 'reevaluation';
         result.is_reevaluation_requested = true;
         result.reevaluation_reason = reason || 'No reason provided';
-        
+
         await result.save();
         res.json({ message: 'Re-evaluation requested' });
     } catch (err) {
@@ -4928,7 +4928,7 @@ app.get('/api/student/exam-review/:resultId', authenticateToken, async (req, res
     try {
         const result = await ExamResult.findById(req.params.resultId).lean();
         if (!result) return res.status(404).json({ error: 'Result not found' });
-        
+
         // Authorization: Only student or staff can view
         if (result.student_id.toString() !== req.user.id) {
             const role = await getUserRole(req.user.id);
@@ -4946,11 +4946,11 @@ app.get('/api/student/exam-review/:resultId', authenticateToken, async (req, res
         const review = questions.map(q => {
             const studentAns = answers[q._id.toString()];
             let isCorrect = false;
-            
+
             // Get manual grading if it exists
             const sId = q._id.toString();
-            const manualGrade = result.subjective_grading instanceof Map 
-                ? result.subjective_grading.get(sId) 
+            const manualGrade = result.subjective_grading instanceof Map
+                ? result.subjective_grading.get(sId)
                 : result.subjective_grading?.[sId];
 
             if (q.type === 'multiple_choice' || q.type === 'mcq') {
@@ -4959,17 +4959,17 @@ app.get('/api/student/exam-review/:resultId', authenticateToken, async (req, res
                     isCorrect = true;
                 }
             } else if (q.type === 'true_false') {
-                 const correctVal = String(q.correct_answer || q.options.find(o => o.is_correct)?.text).toLowerCase();
-                 if (String(studentAns).toLowerCase() === correctVal) isCorrect = true;
+                const correctVal = String(q.correct_answer || q.options.find(o => o.is_correct)?.text).toLowerCase();
+                if (String(studentAns).toLowerCase() === correctVal) isCorrect = true;
             } else if (q.type === 'fill_blank') {
-                 const correctVal = String(q.correct_answer || q.options.find(o => o.is_correct)?.text).trim().toLowerCase();
-                 if (String(studentAns).trim().toLowerCase() === correctVal) isCorrect = true;
+                const correctVal = String(q.correct_answer || q.options.find(o => o.is_correct)?.text).trim().toLowerCase();
+                if (String(studentAns).trim().toLowerCase() === correctVal) isCorrect = true;
             } else if (['short', 'long', 'subjective', 'short_answer', 'long_answer'].includes(q.type)) {
-                 if (manualGrade) {
-                     isCorrect = manualGrade.marks > 0;
-                 } else {
-                     isCorrect = null; // Pending
-                 }
+                if (manualGrade) {
+                    isCorrect = manualGrade.marks > 0;
+                } else {
+                    isCorrect = null; // Pending
+                }
             } else if (q.type === 'coding') {
                 if (String(studentAns).trim() === String(q.correct_answer).trim()) isCorrect = true;
                 else isCorrect = null; // Unknown/Review
@@ -4979,10 +4979,10 @@ app.get('/api/student/exam-review/:resultId', authenticateToken, async (req, res
                 id: q._id,
                 text: q.question_text,
                 type: q.type,
-                options: q.options.map(opt => ({ 
-                    id: opt._id?.toString() || opt.text, 
+                options: q.options.map(opt => ({
+                    id: opt._id?.toString() || opt.text,
                     text: opt.text,
-                    is_correct: opt.is_correct 
+                    is_correct: opt.is_correct
                 })),
                 correct_answer: q.correct_answer,
                 studentAnswerId: studentAns,
@@ -5053,12 +5053,12 @@ const createCourseResourceRoutes = (resourceName, Model) => {
 
                     if (studentBatch) {
                         const batchIds = [studentBatch.batch_id.toString()];
-                        
+
                         // Handle session-specific slots in "all" type courses
                         if (studentBatch.assigned_session && studentBatch.assigned_session !== 'all') {
                             const parentBatch = await Batch.findById(studentBatch.batch_id).lean();
                             if (parentBatch && parentBatch.batches) {
-                                const sub = parentBatch.batches.find(b => 
+                                const sub = parentBatch.batches.find(b =>
                                     b.batch_type && b.batch_type.toLowerCase() === studentBatch.assigned_session.toLowerCase()
                                 );
                                 if (sub) {
@@ -5073,14 +5073,14 @@ const createCourseResourceRoutes = (resourceName, Model) => {
                         const objectIds = batchIds
                             .filter(id => mongoose.Types.ObjectId.isValid(id))
                             .map(id => new mongoose.Types.ObjectId(id));
-                        
+
                         const stringIds = batchIds.map(id => id.toString());
 
                         filter.$or = [
                             ...globalFilter,
                             { allowed_batches: { $in: [...objectIds, ...stringIds] } }
                         ];
-                        
+
                         console.log(`[ACL] Enabled for ${resourceName}. Found batch(es): ${batchIds.join(', ')}`);
                     } else {
                         filter.$or = globalFilter;
@@ -5150,7 +5150,7 @@ const createCourseResourceRoutes = (resourceName, Model) => {
             // const doc = await Model.findById(req.params.id);
             // const course = await Course.findById(doc.course_id);
             // if (course.instructor_id !== req.user.id) throw new Error('Forbidden');
-            
+
             const item = await Model.findByIdAndUpdate(req.params.id, req.body, { returnDocument: 'after' });
             res.json(item);
         } catch (err) {
@@ -5178,16 +5178,16 @@ app.get('/api/courses/:courseId/roster', authenticateToken, requireInstructor, a
 
         // SECURITY: If instructor, first find WHICH students are in THEIR batches
         if (role === 'instructor') {
-            const myBatches = await Batch.find({ 
-                course_id: req.params.courseId, 
-                instructor_id: req.user.id 
+            const myBatches = await Batch.find({
+                course_id: req.params.courseId,
+                instructor_id: req.user.id
             }).select('_id').lean();
-            
+
             const myBatchIds = myBatches.map(b => b._id);
-            const myStudentAssignments = await StudentBatch.find({ 
-                batch_id: { $in: myBatchIds } 
+            const myStudentAssignments = await StudentBatch.find({
+                batch_id: { $in: myBatchIds }
             }).select('student_id').lean();
-            
+
             const myStudentIds = myStudentAssignments.map(a => a.student_id);
             enrollmentQuery.user_id = { $in: myStudentIds };
         }
@@ -5195,11 +5195,11 @@ app.get('/api/courses/:courseId/roster', authenticateToken, requireInstructor, a
         const enrollments = await Enrollment.find(enrollmentQuery)
             .populate('user_id', 'full_name email phone avatar_url')
             .lean();
-        
+
         // Fetch profiles separately if needed, or join if possible. 
         // For now, let's just get the basic user info and use the Profile model if mobile_number is there.
         const userIds = enrollments.map(e => e.user_id?._id).filter(id => id);
-        
+
         const [profiles, batchAssignments] = await Promise.all([
             Profile.find({ user_id: { $in: userIds } }).lean(),
             StudentBatch.find({ course_id: req.params.courseId, student_id: { $in: userIds } }).populate('batch_id').lean()
@@ -5238,7 +5238,7 @@ app.get('/api/courses/:courseId/roster', authenticateToken, requireInstructor, a
                 progress: e.progress_percentage || 0
             });
         });
-        
+
         res.json(uniqueRoster);
     } catch (err) {
         handleError(res, err, 'get-course-roster');
@@ -5296,7 +5296,7 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
     try {
         const studentRoles = await UserRole.find({ role: 'student' }).select('user_id');
         const studentIds = studentRoles.map(r => r.user_id);
-        
+
         const students = await User.aggregate([
             { $match: { _id: { $in: studentIds } } },
             {
@@ -5325,7 +5325,7 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
                 }
             }
         ]);
-        
+
         res.json(students);
     } catch (err) {
         handleError(res, err, 'get-admin-students');
@@ -5339,7 +5339,7 @@ app.get('/api/system/time', (req, res) => {
 app.get('/api/data/:table', authenticateToken, async (req, res) => {
     const { table } = req.params;
     const Model = MODEL_MAP[table];
-    
+
     if (!Model) return res.status(403).json({ error: 'Invalid table' });
 
     try {
@@ -5351,13 +5351,13 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
         // Utility to convert hex strings to ObjectId if they look like one
         const tryConvertId = (val) => {
             if (typeof val === 'string' && val.length === 24 && /^[0-9a-fA-F]{24}$/.test(val)) {
-                try { 
+                try {
                     // Only convert if it's explicitly used for an ID field like _id, student_id, etc.
                     // For generic queries, we'll try to convert but catch any potential issues.
-                    return new mongoose.Types.ObjectId(val); 
-                } catch (e) { 
+                    return new mongoose.Types.ObjectId(val);
+                } catch (e) {
                     console.warn(`[tryConvertId] Failed to convert ${val}:`, e.message);
-                    return val; 
+                    return val;
                 }
             }
             return val;
@@ -5425,7 +5425,7 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                 // 1. Get all active enrollment IDs for this student
                 const enrollments = await Enrollment.find({ user_id: req.user.id, status: 'active' }).select('course_id').lean();
                 const enrolledCourseIds = enrollments.map(e => e.course_id.toString());
-                
+
                 const enrollmentFilter = { course_id: { $in: enrolledCourseIds } };
 
                 // 2. Find all batches the student is part of and their instructors
@@ -5444,16 +5444,18 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
 
                 if (table === 'live_classes') {
                     const studentBatchIds = studentBatches.map(sb => sb.batch_id?._id?.toString()).filter(Boolean);
-                    
+
                     const batchFilter = {
                         $or: [
                             { target_batch: 'all' },
                             { batch_id: { $in: studentBatchIds } },
-                            { $and: [
-                                { batch_id: { $exists: false } },
-                                { target_batch: { $in: studentBatchTypes } },
-                                { instructor_id: { $in: studentInstructors } }
-                            ]}
+                            {
+                                $and: [
+                                    { batch_id: { $exists: false } },
+                                    { target_batch: { $in: studentBatchTypes } },
+                                    { instructor_id: { $in: studentInstructors } }
+                                ]
+                            }
                         ]
                     };
                     contentFilter = { $and: [enrollmentFilter, batchFilter] };
@@ -5462,7 +5464,7 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                     for (const sb of studentBatches) {
                         if (sb.batch_id && sb.batch_id._id) {
                             studentBatchIds.push(sb.batch_id._id.toString());
-                            
+
                             if (sb.assigned_session && sb.assigned_session !== 'all') {
                                 const fullBatch = await Batch.findById(sb.batch_id._id).lean();
                                 if (fullBatch && fullBatch.batches) {
@@ -5479,33 +5481,41 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                         $or: [
                             // 1. Explicitly allowed for these specific batch IDs
                             { allowed_batches: { $in: studentBatchIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id) } },
-                            
+
                             // 2. Matches both session type AND the instructor assigned to the student
-                            { $and: [
-                                { batch_type: { $in: studentBatchTypes } },
-                                { instructor_id: { $in: studentInstructors } }
-                            ]},
-                            
+                            {
+                                $and: [
+                                    { batch_type: { $in: studentBatchTypes } },
+                                    { instructor_id: { $in: studentInstructors } }
+                                ]
+                            },
+
                             // 3. (Optional) Legacy support: if no instructor_id is set yet, fallback to batch_type alone
-                            { $and: [
-                                { instructor_id: { $exists: false } },
-                                { batch_type: { $in: studentBatchTypes } }
-                            ]},
+                            {
+                                $and: [
+                                    { instructor_id: { $exists: false } },
+                                    { batch_type: { $in: studentBatchTypes } }
+                                ]
+                            },
 
                             // 4. No batch restrictions: visible to all enrolled students
                             {
                                 $and: [
-                                    { $or: [
-                                        { allowed_batches: { $size: 0 } },
-                                        { allowed_batches: { $exists: false } },
-                                        { allowed_batches: null }
-                                    ]},
-                                    { $or: [
-                                        { batch_type: { $exists: false } },
-                                        { batch_type: null },
-                                        { batch_type: 'all' },
-                                        { batch_type: '' }
-                                    ]}
+                                    {
+                                        $or: [
+                                            { allowed_batches: { $size: 0 } },
+                                            { allowed_batches: { $exists: false } },
+                                            { allowed_batches: null }
+                                        ]
+                                    },
+                                    {
+                                        $or: [
+                                            { batch_type: { $exists: false } },
+                                            { batch_type: null },
+                                            { batch_type: 'all' },
+                                            { batch_type: '' }
+                                        ]
+                                    }
                                 ]
                             }
                         ]
@@ -5520,17 +5530,17 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                     query = contentFilter;
                 }
             }
-            
+
             if (table === 'courses') {
                 query['is_active'] = { $ne: false };
                 query['status'] = { $in: ['approved', 'published'] };
             }
         } else if (role === 'instructor') {
             console.log(`[ACL] Instructor access to ${table}`);
-            
+
             // Content isolation: Instructors ONLY see their own modules, videos, etc.
             if ([
-                'course_modules', 'course_videos', 'course_resources', 
+                'course_modules', 'course_videos', 'course_resources',
                 'course_announcements', 'course_timeline', 'course_topics'
             ].includes(table)) {
                 const contentFilter = { instructor_id: req.user.id };
@@ -5547,7 +5557,7 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                 const myBatchIds = myBatches.map(b => b._id);
                 const myStudentAssignments = await StudentBatch.find({ batch_id: { $in: myBatchIds } }).select('student_id').lean();
                 const myStudentIds = myStudentAssignments.map(a => a.student_id);
-                
+
                 const enrollmentFilter = { user_id: { $in: myStudentIds } };
                 if (Object.keys(query).length > 0) {
                     query = { $and: [query, enrollmentFilter] };
@@ -5557,7 +5567,7 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
             }
 
             if (table === 'courses') {
-                const courseFilter = { 
+                const courseFilter = {
                     $or: [
                         { instructor_id: req.user.id },
                         { instructor_ids: req.user.id }
@@ -5582,12 +5592,12 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
 
         // Execute query
         console.log(`[DB] Fetching ${table} with query:`, JSON.stringify(query));
-        
+
         const projection = req.query.select ? req.query.select.split(',').join(' ') : null;
-        
+
         let dataQuery = Model.find(query).sort(sort).limit(limit).skip(skip);
         if (projection) dataQuery = dataQuery.select(projection);
-        
+
         let data;
         if (table === 'leaderboard_stats' || table === 'leaderboard') {
             data = await dataQuery.populate('user_id', 'full_name avatar_url email');
@@ -5622,7 +5632,7 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
 
     try {
         const role = await getUserRole(req.user.id);
-        
+
         // Security: Restrict who can create entries in sensitive tables
         if (role !== 'admin' && role !== 'manager') {
             if (['course_enrollments', 'student_exam_access', 'course_ratings'].includes(table)) {
@@ -5644,11 +5654,11 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
                 req.body.instructor_id = req.user.id;
                 req.body.status = 'draft'; // Forces draft state
             } else if ([
-                'course_topics', 'course_modules', 'course_videos', 
+                'course_topics', 'course_modules', 'course_videos',
                 'course_resources', 'course_timeline', 'course_announcements', 'live_classes'
             ].includes(table)) {
                 if (role !== 'instructor') return res.status(403).json({ error: 'Unauthorized to create course content' });
-                
+
                 // Set ownership
                 req.body.instructor_id = req.user.id;
 
@@ -5657,14 +5667,14 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
                 } else if (!req.body.course_id) {
                     return res.status(400).json({ error: 'course_id is required' });
                 }
-                
+
                 if (req.body.course_id) {
                     const course = await Course.findById(req.body.course_id);
                     if (!course) return res.status(404).json({ error: 'Course not found' });
-                    
+
                     const isOwner = course.instructor_id?.toString() === req.user.id;
                     const isAssigned = course.instructor_ids?.some(id => id.toString() === req.user.id);
-                    
+
                     if (!isOwner && !isAssigned) {
                         return res.status(403).json({ error: 'Forbidden: You must be the assigned instructor of this course' });
                     }
@@ -5673,12 +5683,12 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
                 return res.status(403).json({ error: 'Unauthorized to create entries in this table' });
             }
         } else {
-             // Admin/Manager creation logic
-             if (table === 'question_bank') {
-                 // Admins/Managers can set status, but default created_by to themselves if not set
-                 req.body.created_by = req.body.created_by || req.user.id;
-                 // If they didn't provide status, let schema default (pending) or they can set 'approved'
-             }
+            // Admin/Manager creation logic
+            if (table === 'question_bank') {
+                // Admins/Managers can set status, but default created_by to themselves if not set
+                req.body.created_by = req.body.created_by || req.user.id;
+                // If they didn't provide status, let schema default (pending) or they can set 'approved'
+            }
         }
 
         const item = await Model.create(req.body);
@@ -5712,7 +5722,7 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
                         message: `Instructor has scheduled: ${title}`,
                         type: 'info'
                     });
-                    
+
                     // Also emit the record change only to their specific sockets
                     const sockets = userSockets.get(sid);
                     if (sockets) {
@@ -5764,34 +5774,34 @@ app.put('/api/data/:table/:id', authenticateToken, async (req, res) => {
                 if (role === 'instructor') {
                     const isAlreadyOwner = existing?.instructor_id?.toString() === req.user.id;
                     const isAssigningSelf = req.body.instructor_id === req.user.id;
-                    
+
                     if (!isAlreadyOwner && !isAssigningSelf) {
                         return res.status(403).json({ error: 'Forbidden: Cannot modify courses assigned to others' });
                     }
                 }
             } else if ([
-                'course_topics', 'course_modules', 'course_videos', 
+                'course_topics', 'course_modules', 'course_videos',
                 'course_resources', 'course_timeline', 'course_announcements', 'live_classes'
             ].includes(table)) {
                 if (role === 'instructor') {
                     const item = await Model.findById(id);
                     if (!item) return res.status(404).json({ error: 'Item not found' });
-                    
+
                     if (table === 'live_classes' && item.instructor_id?.toString() === req.user.id) {
                         // Priority check: If they are the host of the meeting, allow it
                     } else if (item.course_id) {
                         const course = await Course.findById(item.course_id);
                         if (!course) return res.status(404).json({ error: 'Course not found' });
-                        
+
                         const isOwner = course.instructor_id?.toString() === req.user.id;
                         const isAssigned = course.instructor_ids?.some(id => id.toString() === req.user.id);
-                        
+
                         if (!isOwner && !isAssigned) {
                             return res.status(403).json({ error: 'Forbidden: You must be the assigned instructor of this course' });
                         }
                     } else {
                         // Not host and no course attached
-                         return res.status(403).json({ error: 'Forbidden: Action unauthorized for this session' });
+                        return res.status(403).json({ error: 'Forbidden: Action unauthorized for this session' });
                     }
                 }
             } else if (table === 'question_bank') {
@@ -5805,7 +5815,7 @@ app.put('/api/data/:table/:id', authenticateToken, async (req, res) => {
                 }
                 delete req.body.created_by;
             } else if (!['doubts', 'doubt_replies'].includes(table)) {
-                 return res.status(403).json({ error: 'Unauthorized to update this table' });
+                return res.status(403).json({ error: 'Unauthorized to update this table' });
             }
         }
 
@@ -5818,7 +5828,7 @@ app.put('/api/data/:table/:id', authenticateToken, async (req, res) => {
                 { $set: { approval_status: 'approved' } }
             );
         }
-        
+
         // Socket Events for Updates
         io.emit(`${table}_changed`, { action: 'update', item, id });
         if (table === 'doubts') {
@@ -5858,29 +5868,29 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
             // Instructors
             if (role === 'instructor') {
                 const courseRelatedTables = [
-                    'courses', 'course_topics', 'course_modules', 'course_videos', 
+                    'courses', 'course_topics', 'course_modules', 'course_videos',
                     'course_resources', 'course_timeline', 'course_announcements', 'live_classes'
                 ];
-                
+
                 if (courseRelatedTables.includes(table)) {
                     // Get courseId for sub-items or item itself if it's a course
                     if (table === 'live_classes' && item.instructor_id?.toString() === req.user.id) {
-                         // Priority check: allow meeting host to delete
+                        // Priority check: allow meeting host to delete
                     } else {
                         const courseId = table === 'courses' ? item._id : item.course_id;
-                        
+
                         if (courseId) {
                             const course = await Course.findById(courseId);
                             const authorizedInstructors = [
                                 course?.instructor_id?.toString(),
                                 ...(course?.instructor_ids || []).map(id => id.toString())
                             ];
-                            
+
                             if (!course || !authorizedInstructors.includes(req.user.id)) {
                                 return res.status(403).json({ error: 'Forbidden: You must be an assigned instructor of this course' });
                             }
                         } else if (table === 'live_classes') {
-                             return res.status(403).json({ error: 'Forbidden: You are not the host of this session' });
+                            return res.status(403).json({ error: 'Forbidden: You are not the host of this session' });
                         }
                     }
                 } else if (table === 'question_bank') {
@@ -5889,7 +5899,7 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
                     }
                 } else if (['doubts', 'doubt_replies'].includes(table)) {
                     if (item.user_id?.toString() !== req.user.id) {
-                         return res.status(403).json({ error: 'Forbidden: Ownership required' });
+                        return res.status(403).json({ error: 'Forbidden: Ownership required' });
                     }
                 } else {
                     return res.status(403).json({ error: 'Unauthorized to delete from this table' });
@@ -5957,14 +5967,14 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
             ]);
         } else if (table === 'courses') {
             console.log(`[CASCADE] Deleting course ${id}. Purging modules, resources, and student access...`);
-            
+
             // Find all videos to delete from S3
             const videos = await Video.find({ course_id: id }).lean();
             for (const vid of videos) {
                 await deleteFromS3(vid.video_url);
                 await deleteFromS3(vid.thumbnail_url);
             }
-            
+
             // Find all resources to delete from S3
             const resources = await Resource.find({ course_id: id }).lean();
             for (const resItem of resources) {
@@ -5990,7 +6000,7 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
             await StudentExamAccess.deleteMany({ exam_id: id });
             // 2. Delete associated exam results (Grading Data)
             await ExamResult.deleteMany({ exam_id: id });
-            
+
             if (topic) {
                 console.log(`[CASCADE] Deleting legacy exam: "${topic}". Syncing Question Bank...`);
                 await QuestionBank.deleteMany({ topic });
@@ -6005,7 +6015,7 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
         if (table === 'course_videos') {
             await deleteFromS3(itemToDelete.video_url);
             await deleteFromS3(itemToDelete.thumbnail_url);
-            
+
             // Cascade: Delete the entire unit (Module + siblings) as requested
             if (itemToDelete.module_id) {
                 console.log(`[CASCADE] Video deleted, purging entire unit for module ${itemToDelete.module_id}`);
@@ -6026,7 +6036,7 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
             // Cascade: Delete all videos in this module
             const moduleVideos = await Video.find({ module_id: id });
             console.log(`[CASCADE] Deleting module ${id}: Found ${moduleVideos.length} associated videos.`);
-            
+
             for (const vid of moduleVideos) {
                 await deleteFromS3(vid.video_url);
                 await deleteFromS3(vid.thumbnail_url);
@@ -6072,19 +6082,19 @@ app.post('/api/batches', authenticateToken, requireInstructor, async (req, res) 
         if (!req.body.course_id || req.body.course_id === 'Catalogue' || req.body.course_id === 'all') {
             return res.status(400).json({ error: 'Valid Course ID is required to create a batch' });
         }
-        
+
         const { batch_name, batch_type, max_students, start_time, end_time, course_id } = req.body;
 
-        const batch = await Batch.create({ 
+        const batch = await Batch.create({
             batch_name,
             batch_type,
             course_id,
             max_students: parseInt(max_students) || 50,
             start_time: start_time || null,
             end_time: end_time || null,
-            is_active: true, 
+            is_active: true,
             status: 'approved',
-            instructor_id: req.user.id 
+            instructor_id: req.user.id
         });
         res.json(batch);
     } catch (err) {
@@ -6100,7 +6110,7 @@ app.get('/api/batches/student-assignments', authenticateToken, requireInstructor
     try {
         let query = {};
         const courseQuery = req.query.course_id;
-        
+
         if (courseQuery && courseQuery.startsWith('in.(')) {
             const ids = courseQuery.slice(4, -1).split(',').map(id => id.trim());
             query.course_id = { $in: ids };
@@ -6119,7 +6129,7 @@ app.get('/api/batches/student-assignments', authenticateToken, requireInstructor
         const assignments = await StudentBatch.find(query)
             .populate('batch_id')
             .lean();
-            
+
         res.json(assignments);
     } catch (err) {
         handleError(res, err, 'get-student-assignments');
@@ -6151,9 +6161,9 @@ app.get('/api/batches', authenticateToken, async (req, res) => {
             }
         }
         if (req.query.is_active !== undefined) filter.is_active = req.query.is_active === 'true';
-        
+
         const batches = await Batch.find(filter).sort({ batch_type: 1, batch_name: 1 }).lean();
-        
+
         const finalBatches = await Promise.all(batches.map(async (b) => {
             const count = await StudentBatch.countDocuments({ batch_id: b._id });
             return { ...b, id: b._id.toString(), student_count: count };
@@ -6161,7 +6171,7 @@ app.get('/api/batches', authenticateToken, async (req, res) => {
 
         res.json(finalBatches);
     } catch (err) {
-        if (err.name === 'CastError') return res.json([]); 
+        if (err.name === 'CastError') return res.json([]);
         handleError(res, err, 'list-batches');
     }
 });
@@ -6174,7 +6184,7 @@ app.post('/api/instructor/live-classes', authenticateToken, requireInstructor, a
         const accessToken = await getZoomAccessToken();
         const zoomResponse = await axios.post('https://api.zoom.us/v2/users/me/meetings', {
             topic: zoom.topic,
-            type: 2, 
+            type: 2,
             start_time: zoom.startTime,
             duration: zoom.duration,
             agenda: zoom.agenda,
@@ -6297,11 +6307,11 @@ app.delete('/api/batches/:id', authenticateToken, requireInstructor, async (req,
 // Get current student's batch for a specific course
 app.get('/api/batches/my-batch/:courseId', authenticateToken, async (req, res) => {
     try {
-        const assignment = await StudentBatch.findOne({ 
-            student_id: req.user.id, 
-            course_id: req.params.courseId 
+        const assignment = await StudentBatch.findOne({
+            student_id: req.user.id,
+            course_id: req.params.courseId
         }).populate('batch_id').lean();
-        
+
         if (!assignment) return res.json(null);
 
         const enrollment = await Enrollment.findOne({
@@ -6357,20 +6367,20 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
         // Get profiles and roles
         const profiles = await Profile.find({ user_id: { $in: studentIds } }).lean();
         const users = await User.find({ _id: { $in: studentIds } }).select('full_name email role avatar_url').lean();
-        
-        const profileMap = profiles.reduce((acc, p) => { 
-            if (p.user_id) acc[p.user_id.toString()] = p; 
-            return acc; 
+
+        const profileMap = profiles.reduce((acc, p) => {
+            if (p.user_id) acc[p.user_id.toString()] = p;
+            return acc;
         }, {});
-        
-        const userMap = users.reduce((acc, u) => { 
-            acc[u._id.toString()] = u; 
-            return acc; 
+
+        const userMap = users.reduce((acc, u) => {
+            acc[u._id.toString()] = u;
+            return acc;
         }, {});
-        
+
         const roles = await UserRole.find({ user_id: { $in: studentIds } }).lean();
         const roleMap = roles.reduce((acc, r) => { acc[r.user_id?.toString()] = r.role; return acc; }, {});
-        
+
         const assignmentMap = assignments.reduce((acc, a) => {
             acc[a.student_id?.toString()] = {
                 batch: a.batch_id,
@@ -6378,7 +6388,7 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
             };
             return acc;
         }, {});
-        
+
         const rosterData = enrollments.map(e => {
             const uid = e.user_id ? e.user_id.toString() : null;
             if (!uid) return null;
@@ -6405,7 +6415,7 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
                 } : null
             };
         }).filter(s => s !== null);
-        
+
         // Group by session type or batch type
         const grouped = {
             morning: rosterData.filter(s => s.batch?.session === 'morning' || (s.batch?.type === 'morning' && !s.batch?.session)),
@@ -6420,7 +6430,7 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
                 return acc;
             }, {})
         };
-        
+
         res.json(grouped);
     } catch (err) {
         handleError(res, err, 'course-roster');
@@ -6433,7 +6443,7 @@ app.get('/api/batches/:batchId/students', authenticateToken, requireInstructor, 
     try {
         const assignments = await StudentBatch.find({ batch_id: req.params.batchId }).lean();
         const studentIds = assignments.map(a => a.student_id);
-        
+
         const [profiles, users] = await Promise.all([
             Profile.find({ user_id: { $in: studentIds } }).lean(),
             User.find({ _id: { $in: studentIds } }).select('full_name email').lean()
@@ -6466,7 +6476,7 @@ app.post('/api/batches/:batchId/students', authenticateToken, requireInstructor,
         let batch = await Batch.findById(req.params.batchId).lean();
         let targetBatchId = req.params.batchId;
         let session = req.body.session || 'all';
-        
+
         // If not found by direct ID, it might be a sub-batch ID from the nested array
         if (!batch) {
             batch = await Batch.findOne({ "batches._id": req.params.batchId }).lean();
@@ -6487,9 +6497,9 @@ app.post('/api/batches/:batchId/students', authenticateToken, requireInstructor,
         if (session && session !== 'all') {
             query.assigned_session = session;
         }
-        
+
         const currentCount = await StudentBatch.countDocuments(query);
-        
+
         // Find capacity for this specific section or default to root batch capacity
         let capacity = batch.max_students;
         if (session && session !== 'all' && batch.batches) {
@@ -6608,10 +6618,10 @@ app.post('/api/exams/bulk-assign', authenticateToken, async (req, res) => {
         // 3. Insert Many
         await StudentExamAccess.insertMany(accessRecords, { ordered: false });
 
-        res.json({ 
-            success: true, 
-            count: studentIds.length, 
-            message: `Mock Test assigned to ${studentIds.length} students` 
+        res.json({
+            success: true,
+            count: studentIds.length,
+            message: `Mock Test assigned to ${studentIds.length} students`
         });
     } catch (err) {
         handleError(res, err, 'bulk-assign-mock');
@@ -6657,9 +6667,9 @@ app.post('/api/batches/student-request', authenticateToken, async (req, res) => 
                     title: "New Batch Assignment",
                     message: `${student?.full_name || 'A student'} joined ${batch.batch_name} for ${course.title}`,
                     type: "batch_assignment",
-                    data: { 
-                        student_id: userId, 
-                        course_id: courseId, 
+                    data: {
+                        student_id: userId,
+                        course_id: courseId,
                         batch_id: batchId,
                         actor_avatar: student?.avatar_url,
                         actor_name: student?.full_name
@@ -6674,9 +6684,9 @@ app.post('/api/batches/student-request', authenticateToken, async (req, res) => 
                         title: "New Batch Assignment",
                         message: `${student?.full_name || 'A student'} joined ${batch.batch_name} for ${course.title}`,
                         type: "batch_assignment",
-                        data: { 
-                            student_id: userId, 
-                            course_id: courseId, 
+                        data: {
+                            student_id: userId,
+                            course_id: courseId,
                             batch_id: batchId,
                             actor_avatar: student?.avatar_url,
                             actor_name: student?.full_name
@@ -6713,9 +6723,9 @@ app.post('/api/batches/student-request', authenticateToken, async (req, res) => 
                         title: "Batch Change Request",
                         message: `${student?.full_name || 'A student'} requested to move from ${existingAssignment?.batch_id?.batch_name || 'Current Batch'} to ${batch?.batch_name || 'Target Batch'}`,
                         type: "batch_request",
-                        data: { 
-                            request_id: request._id, 
-                            student_id: userId, 
+                        data: {
+                            request_id: request._id,
+                            student_id: userId,
                             course_id: courseId,
                             actor_avatar: student?.avatar_url,
                             actor_name: student?.full_name
@@ -6730,9 +6740,9 @@ app.post('/api/batches/student-request', authenticateToken, async (req, res) => 
                         title: "Batch Change Request",
                         message: `${student?.full_name || 'A student'} requested to move from ${existingAssignment?.batch_id?.batch_name || 'Current Batch'} to ${batch?.batch_name || 'Target Batch'}`,
                         type: "batch_request",
-                        data: { 
-                            request_id: request._id, 
-                            student_id: userId, 
+                        data: {
+                            request_id: request._id,
+                            student_id: userId,
                             course_id: courseId,
                             actor_avatar: student?.avatar_url,
                             actor_name: student?.full_name
@@ -6756,16 +6766,16 @@ app.get('/api/batches/requests/pending', authenticateToken, requireInstructor, a
             .populate('course_id', 'title')
             .populate('batch_id', 'batch_name batch_type')
             .lean();
-        
+
         // Filter by instructor's courses
-        const instructorCourses = await Course.find({ 
+        const instructorCourses = await Course.find({
             $or: [
                 { instructor_id: req.user.id },
                 { instructor_ids: req.user.id }
             ]
         }).select('_id').lean();
         const courseIds = instructorCourses.map(c => c._id.toString());
-        
+
         const filtered = requests.filter(r => r.course_id && r.course_id._id && courseIds.includes(r.course_id._id.toString()));
         res.json(filtered.map(r => ({ ...r, id: r._id.toString() })));
     } catch (err) {
@@ -6781,7 +6791,7 @@ app.post('/api/batches/requests/:requestId/approve', authenticateToken, requireI
 
         // Update Assignment
         const previous = await StudentBatch.findOne({ student_id: request.student_id, course_id: request.course_id }).lean();
-        
+
         // Update or create student batch assignment with the requested session
         await StudentBatch.findOneAndUpdate(
             { student_id: request.student_id, course_id: request.course_id },
@@ -6903,7 +6913,7 @@ app.post('/api/batches/auto-split/:courseId', authenticateToken, requireInstruct
             // No room in existing batches of this type — auto-create new "Batch N"
             const batchTypeCount = await Batch.countDocuments({ course_id: courseId, batch_type: type });
             const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
-            
+
             // Get timing defaults from earlier batches of same type if they exist
             const template = batches.find(b => b.batch_type === type) || { start_time: "09:00", end_time: "11:00", max_students: 30 };
 
@@ -6918,7 +6928,7 @@ app.post('/api/batches/auto-split/:courseId', authenticateToken, requireInstruct
             });
 
             console.log(`[Batch Scaling] Created new batch: ${newBatch.batch_name}`);
-            
+
             // Add new batch to our local tracking to avoid immediate re-creation
             batchCounts.push({ batch: newBatch, count: 1 });
             return newBatch._id;
@@ -7001,9 +7011,9 @@ app.get('/api/student/my-batch/:courseId', authenticateToken, async (req, res) =
 
 app.get('/api/public/courses', async (req, res) => {
     try {
-        const query = { 
+        const query = {
             status: { $in: ['published', 'approved'] },
-            is_active: { $ne: false } 
+            is_active: { $ne: false }
         };
         if (req.query.category && req.query.category.toLowerCase() !== 'all') {
             query.category = req.query.category;
@@ -7021,10 +7031,10 @@ app.get('/api/courses/:id', async (req, res) => {
         if (mongoose.Types.ObjectId.isValid(req.params.id)) {
             course = await Course.findById(req.params.id);
         } else {
-             // Fallback for slugs if you use them
-             course = await Course.findOne({ slug: req.params.id });
+            // Fallback for slugs if you use them
+            course = await Course.findOne({ slug: req.params.id });
         }
-        
+
         if (!course) return res.status(404).json({ error: 'Course not found' });
         res.json(course);
     } catch (err) {
@@ -7061,7 +7071,7 @@ app.get(/\/api\/s3\/public\/(.*)/, async (req, res) => {
         const key = req.params[0];
         console.log(`[S3 PROXY] Accessing: ${key}`);
         if (!key) return res.status(404).send('Not Found');
-        
+
         const url = await generateViewUrl(key);
         res.redirect(url);
     } catch (err) {
@@ -7103,7 +7113,7 @@ app.get('/api/admin/chat-monitor/conversations/:id/messages', authenticateToken,
         const messages = await Message.find({ conversation_id: req.params.id })
             .populate('sender', 'full_name avatar_url')
             .sort({ created_at: 1 });
-        
+
         const formatted = messages.map(m => ({
             id: m._id,
             content: m.content,
