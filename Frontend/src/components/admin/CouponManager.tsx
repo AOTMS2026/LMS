@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Ticket,
   Search,
@@ -102,29 +102,14 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
   const [newCollegeName, setNewCollegeName] = useState("");
   const [isSavingCollege, setIsSavingCollege] = useState(false);
 
-  useEffect(() => {
-    refreshAllData();
-  }, []);
-
-  const refreshAllData = async (showToast = false) => {
-    setLoading(true);
-    await Promise.all([
-      fetchStudents(),
-      fetchCoupons(),
-      fetchColleges()
-    ]);
-    setLoading(false);
-    if (showToast) toast.success("Reward data synchronized");
-  };
-
-  const fetchColleges = async () => {
+  const fetchColleges = useCallback(async () => {
     try {
       const data = await fetchWithAuth<{id: string, name: string}[]>("/data/colleges");
       setRegisteredColleges(data || []);
     } catch (err) {
       console.error("Failed to fetch colleges:", err);
     }
-  };
+  }, []);
 
   const handleAddCollege = async () => {
     if (!newCollegeName.trim()) return;
@@ -145,16 +130,16 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
     }
   };
 
-  const fetchCoupons = async () => {
+  const fetchCoupons = useCallback(async () => {
     try {
       const data = await fetchWithAuth<Coupon[]>("/data/coupons?sort=created_at&order=desc&limit=50");
       setCoupons(data || []);
     } catch (err) {
       console.error("Failed to fetch coupons:", err);
     }
-  };
+  }, []);
 
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const studentUsers = await fetchWithAuth<Student[]>("/admin/students");
       setStudents(studentUsers || []);
@@ -164,7 +149,22 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
     } finally {
       // Handled by refreshAllData
     }
-  };
+  }, []);
+
+  const refreshAllData = useCallback(async (showToast = false) => {
+    setLoading(true);
+    await Promise.all([
+      fetchStudents(),
+      fetchCoupons(),
+      fetchColleges()
+    ]);
+    setLoading(false);
+    if (showToast) toast.success("Reward data synchronized");
+  }, [fetchStudents, fetchCoupons, fetchColleges]);
+
+  useEffect(() => {
+    refreshAllData();
+  }, [refreshAllData]);
 
   const generateCoupon = async () => {
     if (!selectedStudent) {
@@ -598,12 +598,12 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                         </p>
                                         {/* College badge */}
                                         {(student.college_name || student.institute_name) && (() => {
-                                            const getVal = (v: string | { name?: string; title?: string } | null | undefined) =>
-                                                typeof v === 'object' && v !== null ? (v.name || v.title || '') : (v || '');
+                                            const getVal = (v: string | { name?: string; title?: string } | null | undefined): string =>
+                                                (typeof v === 'object' && v !== null) ? (v.name || v.title || '') : (typeof v === 'string' ? v : '');
                                             const label = getVal(student.college_name) || getVal(student.institute_name);
                                             return label ? (
                                                 <Badge className="text-[7px] h-4 px-1.5 rounded-md uppercase font-black bg-blue-50 text-blue-600 border-none shadow-none w-fit max-w-[180px] truncate">
-                                                    {label}
+                                                    {label as string}
                                                 </Badge>
                                             ) : null;
                                         })()}
