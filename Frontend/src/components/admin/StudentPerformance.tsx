@@ -555,7 +555,7 @@ export function StudentPerformance({
             <BarChart3 className="h-8 w-8 text-white" />
           </div>
           <div className="space-y-1">
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-none">Academic Scores</h1>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-900 leading-none">Student Hub</h1>
             <p className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-2">
                <span className="h-1 w-4 bg-primary rounded-full" /> Platform Registry V.2
             </p>

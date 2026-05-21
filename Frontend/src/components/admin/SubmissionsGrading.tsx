@@ -173,10 +173,13 @@ export default function SubmissionsGrading({ onSync, loading: parentLoading = fa
     }
   };
 
-  const filtered = submissions.filter(s => 
-    s.student_id.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.test_title?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = submissions.filter(s => {
+    if (!s.student_id) return false; // skip orphaned results where student was deleted
+    return (
+      s.student_id.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+      s.test_title?.toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   return (
     <div className="flex flex-col lg:flex-row h-[calc(100vh-120px)] gap-6 p-2 lg:p-4 bg-slate-50 text-slate-900 font-sans antialiased overflow-hidden">
