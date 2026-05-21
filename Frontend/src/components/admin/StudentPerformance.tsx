@@ -81,7 +81,17 @@ interface CourseEntry {
   progress_percentage?: number;
 }
 
+interface QuestionSnap {
+  question_id: string;
+  question_text: string;
+  type: string;
+  marks: number;
+  correct_answer?: string;
+  student_answer?: string;
+}
+
 interface ResultEntry {
+  result_id?: string;
   title?: string;
   exam_name?: string;
   score?: number;
@@ -89,6 +99,9 @@ interface ResultEntry {
   percentage?: number;
   date?: string;
   passed?: boolean;
+  grading_status?: string;
+  answers?: Record<string, string>;
+  questions_snapshot?: QuestionSnap[];
 }
 
 interface PerformanceData {
@@ -437,6 +450,7 @@ export function StudentPerformance({
   const [detailCache, setDetailCache] = useState<Record<string, StudentDetail>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedExamKey, setExpandedExamKey] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => { loadStudents(); }, []);
@@ -449,6 +463,10 @@ export function StudentPerformance({
   const loadStudents = async (showToast = false) => {
     setLoading(true);
     setIsSyncing(true);
+    // Clear cached detail data so fresh avatars and scores are loaded
+    setDetailCache({});
+    setExpandedId(null);
+    setExpandedExamKey(null);
     try {
       // /admin/users returns merged User+Profile+UserRole data — same source as UserManagement
       const usersData = await fetchWithAuth<StudentProfile[]>("/admin/students");
@@ -469,12 +487,8 @@ export function StudentPerformance({
     }
   };
 
-  // ── Fetch all detail — use user_id (not profile id) for backend calls ─────────
+  // ── Fetch all detail — always fetch fresh (no stale cache) ─────────
   const fetchDetail = async (profile: StudentProfile): Promise<StudentDetail> => {
-    if (detailCache[profile.id]) return detailCache[profile.id];
-
-    // The /admin/student-performance/:id uses profile.id (profile._id)
-    // because in UserManagement.tsx they also pass selectedUser.id
     const uid = profile.id;
 
     const [perfRaw, attendanceRaw, liveRaw, resourcesRaw, atsRaw] = await Promise.all([
@@ -484,6 +498,13 @@ export function StudentPerformance({
       safe(() => fetchWithAuth<ResourceData[]>(`/data/course_resources?limit=50`)),
       safe(() => fetchWithAuth<ResumeATS[]>(`/data/resumescans?user_id=${uid}&limit=1`)),
     ]);
+
+    // Debug: log what results came back
+    console.log('[StudentHub] results for', profile.full_name, ':', perfRaw?.results?.map(r => ({
+      title: r.title,
+      qs_count: r.questions_snapshot?.length,
+      ans_count: Object.keys(r.answers || {}).length
+    })));
 
     const detail: StudentDetail = {
       performance: perfRaw,
@@ -496,14 +517,15 @@ export function StudentPerformance({
     return detail;
   };
 
+
+
   const toggleExpand = async (p: StudentProfile) => {
     if (expandedId === p.id) { setExpandedId(null); return; }
     setExpandedId(p.id);
-    if (!detailCache[p.id]) {
-      setLoadingId(p.id);
-      await fetchDetail(p).catch(() => {});
-      setLoadingId(null);
-    }
+    // Always re-fetch to get latest Q&A data (no stale cache)
+    setLoadingId(p.id);
+    await fetchDetail(p).catch(() => {});
+    setLoadingId(null);
   };
 
   const downloadPdf = async (e: React.MouseEvent, profile: StudentProfile) => {
@@ -868,25 +890,115 @@ export function StudentPerformance({
 
                                   {/* 4. Exams */}
                                   <Sec icon={Award} title="Academic Scores" color="text-slate-900" count={results.length} empty="No Assessments Found">
-                                    <div className="space-y-3 pt-2 max-h-[350px] overflow-y-auto pr-1">
+                                    <div className="space-y-3 pt-2 max-h-[600px] overflow-y-auto pr-1">
                                       {results.map((r, i) => {
                                         const pct = r.percentage ?? (r.score && r.total ? Math.round((r.score / r.total) * 100) : 0);
                                         const pass = pct >= 60;
+                                        const qs = r.questions_snapshot || [];
+                                        const examKey = `${stu.id}-exam-${i}`;
+                                        const isExamOpen = expandedExamKey === examKey;
                                         return (
-                                          <div key={i} className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                                            <div className="flex items-center justify-between mb-2">
-                                              <p className="text-xs font-black text-slate-900 truncate uppercase tracking-tighter">{sv(r.title || r.exam_name)}</p>
-                                              <span className="text-[10px] font-black text-slate-400 ml-2">{r.score || 0}/{r.total || 100}</span>
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                                <div className={`h-full rounded-full ${pass ? "bg-slate-900" : "bg-slate-300"}`} style={{ width: `${pct}%` }} />
+                                          <div key={i} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                                            {/* Clickable Score Header */}
+                                            <button
+                                              className="w-full p-4 text-left hover:bg-slate-50 transition-colors"
+                                              onClick={() => setExpandedExamKey(isExamOpen ? null : examKey)}
+                                            >
+                                              <div className="flex items-center justify-between mb-2">
+                                                <p className="text-xs font-black text-slate-900 truncate uppercase tracking-tighter flex-1">{sv(r.title || r.exam_name)}</p>
+                                                <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                                                  <span className="text-[10px] font-black text-slate-400">{r.score || 0}/{r.total || 100}</span>
+                                                  {qs.length > 0 && (
+                                                    <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border transition-colors ${
+                                                      isExamOpen
+                                                        ? 'bg-slate-900 text-white border-slate-900'
+                                                        : 'bg-slate-50 text-slate-500 border-slate-200'
+                                                    }`}>
+                                                      {isExamOpen ? '▲ Hide' : '▼ Review'}
+                                                    </span>
+                                                  )}
+                                                </div>
                                               </div>
-                                              <Badge className={`text-[8px] font-black border-none px-2 py-0.5 rounded-full ${pass ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-500"}`}>
-                                                {pass ? "PASSED" : "FAILED"}
-                                              </Badge>
-                                            </div>
-                                            <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest mt-2">ASSESSED ON {sd(r.date)}</p>
+                                              <div className="flex items-center gap-3">
+                                                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                  <div className={`h-full rounded-full ${pass ? 'bg-slate-900' : 'bg-slate-300'}`} style={{ width: `${pct}%` }} />
+                                                </div>
+                                                <Badge className={`text-[8px] font-black border-none px-2 py-0.5 rounded-full ${pass ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500'}`}>
+                                                  {pass ? 'PASSED' : 'FAILED'}
+                                                </Badge>
+                                              </div>
+                                              <div className="flex items-center justify-between mt-2">
+                                                <p className="text-[8px] font-black text-slate-300 uppercase tracking-widest">ASSESSED ON {sd(r.date)}</p>
+                                                {qs.length > 0 && (
+                                                  <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest">{qs.length} Questions</p>
+                                                )}
+                                              </div>
+                                            </button>
+
+                                            {/* Expandable Q&A Dropdown */}
+                                            <AnimatePresence>
+                                              {isExamOpen && qs.length > 0 && (
+                                                <motion.div
+                                                  initial={{ height: 0, opacity: 0 }}
+                                                  animate={{ height: 'auto', opacity: 1 }}
+                                                  exit={{ height: 0, opacity: 0 }}
+                                                  transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                                  className="overflow-hidden"
+                                                >
+                                                  <div className="border-t border-slate-100 bg-slate-50/70 p-3 space-y-3">
+                                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1 mb-2">
+                                                      <FileText className="h-3 w-3" /> Questions & Answers ({qs.length})
+                                                    </p>
+                                                    {qs.map((q, qi) => {
+                                                      const studentAns = q.student_answer || r.answers?.[q.question_id] || '';
+                                                      const isCorrect = !!(studentAns && q.correct_answer &&
+                                                        studentAns.trim().toLowerCase() === q.correct_answer.trim().toLowerCase());
+                                                      return (
+                                                        <div key={qi} className="bg-white rounded-xl border border-slate-100 p-3 space-y-2">
+                                                          {/* Question */}
+                                                          <div className="flex items-start gap-2">
+                                                            <span className="h-5 w-5 rounded-full bg-slate-900 text-white text-[9px] font-black flex items-center justify-center flex-shrink-0 mt-0.5">{qi + 1}</span>
+                                                            <p className="text-[10px] font-bold text-slate-800 leading-relaxed">{q.question_text}</p>
+                                                          </div>
+                                                          {/* Answers */}
+                                                          <div className="ml-7 space-y-1.5">
+                                                            {/* Student Answer */}
+                                                            <div className={`p-2 rounded-lg border text-[9px] font-bold ${
+                                                              !studentAns
+                                                                ? 'bg-slate-50 border-slate-100 text-slate-400'
+                                                                : isCorrect
+                                                                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                                                : 'bg-rose-50 border-rose-200 text-rose-800'
+                                                            }`}>
+                                                              <span className="font-black uppercase tracking-widest text-[7px] block mb-0.5 opacity-60">Student Answer:</span>
+                                                              {studentAns || '— No answer provided —'}
+                                                            </div>
+                                                            {/* Correct Answer (only if wrong) */}
+                                                            {q.correct_answer && !isCorrect && (
+                                                              <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[9px] font-bold text-emerald-800">
+                                                                <span className="font-black uppercase tracking-widest text-[7px] block mb-0.5 opacity-60">Correct Answer:</span>
+                                                                {q.correct_answer}
+                                                              </div>
+                                                            )}
+                                                            {/* Status + marks */}
+                                                            <div className="flex items-center justify-between pt-0.5">
+                                                              <Badge className={`text-[7px] font-black border-none px-2 py-0 rounded-full ${
+                                                                isCorrect ? 'bg-emerald-100 text-emerald-700'
+                                                                : studentAns ? 'bg-rose-100 text-rose-600'
+                                                                : 'bg-slate-100 text-slate-400'
+                                                              }`}>
+                                                                {isCorrect ? '✓ Correct' : studentAns ? '✗ Wrong' : 'Skipped'}
+                                                              </Badge>
+                                                              <span className="text-[7px] font-black text-slate-300 uppercase">{q.marks} mark{q.marks !== 1 ? 's' : ''}</span>
+                                                            </div>
+                                                          </div>
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </motion.div>
+                                              )}
+                                            </AnimatePresence>
                                           </div>
                                         );
                                       })}

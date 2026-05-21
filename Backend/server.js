@@ -2240,31 +2240,141 @@ app.get('/api/admin/data-summary', authenticateToken, requireAdminOrManager, asy
 // Admin Student Performance
 app.get('/api/admin/student-performance/:studentId', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
-        const studentId = req.params.studentId;
+        const { studentId } = req.params;
+        const enrollments = await Enrollment.find({ user_id: studentId }).populate('course_id').lean();
+
+        const activeEnrollments = enrollments.filter(e => e.course_id && e.course_id.is_active !== false);
+
+        const courseProgress = activeEnrollments.map(e => ({
+            course_name: e.course_id.title,
+            progress: e.progress_percentage || 0,
+            status: e.status
+        }));
+
+        // Do NOT use .lean() — Mongoose Maps don't serialize properly with lean
+        const results = await ExamResult.find({ student_id: studentId }).populate('exam_id mock_paper_id');
+
         const profile = await Profile.findOne({ user_id: studentId }).lean();
-        const enrollmentsRaw = await Enrollment.find({ user_id: studentId }).populate('course_id', 'title').lean();
-        const resultsRaw = await ExamResult.find({ student_id: studentId }).populate('exam_id', 'title').lean();
 
-        const performanceData = {
-            enrollments: enrollmentsRaw.map(e => ({
-                course_name: e.course_id?.title || 'Unknown Course',
-                progress: typeof e.progress === 'number' ? e.progress : 0,
-                status: e.status || 'Unknown'
-            })),
-            results: resultsRaw.map(r => ({
-                title: r.exam_id?.title || 'Unknown Assessment',
+        const { QuestionBank } = require('./models/Exam');
+
+        const processedResults = await Promise.all(results.map(async r => {
+            // Convert Mongoose Map to plain object correctly
+            let answersObj = {};
+            if (r.answers) {
+                try {
+                    answersObj = Object.fromEntries(r.answers);
+                } catch(e) {
+                    if (typeof r.answers === 'object') {
+                        Object.entries(r.answers).forEach(([k, v]) => { answersObj[k] = String(v); });
+                    }
+                }
+            }
+
+            const rawSnapshot = r.questions_snapshot || [];
+
+            // Fetch QuestionBank entries to resolve MCQ option IDs → text
+            const qIds = rawSnapshot.map(q => q.question_id).filter(Boolean);
+            let bankMap = {};
+            if (qIds.length > 0) {
+                try {
+                    const bankQs = await QuestionBank.find({ _id: { $in: qIds } }).lean();
+                    bankQs.forEach(q => { bankMap[q._id.toString()] = q; });
+                } catch(e) {}
+            }
+
+            // Helper: resolve answer value — if it's an option ObjectId, return the option text
+            const resolveAnswer = (qId, rawAnswer, bankQ) => {
+                if (!rawAnswer) return '';
+                if (!bankQ || !Array.isArray(bankQ.options) || bankQ.options.length === 0) return rawAnswer;
+                // Check if rawAnswer matches an option _id
+                const optById = bankQ.options.find(o => o._id && o._id.toString() === rawAnswer);
+                if (optById) return optById.text;
+                // Check if rawAnswer matches option text directly
+                const optByText = bankQ.options.find(o => o.text === rawAnswer);
+                if (optByText) return optByText.text;
+                return rawAnswer;
+            };
+
+            const snapshot = rawSnapshot
+                .map(q => {
+                    const qId = q.question_id ? q.question_id.toString() : '';
+                    const bankQ = bankMap[qId];
+                    const rawStudentAns = answersObj[qId] || q.student_answer || '';
+                    const studentAnsText = resolveAnswer(qId, rawStudentAns, bankQ);
+
+                    // Resolve correct answer too (snapshot stores text, but double-check)
+                    let correctAnsText = q.correct_answer || '';
+                    if (bankQ && Array.isArray(bankQ.options) && bankQ.options.length > 0) {
+                        const correctOpt = bankQ.options.find(o => o.is_correct);
+                        if (correctOpt) correctAnsText = correctOpt.text;
+                        // Also check if stored correct_answer is an option ID
+                        if (!correctAnsText && q.correct_answer) {
+                            const optById = bankQ.options.find(o => o._id && o._id.toString() === q.correct_answer);
+                            if (optById) correctAnsText = optById.text;
+                        }
+                    }
+
+                    return {
+                        question_id: qId,
+                        question_text: q.question_text || '',
+                        type: q.type || 'multiple_choice',
+                        marks: q.marks || 1,
+                        correct_answer: correctAnsText,
+                        student_answer: studentAnsText
+                    };
+                })
+                .filter(q => q.question_text.trim() !== '');
+
+            // If snapshot still empty but answers exist → rebuild from QuestionBank
+            const answerKeys = Object.keys(answersObj);
+            if (snapshot.length === 0 && answerKeys.length > 0) {
+                const validIds = answerKeys.filter(id => /^[a-f0-9]{24}$/i.test(id));
+                if (validIds.length > 0) {
+                    try {
+                        const bankQs = await QuestionBank.find({ _id: { $in: validIds } }).lean();
+                        bankQs.forEach(q => {
+                            const qId = q._id.toString();
+                            const rawAns = answersObj[qId] || '';
+                            const correctOpt = Array.isArray(q.options) ? q.options.find(o => o.is_correct) : null;
+                            const correctText = q.correct_answer || (correctOpt ? correctOpt.text : '');
+                            const optById = Array.isArray(q.options) ? q.options.find(o => o._id && o._id.toString() === rawAns) : null;
+                            const studentText = optById ? optById.text : rawAns;
+                            snapshot.push({
+                                question_id: qId,
+                                question_text: q.question_text || '',
+                                type: q.type || 'multiple_choice',
+                                marks: q.marks || 1,
+                                correct_answer: correctText,
+                                student_answer: studentText
+                            });
+                        });
+                    } catch(e) {}
+                }
+            }
+
+            return {
+                result_id: r._id.toString(),
+                title: r.test_title || r.exam_id?.title || r.mock_paper_id?.title || 'Assessment',
                 score: r.score,
-                total: r.total_questions || 0,
+                total: r.total_questions || r.total_score,
                 percentage: r.percentage,
-                date: r.created_at
-            })),
-            github_url: profile?.github_url || null,
-            resume_url: profile?.resume_url || null
-        };
+                date: r.submitted_at || r.created_at,
+                grading_status: r.grading_status || 'graded',
+                answers: answersObj,
+                questions_snapshot: snapshot
+            };
+        }));
 
-        res.json(performanceData);
+
+        res.json({
+            enrollments: courseProgress,
+            results: processedResults,
+            github_url: profile?.github_url,
+            resume_url: profile?.resume_url
+        });
     } catch (err) {
-        handleError(res, err, 'student-performance');
+        handleError(res, err, 'admin-student-performance');
     }
 });
 
@@ -4442,39 +4552,7 @@ app.get('/api/manager/lookup-student/:studentId', authenticateToken, requireAdmi
     }
 });
 
-app.get('/api/admin/student-performance/:studentId', authenticateToken, requireAdminOrManager, async (req, res) => {
-    try {
-        const { studentId } = req.params;
-        const enrollments = await Enrollment.find({ user_id: studentId }).populate('course_id').lean();
-
-        const activeEnrollments = enrollments.filter(e => e.course_id && e.course_id.is_active !== false);
-
-        const courseProgress = activeEnrollments.map(e => ({
-            course_name: e.course_id.title,
-            progress: e.progress_percentage || 0,
-            status: e.status
-        }));
-
-        const results = await ExamResult.find({ student_id: studentId }).populate('exam_id mock_paper_id').lean();
-
-        const profile = await Profile.findOne({ user_id: studentId }).lean();
-
-        res.json({
-            enrollments: courseProgress,
-            results: results.map(r => ({
-                title: r.exam_id?.title || r.mock_paper_id?.title || r.test_title || 'Unknown Test',
-                score: r.score,
-                total: r.total_score || r.total,
-                percentage: r.percentage,
-                date: r.created_at || r.submitted_at
-            })),
-            github_url: profile?.github_url,
-            resume_url: profile?.resume_url
-        });
-    } catch (err) {
-        handleError(res, err, 'admin-student-performance');
-    }
-});
+// Route merged with definition at line 2241 to prevent Express route shadowing.
 
 app.post('/api/manager/grant-exam-access', authenticateToken, requireAdminOrManager, async (req, res) => {
     const { studentId, examId, mockPaperId } = req.body;
@@ -5625,7 +5703,8 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
                     user_id: '$_id',
                     full_name: 1,
                     email: 1,
-                    avatar_url: 1,
+                    // avatar_url: check profile first (Cloudinary upload), then User model
+                    avatar_url: { $ifNull: ['$profile.avatar_url', '$avatar_url'] },
                     phone: 1,
                     last_login_at: 1,
                     registration_date: 1,
