@@ -103,6 +103,7 @@ export function ExamModule({ type }: ExamModuleProps) {
                 examId={activeExam.id}
                 examTitle={activeExam.title}
                 durationMinutes={activeExam.duration_minutes || 60}
+                scheduledDate={activeExam.scheduled_date}
                 onFinish={handleFinish}
                 onExit={() => setActiveExam(null)}
                 type={activeTab}

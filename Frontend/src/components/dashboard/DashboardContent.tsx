@@ -290,14 +290,6 @@ function CoursesTab() {
                     </p>
                   </div>
                </div>
-               <Button 
-                variant="ghost" 
-                size="icon" 
-                className="text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-full h-8 w-8"
-                onClick={() => setShowPaymentModal(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
             </div>
           )}
 
@@ -1116,11 +1108,7 @@ function DashboardHome() {
                     </h2>
                     
                     <div className="space-y-3">
-                       <div className="flex justify-between items-end">
-                         <span className="text-[11px] font-black text-slate-700 uppercase tracking-widest leading-none">Overall Program Progress</span>
-                         <span className="text-2xl font-black text-slate-900 tracking-tighter italic">{latestCourse.progress}%</span>
-                       </div>
-                       <Progress value={latestCourse.progress} className="h-3 bg-slate-100 rounded-full [&>div]:bg-primary shadow-inner" />
+                       
                     </div>
 
                     <Button className="bg-slate-900 text-white hover:bg-black hover:scale-105 transition-all h-14 px-10 font-black italic tracking-tighter rounded-2xl mt-4 shadow-[0_20px_40px_rgba(0,0,0,0.1)] flex items-center gap-3" asChild>
@@ -1133,70 +1121,31 @@ function DashboardHome() {
               )}
             </div>
           </Card>
-
-          {/* Learning Activity Chart - New Feature */}
-          <Card className="pro-card border-none shadow-xl shadow-slate-200/20 overflow-hidden">
-            <CardHeader className="pb-2">
-               <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-black text-slate-900">Learning Intensity</CardTitle>
-                    <CardDescription className="font-medium">Your weekly effort across all modules</CardDescription>
-                  </div>
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
-                    <Activity className="h-5 w-5" />
-                  </div>
-               </div>
-            </CardHeader>
-            <CardContent>
-               <div className="h-[200px] w-full mt-4">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={activityData}>
-                      <defs>
-                        <linearGradient id="colorMin" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#1e293b" stopOpacity={0.1}/>
-                          <stop offset="95%" stopColor="#1e293b" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                      <YAxis hide />
-                      <Tooltip 
-                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                        itemStyle={{ color: '#1e293b', fontWeight: 'bold' }}
-                      />
-                      <Area type="monotone" dataKey="minutes" stroke="#1e293b" strokeWidth={3} fillOpacity={1} fill="url(#colorMin)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-               </div>
-            </CardContent>
-          </Card>
-
-          {/* Row of stats and activity removed as requested */}
         </div>
 
         {/* Right Sidebar - Spans 1 col */}
         <div className="lg:col-span-1 space-y-6">
           {/* Quick Access Documents - Real Data */}
           <Card className="pro-card border-none shadow-xl shadow-slate-200/20">
-            <CardHeader className="pb-4">
+            <CardHeader className="pt-8 px-8 pb-4">
                <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
                   <FileText className="h-5 w-5 text-primary" />
                   Resource Library
                </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="px-8 pb-8 space-y-3">
                {recentResources.length === 0 ? (
                  <div className="py-8 text-center text-xs text-slate-400 font-medium italic">No recent materials</div>
                ) : (
                  recentResources.map((res, i: number) => (
                    <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => res.view_url && window.open(res.view_url, '_blank')}>
-                      <div className="flex items-center gap-3">
-                         <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black group-hover:bg-slate-900 group-hover:text-white transition-all uppercase">
+                      <div className="flex items-center gap-3 min-w-0 flex-1 mr-4">
+                         <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black group-hover:bg-slate-900 group-hover:text-white transition-all uppercase shrink-0">
                            {res.upload_format || res.file_url?.split('.').pop() || 'PDF'}
                          </div>
-                         <span className="text-sm font-bold text-slate-700 line-clamp-1">{res.asset_title || 'Material'}</span>
+                         <span className="text-sm font-bold text-slate-700 truncate">{res.asset_title || 'Material'}</span>
                       </div>
-                      <Download className="h-4 w-4 text-slate-400 group-hover:text-slate-900" />
+                      <Download className="h-4 w-4 text-slate-400 group-hover:text-slate-900 shrink-0" />
                    </div>
                  ))
                )}
@@ -1208,13 +1157,13 @@ function DashboardHome() {
 
           {/* Recent Performance - New Feature */}
           <Card className="pro-card border-none shadow-xl shadow-slate-200/20">
-            <CardHeader className="pb-4">
+            <CardHeader className="pt-8 px-8 pb-4">
               <CardTitle className="text-lg font-black text-slate-900 flex items-center gap-2">
                 <Trophy className="h-5 w-5 text-amber-500" />
                 Recent Performance
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-8 pb-8 space-y-4">
               {dashboardData?.results?.length === 0 ? (
                 <div className="py-8 text-center text-xs text-slate-400 font-medium italic">No recent test attempts</div>
               ) : (
@@ -1246,15 +1195,7 @@ function DashboardHome() {
 
           {/* Announcements removed per user request */}
 
-          {/* Student Support Section - New Feature */}
-          <Card className="bg-primary text-white p-6 rounded-3xl relative overflow-hidden group">
-             <div className="absolute -bottom-4 -right-4 h-24 w-24 bg-white/10 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
-             <h4 className="text-lg font-black mb-1">Need Help?</h4>
-             <p className="text-white/80 text-xs font-medium mb-4">Chat with our senior instructors anytime</p>
-             <Button className="w-full bg-white text-primary hover:bg-slate-100 font-bold rounded-xl h-10 shadow-lg" onClick={() => window.location.href='/student-dashboard/chat'}>
-               Open Career Support
-             </Button>
-          </Card>
+          {/* Student Support Section - Removed as requested */}
         </div>
       </div>
     </div>

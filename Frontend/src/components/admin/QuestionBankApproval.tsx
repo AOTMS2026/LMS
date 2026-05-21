@@ -180,7 +180,6 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
     // College Wise Grant
     const [selectedCollege, setSelectedCollege] = useState<string>("all");
     const [selectedCollegeStudents, setSelectedCollegeStudents] = useState<string[]>([]);
-    const [scheduledDate, setScheduledDate] = useState("");
 
     const fetchPendingBanks = async (showLoading = true, showToast = false) => {
         try {
@@ -389,7 +388,6 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
         setSelectedBatchTypeFilter("all");
         setSelectedCollege("all");
         setSelectedCollegeStudents([]);
-        setScheduledDate(new Date().toISOString().slice(0, 16)); // Default to now
         setShowGrantDialog(true);
         setLoadingBatches(true);
         try {
@@ -437,16 +435,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                     userId: grantType === 'student' ? selectedStudentId : undefined,
                     userIds: grantType === 'college' ? selectedCollegeStudents : undefined,
                     batchId: grantType === 'batch' ? selectedBatchId : undefined,
-                    type: grantType,
-                    scheduled_date: (() => {
-                        if (!scheduledDate) return undefined;
-                        const parts = scheduledDate.split('T');
-                        if (parts.length < 2) return new Date(scheduledDate).toISOString();
-                        const [datePart, timePart] = parts;
-                        const [year, month, day] = datePart.split('-').map(Number);
-                        const [hours, minutes] = timePart.split(':').map(Number);
-                        return new Date(year, month - 1, day, hours, minutes).toISOString();
-                    })()
+                    type: grantType
                 })
             });
 
@@ -809,26 +798,26 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
             </Dialog>
 
             <Dialog open={!!viewingQuestions} onOpenChange={(v) => !v && setViewingQuestions(null)}>
-                <DialogContent className="w-[95vw] sm:max-w-3xl overflow-hidden p-0 border-none shadow-2xl rounded-2xl sm:rounded-[2rem] bg-white">
-                    <div className="bg-slate-900 p-8 text-white">
+                <DialogContent className="w-[95vw] sm:max-w-3xl overflow-hidden p-0 border-none shadow-2xl rounded-2xl sm:rounded-[2rem] bg-white flex flex-col max-h-[90vh]">
+                    <div className="bg-white p-6 md:p-8 border-b border-slate-100 shrink-0">
                         <div className="flex items-center gap-4">
-                            <div className="h-14 w-14 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-                                <BrainCircuit className="h-8 w-8 text-white" />
+                            <div className="h-14 w-14 rounded-2xl bg-slate-50 flex items-center justify-center border border-slate-200 shadow-sm shrink-0">
+                                <BrainCircuit className="h-8 w-8 text-slate-800" />
                             </div>
                             <div>
-                                <DialogTitle className="text-2xl font-black">{viewingQuestions}</DialogTitle>
-                                <DialogDescription className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mt-1">Repository Content Inspection</DialogDescription>
+                                <DialogTitle className="text-2xl font-black text-slate-900">{viewingQuestions}</DialogTitle>
+                                <DialogDescription className="text-slate-500 font-bold uppercase tracking-widest text-[10px] mt-1">Repository Content Inspection</DialogDescription>
                             </div>
                         </div>
                     </div>
-                    <div className="p-8">
+                    <div className="p-6 md:p-8 flex flex-col flex-1 overflow-hidden min-h-0">
                         {loadingQuestions ? (
-                            <div className="py-24 flex flex-col items-center justify-center gap-4">
+                            <div className="flex-1 py-16 flex flex-col items-center justify-center gap-4">
                                 <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                                <p className="text-xs font-black text-slate-300 uppercase tracking-[0.3em] animate-pulse">Analyzing Logic Streams...</p>
+                                <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] animate-pulse">Analyzing Logic Streams...</p>
                             </div>
                         ) : (
-                            <div className="space-y-4 max-h-[500px] overflow-y-auto pr-4 scroll-smooth">
+                            <div className="flex-1 overflow-y-auto space-y-4 pr-2 scroll-smooth min-h-0">
                                 {questionsList.length === 0 ? (
                                     <div className="py-20 text-center text-slate-400 italic">No questions found in this repository.</div>
                                 ) : (
@@ -853,7 +842,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                 )}
                             </div>
                         )}
-                        <div className="flex justify-end mt-8 border-t border-slate-100 pt-6">
+                        <div className="flex justify-end mt-6 border-t border-slate-100 pt-6 shrink-0">
                             <Button
                                 onClick={() => setViewingQuestions(null)}
                                 className="h-12 px-10 rounded-xl font-black bg-slate-900 hover:bg-black text-white uppercase tracking-widest text-[10px]"
@@ -1176,22 +1165,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                     )}
                                 </TabsContent>
                             </Tabs>
-
-                            <div className="space-y-3 px-1 pt-4 border-t border-slate-100">
-                                <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-2">
-                                    <Clock className="h-3 w-3" /> Scheduled Date & Time
-                                </Label>
-                                <Input 
-                                    type="datetime-local" 
-                                    value={scheduledDate}
-                                    onChange={(e) => setScheduledDate(e.target.value)}
-                                    className="h-14 rounded-3xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700 transition-all hover:bg-white hover:shadow-md"
-                                />
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest pl-2">
-                                    Students will see the countdown until this time.
-                                </p>
-                            </div>
-
+                            
                             <div className="p-6 rounded-[1.5rem] bg-emerald-50/30 border border-emerald-500/10 space-y-3 relative overflow-hidden group">
                                 <div className="flex items-center gap-2">
                                     <Badge className="bg-emerald-500 text-white border-none font-black text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-md">Instant Access</Badge>

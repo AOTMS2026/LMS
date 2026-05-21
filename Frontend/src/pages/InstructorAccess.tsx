@@ -497,117 +497,121 @@ export default function InstructorAccess({ onSync, loading: externalLoading }: I
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.98 }}
-                    className="grid grid-cols-1 md:grid-cols-12 gap-4 md:items-center p-4 md:p-6 bg-white rounded-[2rem] border border-slate-100 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-300 relative group"
+                    className="flex flex-col md:grid md:grid-cols-12 gap-4 md:items-center p-4 md:p-6 bg-white rounded-[2rem] border border-slate-100 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/5 transition-all duration-300 relative group"
                   >
-                    {/* Image Column */}
-                    <div className="col-span-1 flex items-center justify-center md:justify-start">
-                      <Avatar className="h-12 w-12 border-2 border-slate-50 shadow-sm rounded-xl overflow-hidden group-hover:scale-110 transition-transform">
-                        <AvatarImage src={course.instructor_avatar || ""} />
-                        <AvatarFallback className="bg-primary/5 text-primary text-xs font-black">
-                          {course.instructor_name?.[0] || 'I'}
-                        </AvatarFallback>
-                      </Avatar>
-                    </div>
-
-                    {/* Instructor & Email Column */}
-                    <div className="col-span-1 md:col-span-3 min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm md:text-base font-black text-slate-900 truncate tracking-tight">{course.instructor_name}</h4>
-                        {course.batch_name && (
-                            <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase border-slate-200 text-slate-400 bg-slate-50">
-                                {course.batch_name}
-                            </Badge>
-                        )}
-                      </div>
-                      <p className="text-[11px] md:text-sm font-medium text-slate-400 truncate tracking-tight uppercase">{course.instructor_email}</p>
-                    </div>
-
-                    {/* Course Column */}
-                    <div className="col-span-1 md:col-span-2">
-                      <div className="flex items-center gap-3">
-                         <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
-                           <BookOpen className="h-4 w-4 text-indigo-500" />
-                         </div>
-                         <p className="text-xs md:text-sm font-black text-slate-800 line-clamp-1">{course.title}</p>
-                      </div>
-                    </div>
-
-                    {/* Batch Column */}
-                    <div className="col-span-1 md:col-span-2">
-                       <div className="flex items-center gap-2">
-                          <div className={`h-8 px-3 rounded-full flex items-center gap-2 border ${
-                            course.batch_type === 'morning' ? 'bg-orange-50 border-orange-100 text-orange-600' :
-                            course.batch_type === 'afternoon' ? 'bg-blue-50 border-blue-100 text-blue-600' :
-                            course.batch_type === 'evening' ? 'bg-violet-50 border-violet-100 text-violet-600' :
-                            'bg-slate-50 border-slate-100 text-slate-400'
-                          }`}>
-                            <Clock className="h-3 w-3" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">
-                                {course.batch_type || 'unassigned'}
-                            </span>
+                    {/* Main Row Content */}
+                      
+                      {/* Mobile Header: Avatar + Info */}
+                      <div className="md:col-span-4 flex items-center gap-4">
+                        <Avatar className="h-12 w-12 border-2 border-slate-50 shadow-sm rounded-xl overflow-hidden group-hover:scale-110 transition-transform shrink-0">
+                          <AvatarImage src={course.instructor_avatar || ""} />
+                          <AvatarFallback className="bg-primary/5 text-primary text-xs font-black">
+                            {course.instructor_name?.[0] || 'I'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 space-y-0.5 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className="text-sm md:text-base font-black text-slate-900 truncate tracking-tight">{course.instructor_name}</h4>
+                            {course.batch_name && (
+                                <Badge variant="outline" className="px-2 py-1 text-[9px] font-black uppercase border-slate-200 text-slate-500 bg-slate-50 whitespace-nowrap truncate max-w-[150px] md:max-w-[200px]">
+                                    {course.batch_name}
+                                </Badge>
+                            )}
                           </div>
-                       </div>
-                    </div>
-
-                    {/* Status Column */}
-                    <div className="col-span-1 md:col-span-1">
-                       <div className="flex items-center">
-                          <Badge className={`rounded-xl px-2 py-1 font-black text-[8px] uppercase tracking-widest border-none ${
-                            course.status === 'pending' ? 'bg-amber-100 text-amber-600' :
-                            course.status === 'approved' ? 'bg-emerald-100 text-emerald-600' :
-                            'bg-rose-100 text-rose-600'
-                          }`}>
-                            {course.status}
-                          </Badge>
-                       </div>
-                    </div>
-
-                    {/* Date/Audit Column */}
-                    <div className="col-span-1 md:col-span-1">
-                       <div className="flex flex-col gap-0.5">
-                          <span className="text-[11px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1.5 md:block">
-                             <Calendar className="h-3 w-3 md:hidden text-slate-300" />
-                             {course.created_at ? new Date(course.created_at).toLocaleDateString('en-GB') : 'N/A'}
-                          </span>
-                          {course.status === 'approved' && course.processed_by_name && (
-                             <div className="flex flex-col">
-                                <span className="text-[8px] font-bold text-emerald-500 uppercase leading-tight">Approved By:</span>
-                                <span className="text-[9px] font-black text-slate-600 truncate max-w-[80px]">{course.processed_by_name}</span>
-                                {course.processed_at && (
-                                   <span className="text-[8px] font-medium text-slate-400">
-                                      {new Date(course.processed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                                   </span>
-                                )}
-                             </div>
-                          )}
-                       </div>
-                    </div>
-
-                    {/* Actions Column */}
-                    <div className="col-span-1 md:col-span-2 flex items-center justify-between md:justify-end gap-2 border-t md:border-t-0 pt-4 md:pt-0">
-                      {course.status === 'pending' && (
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            onClick={() => handleApprove(course.id, course.title, course.instructor_id)}
-                            disabled={processing}
-                            className="h-10 px-4 bg-[#0084FF] hover:bg-[#0073e6] text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20"
-                          >
-                            Grant Access
-                          </Button>
-                          <Button 
-                             variant="ghost" 
-                             onClick={() => { 
-                               setSelectedCourse(course); 
-                               setSelectedInstructorId(course.instructor_id || null);
-                               setShowRejectDialog(true); 
-                             }}
-                             disabled={processing}
-                             className="h-10 w-10 p-0 text-rose-500 hover:bg-rose-50 rounded-xl"
-                          >
-                             <XCircle className="h-5 w-5" />
-                          </Button>
+                          <p className="text-[11px] md:text-sm font-medium text-slate-400 truncate tracking-tight uppercase">{course.instructor_email}</p>
                         </div>
-                      )}
+                      </div>
+
+                      {/* Course Information */}
+                      <div className="md:col-span-2 flex flex-col md:block gap-1 mt-2 md:mt-0">
+                        <span className="md:hidden text-[9px] font-black text-slate-400 uppercase tracking-widest">Course</span>
+                        <div className="flex items-center gap-3">
+                           <div className="h-8 w-8 rounded-lg bg-indigo-50 flex items-center justify-center shrink-0">
+                             <BookOpen className="h-4 w-4 text-indigo-500" />
+                           </div>
+                           <p className="text-xs md:text-sm font-black text-slate-800 line-clamp-1">{course.title}</p>
+                        </div>
+                      </div>
+
+                      {/* Batch Column */}
+                      <div className="md:col-span-2 flex flex-col md:block gap-1 mt-2 md:mt-0">
+                         <span className="md:hidden text-[9px] font-black text-slate-400 uppercase tracking-widest">Session Unit</span>
+                         <div className="flex items-center gap-2">
+                            <div className={`h-8 px-4 py-1 rounded-full flex items-center gap-2 border ${
+                              course.batch_type === 'morning' ? 'bg-orange-50 border-orange-100 text-orange-600' :
+                              course.batch_type === 'afternoon' ? 'bg-blue-50 border-blue-100 text-blue-600' :
+                              course.batch_type === 'evening' ? 'bg-violet-50 border-violet-100 text-violet-600' :
+                              'bg-slate-50 border-slate-100 text-slate-400'
+                            }`}>
+                              <Clock className="h-3.5 w-3.5" />
+                              <span className="text-[10px] font-black uppercase tracking-widest">
+                                  {course.batch_type || 'unassigned'}
+                              </span>
+                            </div>
+                         </div>
+                      </div>
+
+                      {/* Status Column */}
+                      <div className="md:col-span-1 flex flex-col md:block gap-1 mt-2 md:mt-0">
+                         <span className="md:hidden text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</span>
+                         <div className="flex items-center">
+                            <Badge className={`rounded-xl px-3 py-1 font-black text-[9px] uppercase tracking-widest border-none ${
+                              course.status === 'pending' ? 'bg-amber-100 text-amber-600' :
+                              course.status === 'approved' ? 'bg-emerald-100 text-emerald-600' :
+                              'bg-rose-100 text-rose-600'
+                            }`}>
+                              {course.status}
+                            </Badge>
+                         </div>
+                      </div>
+
+                      {/* Date/Audit Column */}
+                      <div className="md:col-span-1 flex flex-col md:block gap-1 mt-2 md:mt-0">
+                         <span className="md:hidden text-[9px] font-black text-slate-400 uppercase tracking-widest">Date</span>
+                         <div className="flex flex-col gap-0.5">
+                            <span className="text-[11px] font-black text-slate-400 uppercase tracking-tighter flex items-center gap-1.5 md:block">
+                               <Calendar className="h-3 w-3 md:hidden text-slate-300" />
+                               {course.created_at ? new Date(course.created_at).toLocaleDateString('en-GB') : 'N/A'}
+                            </span>
+                            {course.status === 'approved' && course.processed_by_name && (
+                               <div className="flex flex-col mt-1">
+                                  <span className="text-[8px] font-bold text-emerald-500 uppercase leading-tight">Approved By:</span>
+                                  <span className="text-[9px] font-black text-slate-600 truncate max-w-[80px]">{course.processed_by_name}</span>
+                                  {course.processed_at && (
+                                     <span className="text-[8px] font-medium text-slate-400">
+                                        {new Date(course.processed_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                                     </span>
+                                  )}
+                               </div>
+                            )}
+                         </div>
+                      </div>
+
+                      {/* Actions Column */}
+                      <div className="md:col-span-2 flex items-center justify-between md:justify-end gap-3 border-t md:border-t-0 pt-4 md:pt-0 mt-2 md:mt-0 w-full md:w-auto">
+                        {course.status === 'pending' && (
+                          <div className="flex items-center gap-2 flex-1 md:flex-initial">
+                            <Button 
+                              onClick={() => handleApprove(course.id, course.title, course.instructor_id)}
+                              disabled={processing}
+                              className="h-10 px-4 bg-[#0084FF] hover:bg-[#0073e6] text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-500/20 w-full md:w-auto"
+                            >
+                              Grant Access
+                            </Button>
+                            <Button 
+                               variant="ghost" 
+                               onClick={() => { 
+                                 setSelectedCourse(course); 
+                                 setSelectedInstructorId(course.instructor_id || null);
+                                 setShowRejectDialog(true); 
+                               }}
+                               disabled={processing}
+                               className="h-10 w-10 p-0 text-rose-500 hover:bg-rose-50 rounded-xl shrink-0"
+                            >
+                               <XCircle className="h-5 w-5" />
+                            </Button>
+                          </div>
+                        )}
 
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

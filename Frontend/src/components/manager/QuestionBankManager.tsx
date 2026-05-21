@@ -1360,18 +1360,18 @@ export function QuestionBankManager({
           ) : (
             <div className="space-y-2">
               {filteredQuestions.map((q, idx) => {
-                const isExpanded = expandedId === q.id;
+                const isExpanded = expandedId === (q.id || q._id);
                 const opts = Array.isArray(q.options) ? q.options : [];
 
                 return (
                   <div
-                    key={q.id}
+                    key={q.id || q._id}
                     className="rounded-xl border bg-card hover:bg-accent/30 transition-colors"
                   >
                     {/* Row */}
                     <div
                       className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 cursor-pointer"
-                      onClick={() => setExpandedId(isExpanded ? null : q.id)}
+                      onClick={() => setExpandedId(isExpanded ? null : (q.id || q._id) as string)}
                     >
                       {/* Index */}
                       <span className="text-[10px] sm:text-xs text-muted-foreground font-mono mt-0.5 w-5 sm:w-6 text-right shrink-0">
@@ -1422,7 +1422,7 @@ export function QuestionBankManager({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 sm:h-8 sm:w-8"
-                          onClick={() => setExpandedId(isExpanded ? null : q.id)}
+                          onClick={() => setExpandedId(isExpanded ? null : (q.id || q._id) as string)}
                         >
                           {isExpanded
                             ? <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -1432,7 +1432,7 @@ export function QuestionBankManager({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 sm:h-8 sm:w-8 hover:bg-destructive/10"
-                          onClick={() => deleteQuestion.mutate(q.id)}
+                          onClick={() => deleteQuestion.mutate((q.id || q._id) as string)}
                         >
                           <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                         </Button>

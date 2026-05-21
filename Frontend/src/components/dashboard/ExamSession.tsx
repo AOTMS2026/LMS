@@ -44,6 +44,7 @@ interface ExamSessionProps {
   examId: string;
   examTitle: string;
   durationMinutes: number;
+  scheduledDate?: string;
   onFinish: (results: {
     examId: string;
     totalQuestions: number;
@@ -54,14 +55,32 @@ interface ExamSessionProps {
   type: 'mock' | 'live';
 }
 
-export function ExamSession({ examId, examTitle, durationMinutes, onFinish, onExit, type }: ExamSessionProps) {
+export function ExamSession({ examId, examTitle, durationMinutes, scheduledDate, onFinish, onExit, type }: ExamSessionProps) {
   const { data: questions, isLoading } = useExamQuestions(examId);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [flagged, setFlagged] = useState<Record<string, boolean>>({});
-  const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
   const [isFullScreen, setIsFullScreen] = useState(false);
   
+  // Calculate absolute target end timestamp when the exam session must officially finish
+  const [endTime] = useState(() => {
+    if (type === 'live' && scheduledDate) {
+      const startTime = new Date(scheduledDate).getTime();
+      return startTime + durationMinutes * 60 * 1000;
+    } else {
+      return Date.now() + durationMinutes * 60 * 1000;
+    }
+  });
+
+  // Calculate dynamic remaining seconds from target endTime
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+    if (type === 'live' && scheduledDate) {
+      return Math.min(durationMinutes * 60, remaining);
+    }
+    return remaining;
+  });
+
   // Coding Execution State
   const [consoleOutput, setConsoleOutput] = useState<Record<string, string>>({});
   const [isRunning, setIsRunning] = useState(false);
@@ -94,14 +113,14 @@ export function ExamSession({ examId, examTitle, durationMinutes, onFinish, onEx
         examId,
         totalQuestions: questions?.length || 0,
         answers: answers,
-        timeSpent: (durationMinutes * 60) - timeLeft,
+        timeSpent: Math.max(0, (durationMinutes * 60) - timeLeft),
         // Score calculation should ideally happen on backend to be secure
         // But we pass answers for processing
     };
     onFinish(results);
   }, [answers, durationMinutes, examId, onFinish, questions?.length, timeLeft, type, toast]);
 
-  // Timer logic
+  // Robust real-time timer calculation based on absolute system clock
   useEffect(() => {
     if (timeLeft <= 0) {
       setIsTimeOver(true);
@@ -110,9 +129,20 @@ export function ExamSession({ examId, examTitle, durationMinutes, onFinish, onEx
       }, 4000);
       return () => clearTimeout(submitTimeout);
     }
-    const timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+
+    const timer = setInterval(() => {
+      const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      
+      if (remaining <= 0) {
+        setIsTimeOver(true);
+        clearInterval(timer);
+        handleComplete();
+      }
+    }, 250); // Tick 4 times a second to keep screen representation flawlessly accurate
+
     return () => clearInterval(timer);
-  }, [timeLeft, handleComplete]);
+  }, [endTime, handleComplete]);
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);

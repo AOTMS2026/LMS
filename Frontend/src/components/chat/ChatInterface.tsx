@@ -486,9 +486,6 @@ export function ChatInterface() {
              >
                 {viewMode === 'chats' ? <MessageSquarePlus className="h-5 w-5" /> : <ArrowLeft className="h-5 w-5" />}
              </Button>
-             <Button size="icon" variant="ghost" className="rounded-full h-10 w-10">
-                <MoreVertical className="h-5 w-5" />
-             </Button>
           </div>
         </div>
         

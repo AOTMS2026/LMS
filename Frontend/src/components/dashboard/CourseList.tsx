@@ -174,16 +174,7 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="p-5 pt-0 flex flex-col flex-1">
-                                <div className="flex items-center gap-4 text-xs font-medium text-muted-foreground mb-6">
-                                    <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-lg">
-                                        <Clock className="h-3.5 w-3.5 text-primary" />
-                                        <span>{course.duration_hours || 10} hours</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5 bg-muted/50 px-2.5 py-1.5 rounded-lg">
-                                        <BookOpen className="h-3.5 w-3.5 text-blue-500" />
-                                        <span>Modules</span>
-                                    </div>
-                                </div>
+
 
                                 <div className="mt-auto">
                                     {type === 'enrolled' ? (
@@ -254,19 +245,7 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                                                     )}
                                                 </div>
 
-                                                <div className="mt-auto space-y-3 pt-4 border-t border-slate-100/30">
-                                                    <div className="flex justify-between items-end">
-                                                        <div className="flex flex-col gap-0.5">
-                                                            <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Learning Journey</span>
-                                                            <span className="text-[11px] font-bold text-slate-600">Course Progress</span>
-                                                        </div>
-                                                        <div className="flex items-baseline gap-0.5">
-                                                            <span className="text-lg font-black text-primary leading-none">{course.progress || 0}</span>
-                                                            <span className="text-[10px] font-bold text-primary">%</span>
-                                                        </div>
-                                                    </div>
-                                                    <Progress value={course.progress || 0} className="h-2.5 bg-slate-100 [&>div]:bg-gradient-to-r [&>div]:from-primary [&>div]:to-primary/80 shadow-inner rounded-full" />
-                                                </div>
+
                                             </>
                                         )}
                                     </div>

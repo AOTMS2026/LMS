@@ -35,6 +35,7 @@ export interface Exam {
 
 export interface Question {
   id: string;
+  _id?: string;
   topic: string;
   question_text: string;
   type: string;

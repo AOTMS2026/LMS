@@ -768,7 +768,7 @@ function MetadataDialog({
                         onClick={() => onOpenChange(false)}
                         className="rounded-xl font-black h-12 px-6 uppercase text-[10px] tracking-widest"
                     >
-                        Abandon
+                        Cancel
                     </Button>
                     <Button 
                         onClick={onSave}

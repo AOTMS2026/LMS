@@ -3018,28 +3018,27 @@ app.put('/api/chat/block-user', authenticateToken, requireAdminOrManager, async 
     res.status(501).json({ error: 'Not implemented, use update-user-status' });
 });
 
-// --- Course Resources Upload (S3) ---
+// --- Course Resources Upload (Cloudinary) ---
 app.post('/api/upload/course-resources', authenticateToken, requireInstructor, upload.single('file'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-        const originalName = req.file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-        const fileName = `Resources/${Date.now()}_${originalName}`;
+        const b64 = Buffer.from(req.file.buffer).toString('base64');
+        const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
 
-        // Upload to S3
-        const s3Key = await uploadFile(req.file.buffer, fileName, req.file.mimetype);
+        console.log(`[System] Instructor ${req.user.id} uploading course resource to Cloudinary...`);
 
-        // Generate a signed URL immediately so the uploader can preview/download it
-        // Or if the bucket is public, construct the public URL.
-        // Assuming we want to return a usable URL:
-        const signedUrl = await generateViewUrl(s3Key);
+        const result = await cloudinary.uploader.upload(dataURI, {
+            folder: 'course_resources',
+            resource_type: 'auto'
+        });
 
         res.json({
-            url: s3Key, // Store the KEY in the database, not the signed URL
-            public_id: s3Key,
-            format: req.file.mimetype.split('/')[1] || 'raw',
+            url: result.secure_url,
+            public_id: result.public_id,
+            format: result.format,
             original_filename: req.file.originalname,
-            view_url: signedUrl // Frontend can use this immediately
+            view_url: result.secure_url
         });
     } catch (err) {
         console.error('Resource upload failed:', err);
@@ -3357,17 +3356,7 @@ app.post('/api/upload/course-videos', authenticateToken, upload.single('file'), 
     }
 });
 
-app.post('/api/upload/course-resources', authenticateToken, upload.single('file'), async (req, res) => {
-    try {
-        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        const fileName = `courses/resources/${Date.now()}_${req.file.originalname.replace(/\s+/g, '_')}`;
-        const s3Key = await uploadFile(req.file.buffer, fileName, req.file.mimetype);
-        const signedUrl = await generateViewUrl(s3Key);
-        res.json({ url: signedUrl, key: s3Key });
-    } catch (err) {
-        handleError(res, err, 'upload-resource');
-    }
-});
+
 
 app.post('/api/upload/live-posters', authenticateToken, upload.single('file'), async (req, res) => {
     try {
@@ -5358,7 +5347,7 @@ const createCourseResourceRoutes = (resourceName, Model) => {
 
     app.post(`/api/courses/:courseId/${resourceName}`, authenticateToken, requireInstructor, async (req, res) => {
         try {
-            const item = await Model.create({ ...req.body, course_id: req.params.courseId });
+            const item = await Model.create({ ...req.body, course_id: req.params.courseId, instructor_id: req.user.id });
             res.json(item);
         } catch (err) {
             handleError(res, err, `create-${resourceName}`);
@@ -5815,8 +5804,11 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
 
                     const batchFilter = {
                         $or: [
-                            // 1. Explicitly allowed for these specific batch IDs
-                            { allowed_batches: { $in: studentBatchIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id) } },
+                            // 1. Explicitly allowed for these specific batch IDs (handles both String and ObjectId saved forms)
+                            { allowed_batches: { $in: [
+                                ...studentBatchIds.map(id => mongoose.Types.ObjectId.isValid(id) ? new mongoose.Types.ObjectId(id) : id),
+                                ...studentBatchIds // also include string forms since Schema.Types.Mixed saves as strings
+                            ] } },
 
                             // 2. Matches both session type AND the instructor assigned to the student
                             {
@@ -6288,7 +6280,8 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
             if (role === 'instructor') {
                 const courseRelatedTables = [
                     'courses', 'course_topics', 'course_modules', 'course_videos',
-                    'course_resources', 'course_timeline', 'course_announcements', 'live_classes'
+                    'course_resources', 'course_timeline', 'course_announcements', 'live_classes',
+                    'exams', 'exam_schedules', 'mock_papers', 'mock_test_configs'
                 ];
 
                 if (courseRelatedTables.includes(table)) {

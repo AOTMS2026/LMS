@@ -851,12 +851,12 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
                                 {batch.batch_name}
                               </p>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                <Badge
-                                  variant="outline"
-                                  className="text-[9px] font-black h-4 px-1.5 tracking-tighter uppercase text-slate-500 border-slate-200 shrink-0"
-                                >
-                                  {batch.batch_type} Session
-                                </Badge>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] font-black px-2 py-0.5 tracking-tighter uppercase text-slate-500 border-slate-200 shrink-0 whitespace-nowrap"
+                                  >
+                                    {batch.batch_type} Session
+                                  </Badge>
                                   <span className="text-[9px] font-bold text-slate-300 hidden sm:block">
                                     •
                                   </span>

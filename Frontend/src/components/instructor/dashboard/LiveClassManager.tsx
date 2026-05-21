@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     Dialog,
     DialogContent,
@@ -36,10 +37,35 @@ import { useInstructorLiveClasses, useCreateLiveClass, useDeleteLiveClass, useIn
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
+const compileTime24 = (h: string, m: string, p: string) => {
+    let hours24 = parseInt(h, 10);
+    if (p === 'PM' && hours24 < 12) hours24 += 12;
+    if (p === 'AM' && hours24 === 12) hours24 = 0;
+    return `${String(hours24).padStart(2, '0')}:${m}`;
+};
+
+const getParsedTime = (time24: string) => {
+    if (!time24) return { h: '12', m: '00', p: 'AM' };
+    const [hours24, minutes] = time24.split(':').map(Number);
+    const p = hours24 >= 12 ? 'PM' : 'AM';
+    let hNum = hours24 % 12;
+    if (hNum === 0) hNum = 12;
+    const h = String(hNum).padStart(2, '0');
+    const m = String(minutes).padStart(2, '0');
+    return { h, m, p };
+};
+
 export function LiveClassManager() {
     const { toast } = useToast();
     const [isAdding, setIsAdding] = useState(false);
     const navigate = useNavigate();
+
+    const handleOpenSchedule = () => {
+        const now = new Date();
+        setSelectedDate(format(now, 'yyyy-MM-dd'));
+        setSelectedTime(format(now, 'HH:mm'));
+        setIsAdding(true);
+    };
     const { data: liveClasses = [], isLoading } = useInstructorLiveClasses();
     const { data: courses = [] } = useInstructorCourses();
     const createMeeting = useCreateLiveClass();
@@ -171,7 +197,7 @@ export function LiveClassManager() {
                     </p>
                 </div>
                 <Button
-                    onClick={() => setIsAdding(true)}
+                    onClick={handleOpenSchedule}
                     className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 h-12 px-6 rounded-xl transition-all hover:scale-105 active:scale-95"
                 >
                     <Plus className="w-5 h-5 mr-2" /> Schedule New Class
@@ -200,7 +226,7 @@ export function LiveClassManager() {
                             Your scheduled sessions will appear here. Start your journey by creating your first interactive live class.
                         </p>
                         <Button 
-                            onClick={() => setIsAdding(true)} 
+                            onClick={handleOpenSchedule} 
                             className="rounded-2xl px-10 py-7 text-lg font-semibold shadow-2xl shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95"
                         >
                             <Calendar className="w-5 h-5 mr-3" /> Schedule First Session
@@ -391,28 +417,63 @@ export function LiveClassManager() {
                                     />
                                 </div>
 
-                                {/* Start Time + Duration */}
                                 {/* Start Date & Time Selection */}
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">Session Date & Time</label>
-                                    <input
-                                        type="datetime-local"
-                                        required
-                                        value={selectedDate && selectedTime ? `${selectedDate}T${selectedTime}` : ""}
-                                        onChange={e => {
-                                            const val = e.target.value;
-                                            if (val) {
-                                                const [d, t] = val.split('T');
-                                                setSelectedDate(d);
-                                                setSelectedTime(t);
-                                            } else {
-                                                setSelectedDate('');
-                                                setSelectedTime('');
-                                            }
-                                        }}
-                                        className="w-full h-11 px-4 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                                    />
-                                    <p className="text-[9px] font-bold text-slate-400 italic">This session will start at your local time.</p>
+                                    <div className="flex flex-col gap-2.5 w-full">
+                                        <div className="relative w-full">
+                                            <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                                            <Input 
+                                                type="date" 
+                                                required
+                                                min={new Date().toISOString().split('T')[0]}
+                                                value={selectedDate}
+                                                onChange={(e) => setSelectedDate(e.target.value)}
+                                                className="h-11 px-4 rounded-lg border border-slate-200 bg-white pl-10 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all w-full"
+                                            />
+                                        </div>
+                                        <div className="flex gap-2 w-full">
+                                            <Select 
+                                                value={getParsedTime(selectedTime).h} 
+                                                onValueChange={(val) => setSelectedTime(compileTime24(val, getParsedTime(selectedTime).m, getParsedTime(selectedTime).p))}
+                                            >
+                                                <SelectTrigger className="h-11 flex-1 rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+                                                    <SelectValue placeholder="HH" />
+                                                </SelectTrigger>
+                                                <SelectContent className="max-h-[200px] bg-white z-50">
+                                                    {Array.from({length: 12}, (_, i) => String(i === 0 ? 12 : i).padStart(2, '0')).map(hr => (
+                                                        <SelectItem key={hr} value={hr}>{hr}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select 
+                                                value={getParsedTime(selectedTime).m} 
+                                                onValueChange={(val) => setSelectedTime(compileTime24(getParsedTime(selectedTime).h, val, getParsedTime(selectedTime).p))}
+                                            >
+                                                <SelectTrigger className="h-11 flex-1 rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+                                                    <SelectValue placeholder="MM" />
+                                                </SelectTrigger>
+                                                <SelectContent className="max-h-[200px] bg-white z-50">
+                                                    {Array.from({length: 60}, (_, i) => String(i).padStart(2, '0')).map(mn => (
+                                                        <SelectItem key={mn} value={mn}>{mn}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Select 
+                                                value={getParsedTime(selectedTime).p} 
+                                                onValueChange={(val) => setSelectedTime(compileTime24(getParsedTime(selectedTime).h, getParsedTime(selectedTime).m, val))}
+                                            >
+                                                <SelectTrigger className="h-11 w-[85px] rounded-lg border-slate-200 bg-white text-sm text-slate-900">
+                                                    <SelectValue placeholder="AM/PM" />
+                                                </SelectTrigger>
+                                                <SelectContent className="bg-white z-50">
+                                                    <SelectItem value="AM">AM</SelectItem>
+                                                    <SelectItem value="PM">PM</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] font-bold text-slate-400 italic mt-1">This session will start at your local time.</p>
                                 </div>
 
 

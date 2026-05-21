@@ -610,12 +610,12 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                                 return (
                                                     <>
                                                         {college && (
-                                                            <Badge className="text-[7px] h-4 px-1.5 rounded-md uppercase font-black bg-blue-50 text-blue-600 border-none shadow-none w-fit max-w-[180px] truncate flex items-center gap-0.5">
+                                                            <Badge className="text-[8px] py-1 px-2.5 rounded-md uppercase font-black bg-blue-50 text-blue-600 border-none shadow-none w-fit max-w-[200px] truncate flex items-center gap-1">
                                                                 🏫 {college}
                                                             </Badge>
                                                         )}
                                                         {institute && (
-                                                            <Badge className="text-[7px] h-4 px-1.5 rounded-md uppercase font-black bg-indigo-50 text-indigo-600 border-none shadow-none w-fit max-w-[180px] truncate flex items-center gap-0.5">
+                                                            <Badge className="text-[8px] py-1 px-2.5 rounded-md uppercase font-black bg-indigo-50 text-indigo-600 border-none shadow-none w-fit max-w-[200px] truncate flex items-center gap-1">
                                                                 🏢 {institute}
                                                             </Badge>
                                                         )}
