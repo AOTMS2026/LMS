@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PlusCircle, Video as VideoIcon, Search, RefreshCw, Play, Clock, BookOpen, X, UploadCloud, Trash2 } from "lucide-react";
-import { fetchWithAuth } from "@/lib/api";
+import { fetchWithAuth, API_URL } from "@/lib/api";
+import { VideoPlayer } from "../../dashboard/VideoPlayer";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { VideoUploader } from "../VideoUploader";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +20,7 @@ interface Video {
   title: string;
   description: string;
   video_url: string;
+  drive_link?: string;
   thumbnail_url: string;
   duration_minutes: number;
   course_id: string;
@@ -77,6 +79,37 @@ export function InstructorVideoLibrary() {
   const getCourseTitle = (courseId: string) => {
     const course = courses.find(c => c.id === courseId);
     return course?.title || 'Unknown Course';
+  };
+
+  const isGoogleDriveUrl = (url?: string) => {
+    if (!url) return false;
+    return url.includes('drive.google.com') || url.includes('docs.google.com');
+  };
+
+  const getVideoSrc = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('http') && !url.includes('.amazonaws.com/')) {
+      return url;
+    }
+    
+    let videoUrlKey = url;
+    if (videoUrlKey.includes('.amazonaws.com/')) {
+      videoUrlKey = videoUrlKey.split('.amazonaws.com/')[1];
+    }
+    
+    if (videoUrlKey.startsWith('/api/s3/public/')) {
+      videoUrlKey = videoUrlKey.replace('/api/s3/public/', '');
+    } else if (videoUrlKey.startsWith('api/s3/public/')) {
+      videoUrlKey = videoUrlKey.replace('api/s3/public/', '');
+    } else if (videoUrlKey.startsWith('/s3/public/')) {
+      videoUrlKey = videoUrlKey.replace('/s3/public/', '');
+    } else if (videoUrlKey.startsWith('s3/public/')) {
+      videoUrlKey = videoUrlKey.replace('s3/public/', '');
+    }
+    if (videoUrlKey.startsWith('/')) {
+      videoUrlKey = videoUrlKey.slice(1);
+    }
+    return `${API_URL}/s3/public/${videoUrlKey}`;
   };
 
   const handleDelete = async (id: string) => {
@@ -353,13 +386,19 @@ export function InstructorVideoLibrary() {
              <DialogTitle>{selectedVideo?.title}</DialogTitle>
              <DialogDescription>Video player for {selectedVideo?.title}</DialogDescription>
           </DialogHeader>
-          <div className="relative aspect-video bg-black flex items-center justify-center group">
+          <div className="relative aspect-video bg-black flex items-center justify-center group w-full">
             {selectedVideo && (
-              <video 
-                src={selectedVideo.video_url.startsWith('http') ? selectedVideo.video_url : (selectedVideo.video_url.includes('s3') ? selectedVideo.video_url : `/s3/public/${selectedVideo.video_url}`)}
-                controls 
-                autoPlay 
-                className="w-full h-full"
+              <VideoPlayer
+                key={selectedVideo.id}
+                url={
+                  selectedVideo.drive_link
+                    ? selectedVideo.drive_link
+                    : (isGoogleDriveUrl(selectedVideo.video_url)
+                      ? selectedVideo.video_url
+                      : getVideoSrc(selectedVideo.video_url || ''))
+                }
+                videoId={selectedVideo.id}
+                courseId={selectedVideo.course_id}
               />
             )}
             <Button 

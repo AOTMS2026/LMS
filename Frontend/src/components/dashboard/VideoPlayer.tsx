@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactPlayer from 'react-player';
 import { fetchWithAuth, API_URL } from '@/lib/api';
-import { Loader2, Play, Pause, RotateCcw, RotateCw, Square, CheckCircle2, ExternalLink } from 'lucide-react';
+import { Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface VideoPlayerProps {
@@ -17,25 +17,12 @@ interface ProgressData {
   completed?: boolean;
 }
 
-const getGoogleDriveStreamUrl = (url?: string) => {
-  if (!url) return '';
-  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || 
-                url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || 
-                url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
-                url.match(/id=([a-zA-Z0-9_-]+)/);
-  const fileId = match && match[1] ? match[1] : '';
-  if (!fileId) return url;
-  
-  // Route through backend proxy to bypass CORS/CORP block and cookie conflicts
-  return `${API_URL}/video/proxy-drive?fileId=${fileId}`;
-};
-
 const getGoogleDriveFileId = (url?: string) => {
   if (!url) return '';
-  const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || 
-                url.match(/[?&]id=([a-zA-Z0-9_-]+)/) || 
-                url.match(/\/d\/([a-zA-Z0-9_-]+)/) ||
-                url.match(/id=([a-zA-Z0-9_-]+)/);
+  const match =
+    url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) ||
+    url.match(/[?&]id=([a-zA-Z0-9_-]+)/) ||
+    url.match(/id=([a-zA-Z0-9_-]+)/);
   return match && match[1] ? match[1] : '';
 };
 
@@ -49,94 +36,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, videoId, courseId
   const [hasResumed, setHasResumed] = useState(false);
   const [pendingSeek, setPendingSeek] = useState<number | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [useIframeFallback, setUseIframeFallback] = useState(false);
-  const [forceIframe, setForceIframe] = useState(false);
 
   const isDrive = url.includes('drive.google.com') || url.includes('docs.google.com') || url.includes('/uc?id=');
   const isS3 = url.includes('/api/s3/public/') || url.includes('.amazonaws.com');
-  const isMkv = url.toLowerCase().includes('.mkv');
   const fileId = getGoogleDriveFileId(url);
-  const streamUrl = getGoogleDriveStreamUrl(url);
 
-  // Play natively via HTML5 video element if it is S3, or if it is Drive and not MKV and we haven't toggled iframe fallback.
-  const playNatively = isS3 || (isDrive && !isMkv && !useIframeFallback && !forceIframe);
+  // For Drive videos: always use iframe /preview (most reliable, no CORS issues)
+  // For S3 videos: use native HTML5 video
+  // For everything else: use ReactPlayer
+  const playNatively = isS3;
 
   useEffect(() => {
-    setUseIframeFallback(isMkv);
     setIsReady(false);
     setHasResumed(false);
     setLoading(true);
-  }, [url, isMkv]);
-
-  const handlePlayPause = () => {
-    const video = playerRef.current as HTMLVideoElement | null;
-    if (!video) return;
-    if (isPlaying) {
-      video.pause();
-      setIsPlaying(false);
-    } else {
-      video.play().catch(() => {});
-      setIsPlaying(true);
-    }
-  };
-
-  const handleForward = () => {
-    const video = playerRef.current as HTMLVideoElement | null;
-    if (!video) return;
-    video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
-  };
-
-  const handleBackward = () => {
-    const video = playerRef.current as HTMLVideoElement | null;
-    if (!video) return;
-    video.currentTime = Math.max(0, video.currentTime - 10);
-  };
-
-  const handleStop = () => {
-    const video = playerRef.current as HTMLVideoElement | null;
-    if (!video) return;
-    video.pause();
-    video.currentTime = 0;
-    setIsPlaying(false);
-  };
+  }, [url]);
 
   // Refs for sync access in beforeunload & unmount cleanup
   const progressRef = useRef(0);
   const timeRef = useRef(0);
-  const [error, setError] = useState<string | null>(null);
-
-  // 1. Fetch saved progress on mount / videoId change
-  useEffect(() => {
-    const init = async () => {
-      try {
-        setForceIframe(false); // Reset on new video
-        setLoading(true);
-        const data = await fetchWithAuth<ProgressData>(`/progress/${videoId}`);
-        if (data) {
-          const savedPct = data.watched_percentage || 0;
-          const savedTime = data.last_watched_time || 0;
-          setLastSavedProgress(savedPct);
-          setCurrentProgress(savedPct);
-          progressRef.current = savedPct;
-          timeRef.current = savedTime;
-          if (savedTime > 0) {
-            setPendingSeek(savedTime);
-          }
-        } else {
-          setLastSavedProgress(0);
-          setCurrentProgress(0);
-          progressRef.current = 0;
-          timeRef.current = 0;
-          setPendingSeek(null);
-        }
-      } catch (err) {
-        console.error('Error fetching progress:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    init();
-  }, [videoId]);
 
   const saveProgress = useCallback(async (percentage: number, currentTime: number, isCompleted: boolean = false) => {
     try {
@@ -159,6 +77,48 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, videoId, courseId
       console.error('Failed to save progress:', err);
     }
   }, [videoId, courseId, onComplete]);
+
+  // 1. Fetch saved progress on mount / videoId change
+  useEffect(() => {
+    const init = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchWithAuth<ProgressData>(`/progress/${videoId}`);
+        if (data) {
+          const savedPct = data.watched_percentage || 0;
+          const savedTime = data.last_watched_time || 0;
+          setLastSavedProgress(savedPct);
+          setCurrentProgress(savedPct);
+          progressRef.current = savedPct;
+          timeRef.current = savedTime;
+          if (savedTime > 0) {
+            setPendingSeek(savedTime);
+          }
+          if (isDrive && savedPct < 95) {
+            saveProgress(100, 0, true);
+            setCurrentProgress(100);
+            progressRef.current = 100;
+          }
+        } else {
+          setLastSavedProgress(0);
+          setCurrentProgress(0);
+          progressRef.current = 0;
+          timeRef.current = 0;
+          setPendingSeek(null);
+          if (isDrive) {
+            saveProgress(100, 0, true);
+            setCurrentProgress(100);
+            progressRef.current = 100;
+          }
+        }
+      } catch (err) {
+        console.error('Error fetching progress:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, [videoId, isDrive, saveProgress]);
 
   // Handle seeking when pendingSeek is loaded
   useEffect(() => {
@@ -257,15 +217,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, videoId, courseId
 
   return (
     <div className="relative group w-full h-full min-h-[400px] bg-black rounded-2xl overflow-hidden shadow-2xl flex flex-col justify-between">
-      {/* Percentage Overlay */}
-      <div className="absolute top-4 left-4 z-20 transition-opacity opacity-70 group-hover:opacity-100">
-         <div className="bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10 flex items-center gap-2">
-            <div className={`h-2 w-2 rounded-full ${currentProgress >= 95 ? 'bg-green-500' : 'bg-amber-500'} animate-pulse`} />
-            <span className="text-[10px] font-bold text-white uppercase tracking-widest">
-              {currentProgress}% {currentProgress >= 95 ? 'Completed' : 'Watched'}
-            </span>
-         </div>
-      </div>
+      {/* Percentage Overlay removed for clean aesthetic */}
 
       {/* Main Video Stream Container */}
       <div className="flex-1 w-full h-full relative min-h-[400px]">
@@ -276,9 +228,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, videoId, courseId
         )}
 
         {playNatively ? (
+          /* S3 Videos — Native HTML5 player */
           <video
             ref={playerRef as React.RefObject<HTMLVideoElement>}
-            src={isDrive ? streamUrl : url}
+            src={url}
             className="w-full h-full object-contain cursor-pointer absolute inset-0 rounded-2xl"
             controls
             autoPlay
@@ -290,37 +243,23 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, videoId, courseId
               saveProgress(progressRef.current, timeRef.current, progressRef.current >= 95);
             }}
             onPlay={() => setIsPlaying(true)}
-            onError={(e) => {
-              console.error("Native video error:", e);
-              if (isDrive) {
-                console.warn("Native stream failed; falling back to iframe");
-                setForceIframe(true);
-              }
-            }}
             controlsList="nodownload"
           />
         ) : isDrive ? (
-          <div className="w-full h-full bg-black rounded-2xl flex flex-col items-center justify-center p-4">
+          /* Google Drive Videos — iframe /preview (most reliable) */
+          <div className="w-full h-full absolute inset-0 rounded-2xl min-h-[400px] overflow-hidden">
             <iframe
               src={`https://drive.google.com/file/d/${fileId}/preview`}
-              className="w-full h-full border-0 rounded-xl"
+              className="w-full h-full border-0 absolute inset-0 rounded-2xl min-h-[400px]"
               allow="autoplay; encrypted-media"
               allowFullScreen
               onLoad={() => setLoading(false)}
             />
-            <div className="mt-4 flex gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://drive.google.com/file/d/${fileId}/view`, '_blank')}
-                className="bg-white/10 hover:bg-white/20 border-white/20 text-white"
-              >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                Open in Drive
-              </Button>
-            </div>
+            {/* Overlay to mask and block the Google Drive pop-out/external link button (top-right corner) */}
+            <div className="absolute top-0 right-0 w-20 h-14 bg-black z-30 pointer-events-auto cursor-default" title="Playback Controls" />
           </div>
         ) : (
+          /* Other URLs — ReactPlayer */
           <ReactPlayer
             ref={playerRef as React.RefObject<ReactPlayer>}
             url={url}
@@ -353,40 +292,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ url, videoId, courseId
         )}
       </div>
 
-      {/* Embedded Iframe Premium Manual Sync Bar */}
-      {isDrive && useIframeFallback && (
-        <div className="absolute bottom-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-3 bg-black/75 backdrop-blur-md px-4 py-3 rounded-xl border border-white/10 shadow-lg transition-transform duration-300">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold text-neutral-300 uppercase tracking-wider">
-              {isMkv ? "MKV Format (Iframe Preview)" : "Embedded Google Drive Preview"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {currentProgress < 95 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  saveProgress(100, duration || 0, true);
-                  setCurrentProgress(100);
-                  progressRef.current = 100;
-                }}
-                className="bg-primary/20 hover:bg-primary/30 border-primary/30 text-white font-medium flex items-center gap-1.5"
-              >
-                <CheckCircle2 className="h-4 w-4 text-green-400" />
-                Mark Completed
-              </Button>
-            ) : (
-              <span className="text-xs font-semibold text-green-400 flex items-center gap-1">
-                <CheckCircle2 className="h-4 w-4" /> Lesson Completed
-              </span>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Drive Iframe Manual Sync Bar removed */}
 
-      {/* Persistent Bottom Progress Bar (only visible when in native or standard player modes) */}
-      {(!isDrive || !useIframeFallback) && (
+      {/* Persistent Bottom Progress Bar (only visible for non-Drive videos) */}
+      {!isDrive && (
         <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-white/10 z-10">
           <div className="h-full bg-primary transition-all duration-300" style={{ width: `${currentProgress}%` }} />
         </div>

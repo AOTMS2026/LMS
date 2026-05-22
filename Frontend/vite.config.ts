@@ -8,10 +8,6 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
     strictPort: false,
-    headers: {
-      "Cross-Origin-Embedder-Policy": "credentialless",
-      "Cross-Origin-Opener-Policy": "same-origin",
-    },
     hmr: {
       host: "localhost",
       protocol: "ws",
