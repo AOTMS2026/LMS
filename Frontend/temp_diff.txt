@@ -1,0 +1,352 @@
+﻿diff --git a/Frontend/src/components/instructor/courses/CourseBuilder.tsx b/Frontend/src/components/instructor/courses/CourseBuilder.tsx
+index b76f414..6d382f3 100644
+--- a/Frontend/src/components/instructor/courses/CourseBuilder.tsx
++++ b/Frontend/src/components/instructor/courses/CourseBuilder.tsx
+@@ -11,14 +11,16 @@ import { Progress } from '@/components/ui/progress';
+ import { useToast } from '@/hooks/use-toast';
+ import { useCourseModules, useCreateCourseModule, useUpdateCourseModule, useModuleVideos, useCreateCourseVideo, useS3Upload, useUpdateCourseStatus, CourseModule, S3CourseVideo, useDeleteCourseVideo, useDeleteCourseModule } from '@/hooks/useCourseBuilder';
+ import { fetchWithAuth } from '@/lib/api';
+-import { Course } from '@/hooks/useInstructorData';
++import { Course, RosterStudent } from '@/hooks/useInstructorData';
++import { useAuth } from '@/hooks/useAuth';
++import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+ import { VideoUploader } from '../VideoUploader';
+ import { 
+   Plus, Edit, ArrowLeft, Trash2, UploadCloud, GripVertical, Loader2, 
+   CheckCircle2, XCircle, Copy, Check, AlertTriangle, Clock, CheckCircle, 
+   FileVideo, X, Layers, ChevronUp, ChevronDown, Users, Sparkles, 
+   TrendingUp, Activity, ExternalLink, Lock, PlayCircle, MoreVertical, 
+-  Image as ImageIcon, Camera 
++  Image as ImageIcon, Camera, Search 
+ } from 'lucide-react';
+ import { BatchManager } from '../BatchManager';
+ import { cn } from "@/lib/utils";
+@@ -38,7 +40,30 @@ const deriveBatchType = (selectedIds: string[], allBatches: {id: string, batch_t
+     return 'all';
+ };
+ 
+-function ModuleItem({ module, course }: { module: CourseModule, course: Course }) {
++const getGoogleDriveStreamUrl = (url?: string) => {
++    if (!url) return '';
++    if (url.includes('/uc?id=')) return url;
++    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
++    return match && match[1] ? `https://drive.google.com/uc?id=${match[1]}&export=download` : url;
++};
++
++const getGoogleDriveFileId = (url?: string) => {
++    if (!url) return '';
++    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/) || url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
++    return match && match[1] ? match[1] : '';
++};
++
++function ModuleItem({ 
++    module, 
++    course,
++    instructorDetails,
++    enrolledStudents 
++}: { 
++    module: CourseModule; 
++    course: Course;
++    instructorDetails?: any[];
++    enrolledStudents?: RosterStudent[];
++}) {
+     const { data: videosData, refetch } = useModuleVideos(module.id, course.id);
+     const videos = (videosData || []) as S3CourseVideo[];
+     const createVideo = useCreateCourseVideo();
+@@ -58,6 +83,7 @@ function ModuleItem({ module, course }: { module: CourseModule, course: Course }
+         unlock_after_days: module.unlock_after_days || 1
+     });
+     const [batches, setBatches] = useState<{ id: string, batch_name: string, batch_type: string }[]>([]);
++    const [previewingVideo, setPreviewingVideo] = useState<S3CourseVideo | null>(null);
+ 
+     const updateModule = useUpdateCourseModule();
+ 
+@@ -210,6 +236,8 @@ function ModuleItem({ module, course }: { module: CourseModule, course: Course }
+                                         setIsVideoUploadOpen(false);
+                                         refetch();
+                                       }}
++                                      instructorDetails={instructorDetails}
++                                      enrolledStudents={enrolledStudents}
+                                     />
+                                 </div>
+                             </div>
+@@ -311,16 +339,49 @@ function ModuleItem({ module, course }: { module: CourseModule, course: Course }
+                                 className="group/vid relative bg-white rounded-2xl sm:rounded-3xl border border-slate-100 p-2 sm:p-3 hover:shadow-2xl transition-all duration-300"
+                             >
+                                 <div className="relative aspect-video rounded-xl sm:rounded-2xl bg-black overflow-hidden mb-3 group/poster">
+-                                    {vid.video_url ? (
+-                                        <video
+-                                            key={vid.video_url}
+-                                            controls
+-                                            className="w-full h-full object-contain"
+-                                            preload="metadata"
+-                                            poster={vid.thumbnail_url ? (vid.thumbnail_url.startsWith('http') ? vid.thumbnail_url : `/s3/public/${vid.thumbnail_url}`) : undefined}
+-                                        >
+-                                            <source src={vid.video_url.startsWith('https') ? vid.video_url : (vid.video_url.includes('s3') ? vid.video_url : `/s3/public/${vid.video_url}`)} type="video/mp4" />
+-                                        </video>
++                                    {vid.video_url || vid.drive_link ? (
++                                        vid.drive_link ? (
++                                            <div 
++                                                className="w-full h-full relative cursor-pointer group/drive-card flex flex-col items-center justify-center bg-gradient-to-br from-slate-950 via-slate-800 to-slate-950 rounded-xl sm:rounded-2xl border border-slate-700/30 overflow-hidden shadow-inner"
++                                                onClick={() => setPreviewingVideo(vid)}
++                                            >
++                                                {vid.thumbnail_url ? (
++                                                    <img 
++                                                        src={vid.thumbnail_url.startsWith('http') ? vid.thumbnail_url : `/s3/public/${vid.thumbnail_url}`} 
++                                                        alt={vid.title}
++                                                        className="w-full h-full object-cover transition-transform duration-500 group-hover/drive-card:scale-105"
++                                                    />
++                                                ) : (
++                                                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-950 gap-2">
++                                                        <FileVideo className="h-10 w-10 text-amber-500/80 animate-pulse" />
++                                                    </div>
++                                                )}
++                                                
++                                                {/* Play Button Overlay */}
++                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 group-hover/drive-card:bg-black/60 transition-all duration-300 gap-2">
++                                                    <div className="h-12 w-12 rounded-full bg-white/20 backdrop-blur-md border border-white/40 flex items-center justify-center shadow-lg group-hover/drive-card:scale-110 transition-transform duration-300">
++                                                        <PlayCircle className="h-7 w-7 text-white fill-white ml-0.5" />
++                                                    </div>
++                                                    <span className="text-[10px] font-bold text-slate-200 tracking-wider uppercase bg-slate-950/80 px-3 py-1 rounded-full border border-white/10 shadow-sm">
++                                                        Preview Lesson
++                                                    </span>
++                                                </div>
++                                                <div className="absolute top-3 left-3">
++                                                    <Badge className="bg-amber-600/90 text-white font-bold text-[9px] tracking-wide border-0 shadow-sm">
++                                                        Google Drive Video
++                                                    </Badge>
++                                                </div>
++                                            </div>
++                                        ) : (
++                                            <video
++                                                key={vid.video_url}
++                                                controls
++                                                className="w-full h-full object-contain"
++                                                preload="metadata"
++                                                poster={vid.thumbnail_url ? (vid.thumbnail_url.startsWith('http') ? vid.thumbnail_url : `/s3/public/${vid.thumbnail_url}`) : undefined}
++                                                src={vid.video_url.startsWith('https') ? vid.video_url : (vid.video_url.includes('s3') ? vid.video_url : `/s3/public/${vid.video_url}`)}
++                                            />
++                                        )
+                                     ) : (
+                                         <div className="relative w-full h-full">
+                                             <img 
+@@ -329,17 +390,10 @@ function ModuleItem({ module, course }: { module: CourseModule, course: Course }
+                                                 alt=""
+                                             />
+                                             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 gap-3">
+-                                                <div className="h-10 w-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg transform group-hover/poster:scale-110 transition-transform">
+-                                                    <ExternalLink className="h-5 w-5 text-white" />
++                                                <div className="h-10 w-10 bg-slate-500 rounded-xl flex items-center justify-center shadow-lg">
++                                                    <AlertTriangle className="h-5 w-5 text-white" />
+                                                 </div>
+-                                                <Button 
+-                                                    variant="secondary" 
+-                                                    size="sm" 
+-                                                    className="h-8 rounded-lg text-[10px] font-black uppercase tracking-widest bg-white/90"
+-                                                    onClick={() => window.open(vid.drive_link, '_blank')}
+-                                                >
+-                                                    Open Link
+-                                                </Button>
++                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">No Video Configured</span>
+                                             </div>
+                                         </div>
+                                     )}
+@@ -365,6 +419,41 @@ function ModuleItem({ module, course }: { module: CourseModule, course: Course }
+                         ))}
+                     </div>
+                 )}
++
++                {/* Live Video Preview Modal */}
++                <Dialog open={!!previewingVideo} onOpenChange={(open) => { if(!open) setPreviewingVideo(null); }}>
++                    <DialogContent className="max-w-4xl p-0 overflow-hidden bg-black border-slate-800 rounded-3xl">
++                        <DialogHeader className="sr-only">
++                            <DialogTitle>{previewingVideo?.title}</DialogTitle>
++                            <DialogDescription>Video Preview</DialogDescription>
++                        </DialogHeader>
++                        {previewingVideo && (
++                            <div className="flex flex-col">
++                                <div className="relative aspect-video bg-black w-full flex items-center justify-center">
++                                    {previewingVideo.video_url ? (
++                                        <video 
++                                            src={previewingVideo.video_url.startsWith('https') ? previewingVideo.video_url : (previewingVideo.video_url.includes('s3') ? previewingVideo.video_url : `/s3/public/${previewingVideo.video_url}`)} 
++                                            controls 
++                                            autoPlay 
++                                            className="w-full h-full"
++                                        />
++                                    ) : (
++                                        <iframe
++                                            src={`https://drive.google.com/file/d/${getGoogleDriveFileId(previewingVideo.drive_link)}/preview`}
++                                            className="w-full h-full border-0 absolute inset-0 min-h-[450px]"
++                                            allow="autoplay; encrypted-media"
++                                            allowFullScreen
++                                        />
++                                    )}
++                                </div>
++                                <div className="p-6 bg-slate-900 text-white">
++                                    <h3 className="text-lg font-bold mb-1">{previewingVideo.title}</h3>
++                                    <p className="text-xs text-slate-400">Google Drive Video Lesson Preview</p>
++                                </div>
++                            </div>
++                        )}
++                    </DialogContent>
++                </Dialog>
+             </CardContent>
+         </Card>
+     );
+@@ -396,6 +485,106 @@ export function CourseBuilder({ course, onBack }: CourseBuilderProps) {
+     const [isUploaderOpen, setIsUploaderOpen] = useState(false);
+     const [activeTab, setActiveTab] = useState<'syllabus' | 'batches'>('syllabus');
+ 
++    const { userRole } = useAuth();
++    const [enrolledStudents, setEnrolledStudents] = useState<RosterStudent[]>([]);
++    const [instructorDetails, setInstructorDetails] = useState<any[]>([]);
++    const [peopleSearchQuery, setPeopleSearchQuery] = useState('');
++    const [isPeopleLoading, setIsPeopleLoading] = useState(false);
++
++    const filteredStudents = useMemo(() => {
++        if (!peopleSearchQuery.trim()) return enrolledStudents;
++        const q = peopleSearchQuery.toLowerCase();
++        return enrolledStudents.filter(s => 
++            (s.full_name && s.full_name.toLowerCase().includes(q)) || 
++            (s.email && s.email.toLowerCase().includes(q))
++        );
++    }, [enrolledStudents, peopleSearchQuery]);
++
++    useEffect(() => {
++        const loadInstructor = async () => {
++            if (!course.id) return;
++            try {
++                const instructorIds = new Set<string>();
++                const getUserIdString = (userVal: any): string | null => {
++                    if (!userVal) return null;
++                    if (typeof userVal === 'string') return userVal;
++                    if (typeof userVal === 'object') return userVal._id || userVal.id || null;
++                    return null;
++                };
++
++                const primaryId = getUserIdString(course.instructor_id);
++                if (primaryId) instructorIds.add(primaryId);
++
++                if (Array.isArray(course.instructor_ids)) {
++                    course.instructor_ids.forEach(id => {
++                        const resolvedId = getUserIdString(id);
++                        if (resolvedId) instructorIds.add(resolvedId);
++                    });
++                }
++
++                const resolvedInstructors: any[] = [];
++                if (instructorIds.size > 0) {
++                    await Promise.all(
++                        Array.from(instructorIds).map(async (id) => {
++                            try {
++                                const details = await fetchWithAuth(`/admin/lookup-user/${id}`);
++                                if (details) {
++                                    resolvedInstructors.push(details);
++                                }
++                            } catch (err) {
++                                console.warn(`Failed to resolve instructor ${id}`, err);
++                                resolvedInstructors.push({
++                                    user_id: id,
++                                    full_name: id === primaryId ? 'Primary Instructor' : 'Co-Instructor',
++                                    email: 'Hidden/Restricted',
++                                    role: 'instructor'
++                                });
++                            }
++                        })
++                    );
++                }
++                setInstructorDetails(resolvedInstructors);
++            } catch (e) {
++                console.error("Failed to resolve instructors on mount", e);
++            }
++        };
++
++        const loadStudents = async () => {
++            if (!course.id) return;
++            try {
++                setIsPeopleLoading(true);
++                const rosterData = await fetchWithAuth(`/batches/course-roster/${course.id}`) as any;
++                if (rosterData) {
++                    const allStudents: RosterStudent[] = [];
++                    const seenIds = new Set<string>();
++
++                    const groups = ['morning', 'afternoon', 'evening', 'unassigned'];
++                    groups.forEach(g => {
++                        if (Array.isArray(rosterData[g])) {
++                            rosterData[g].forEach((stud: any) => {
++                                if (stud && stud.student_id && !seenIds.has(stud.student_id)) {
++                                    seenIds.add(stud.student_id);
++                                    allStudents.push({
++                                        ...stud,
++                                        batch: stud.batch || (g !== 'unassigned' ? { name: g.charAt(0).toUpperCase() + g.slice(1), type: g } : null)
++                                    });
++                                }
++                            });
++                        }
++                    });
++                    setEnrolledStudents(allStudents);
++                }
++            } catch (e) {
++                console.error("Failed to fetch students on mount", e);
++            } finally {
++                setIsPeopleLoading(false);
++            }
++        };
++
++        loadInstructor();
++        loadStudents();
++    }, [course.id, course.instructor_id, course.instructor_ids]);
++
+     useEffect(() => {
+         if (isAddModuleDialogOpen) {
+             const loadBatches = async () => {
+@@ -652,6 +841,8 @@ export function CourseBuilder({ course, onBack }: CourseBuilderProps) {
+                                                 courseId={course.id}
+                                                 courseStatus={course.status || 'draft'}
+                                                 hideVideoList={true}
++                                                instructorDetails={instructorDetails}
++                                                enrolledStudents={enrolledStudents}
+                                             />
+                                         </div>
+                                     </CollapsibleContent>
+@@ -678,7 +869,13 @@ export function CourseBuilder({ course, onBack }: CourseBuilderProps) {
+                                 ) : (
+                                     <div className="space-y-4">
+                                         {modules.map((mod: CourseModule) => (
+-                                            <ModuleItem key={mod.id} module={mod} course={course} />
++                                            <ModuleItem 
++                                                key={mod.id} 
++                                                module={mod} 
++                                                course={course} 
++                                                instructorDetails={instructorDetails}
++                                                enrolledStudents={enrolledStudents}
++                                            />
+                                         ))}
+                                     </div>
+                                 )}
+@@ -709,6 +906,25 @@ export function CourseBuilder({ course, onBack }: CourseBuilderProps) {
+                                     </CardHeader>
+                                     <CardContent className="p-6 space-y-6">
+                                         <div className="space-y-4">
++                                            {/* Primary Instructor Sidebar Card */}
++                                            {instructorDetails.length > 0 && (
++                                                <div className="flex flex-col gap-1.5 pt-2">
++                                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assigned Instructor</span>
++                                                    <div className="p-3 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-3 group-hover:bg-white group-hover:shadow-md group-hover:border-transparent transition-all duration-500">
++                                                        <Avatar className="h-8 w-8 border border-white shadow-sm shrink-0">
++                                                            <AvatarImage src={instructorDetails[0].avatar_url} />
++                                                            <AvatarFallback className="bg-primary/5 text-primary font-black text-xs">
++                                                                {instructorDetails[0].full_name ? instructorDetails[0].full_name[0].toUpperCase() : 'I'}
++                                                            </AvatarFallback>
++                                                        </Avatar>
++                                                        <div className="min-w-0 flex-1">
++                                                            <p className="text-xs font-black text-slate-800 truncate leading-none">{instructorDetails[0].full_name}</p>
++                                                            <p className="text-[9px] text-slate-400 font-bold truncate mt-1 leading-none">{instructorDetails[0].email}</p>
++                                                        </div>
++                                                    </div>
++                                                </div>
++                                            )}
++
+                                             <div className="flex flex-col gap-1.5">
+                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</span>
+                                                 <div className="p-3.5 rounded-2xl bg-slate-50 border border-slate-100/50 flex items-center justify-between group-hover:bg-white group-hover:shadow-md group-hover:border-transparent transition-all duration-500">

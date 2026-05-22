@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -236,7 +236,38 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const [coursesRefreshKey, setCoursesRefreshKey] = useState(0);
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState("users");
+  const tabsListRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState(() => {
+    // Priority: URL path > localStorage > default
+    const saved = localStorage.getItem("adminActiveTab");
+    return saved || "users";
+  });
+
+  // Scroll active tab into view
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (activeTab && tabsListRef.current) {
+        const activeElement = tabsListRef.current.querySelector(
+          `[data-value="${activeTab}"], [value="${activeTab}"], [data-state="active"]`
+        );
+        if (activeElement) {
+          activeElement.scrollIntoView({
+            behavior: "smooth",
+            block: "nearest",
+            inline: "center",
+          });
+        }
+      }
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [activeTab]);
+
+  // Save active tab to localStorage whenever it changes
+  useEffect(() => {
+    if (activeTab) {
+      localStorage.setItem("adminActiveTab", activeTab);
+    }
+  }, [activeTab]);
 
   const adminData = useAdminData(userRole);
   const [selectedCourseDetail, setSelectedCourseDetail] =
@@ -392,14 +423,20 @@ export default function AdminDashboard() {
       "/admin/student-performance": "student-performance",
       "/admin/grading": "grading",
       "/admin/resume-scans": "resume-scans",
+      "/admin/ai-hub": "ai-hub",
     };
 
     const path = location.pathname;
     const tab = tabUrlMap[path];
     if (tab) {
       setActiveTab(tab);
+    } else if (path === "/admin") {
+      const saved = localStorage.getItem("adminActiveTab");
+      if (saved && saved !== "users") {
+        navigate(`/admin/${saved}`, { replace: true });
+      }
     }
-  }, [location.pathname]);
+  }, [location.pathname, navigate]);
 
   if (authLoading) {
     return (
@@ -597,11 +634,17 @@ export default function AdminDashboard() {
             {/* Management Portal */}
             <Tabs
               value={activeTab}
-              onValueChange={setActiveTab}
+              onValueChange={(value) => {
+                setActiveTab(value);
+                navigate(`/admin/${value}`);
+              }}
               className="space-y-6"
             >
               <div className="flex flex-col gap-4 border-b border-slate-200">
-                <div className="w-full overflow-x-auto scrollbar-hide pb-2">
+                <div 
+                  ref={tabsListRef}
+                  className="w-full overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 pb-2"
+                >
                   <TabsList className="bg-transparent h-auto p-0 gap-6 sm:gap-8 flex min-w-max">
                     {[
                       {
@@ -624,7 +667,7 @@ export default function AdminDashboard() {
                       },
                       {
                         id: "student-performance",
-                        label: "Student Hub",
+                        label: "Student Hub3",
                         icon: BarChart3,
                         key: "tab-student-performance",
                       },

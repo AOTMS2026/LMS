@@ -102,6 +102,7 @@ interface GroupedRoster {
   evening: RosterStudent[];
   unassigned: RosterStudent[];
   byBatch: Record<string, RosterStudent[]>;
+  all?: RosterStudent[];
 }
 
 interface BatchRequest {
@@ -155,12 +156,19 @@ function DraggableStudentCard({ student, onRemove }: { student: RosterStudent, o
         <Avatar className="h-10 w-10 border-2 border-white shadow-sm pointer-events-none">
           <AvatarImage src={student.avatar_url} />
           <AvatarFallback className="bg-slate-100 text-slate-400 font-bold text-xs">
-            {student.full_name.split(' ').map(n => n[0]).join('')}
+            {student.full_name ? student.full_name.split(' ').filter(Boolean).map(n => n[0]).join('').toUpperCase() : '?'}
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 min-w-0 pointer-events-none">
           <p className="text-sm font-black text-slate-900 truncate">{student.full_name}</p>
-          <p className="text-[10px] font-bold text-slate-500 truncate">{student.email}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+            <p className="text-[10px] font-bold text-slate-500 truncate max-w-[120px]">{student.email}</p>
+            {student.batch && (
+              <Badge className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md px-1.5 py-0.5 scale-90 shrink-0 whitespace-nowrap">
+                {student.batch.name}
+              </Badge>
+            )}
+          </div>
         </div>
         {!isDragging && student.batch && (
            <Button 
@@ -238,6 +246,7 @@ export function BatchManager({ courseId, courseTitle, assignedSession }: BatchMa
   const [viewMode, setViewMode] = useState<'batches' | 'roster' | 'requests'>('batches');
   const [rosterFilter, setRosterFilter] = useState<'morning' | 'afternoon' | 'evening' | 'unassigned'>('morning');
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
+  const [rosterSearchQuery, setRosterSearchQuery] = useState("");
   const { toast } = useToast();
   
   // Dnd-kit sensors
@@ -858,37 +867,79 @@ export function BatchManager({ courseId, courseTitle, assignedSession }: BatchMa
               <div className="flex gap-6 min-w-max pb-2">
                 {selectedBatchId ? (
                   // Single Batch View
-                  <div className="space-y-4 w-[400px]">
-                    <div className="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
-                       <div className="flex items-center gap-3">
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => setSelectedBatchId(null)}
-                            className="h-8 w-8 p-0 rounded-full hover:bg-slate-100"
-                          >
-                             <X className="h-4 w-4" />
-                          </Button>
-                          {(() => {
-                             const b = batches.find(x => x.id === selectedBatchId);
-                             return (
-                               <div>
-                                  <h4 className="font-black text-slate-900 text-sm">{b?.batch_name}</h4>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                     {b ? getSessionTime(b) : 'No Batch Selected'}
-                                  </p>
-                               </div>
-                             );
-                          })()}
-                       </div>
+                  <div className="flex gap-6 min-w-max pb-2">
+                    <div className="space-y-4 w-[320px] shrink-0">
+                      <div className="flex items-center justify-between bg-white p-4 rounded-3xl border border-slate-100 shadow-sm h-14">
+                         <div className="flex items-center gap-3">
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={() => setSelectedBatchId(null)}
+                              className="h-8 w-8 p-0 rounded-full hover:bg-slate-100"
+                            >
+                               <X className="h-4 w-4" />
+                            </Button>
+                            {(() => {
+                               const b = batches.find(x => x.id === selectedBatchId);
+                               return (
+                                 <div>
+                                    <h4 className="font-black text-slate-900 text-xs truncate max-w-[180px]">{b?.batch_name}</h4>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                                       {b ? getSessionTime(b) : 'No Batch Selected'}
+                                    </p>
+                                 </div>
+                               );
+                            })()}
+                         </div>
+                      </div>
+                      <DroppableRosterColumn 
+                        title="Allocated Students" 
+                        students={roster?.byBatch[selectedBatchId] || []} 
+                        colorClass="bg-primary/10 text-primary" 
+                        type={selectedBatchId}
+                        onRemove={handleRemoveStudent}
+                      />
                     </div>
-                    <DroppableRosterColumn 
-                      title="Allocated Students" 
-                      students={roster?.byBatch[selectedBatchId] || []} 
-                      colorClass="bg-primary/10 text-primary" 
-                      type={selectedBatchId}
-                      onRemove={handleRemoveStudent}
-                    />
+
+                    {/* Available / Full Course Roster Column */}
+                    <div className="space-y-4 w-[320px] shrink-0">
+                      <div className="flex items-center justify-between bg-white px-4 py-2 rounded-3xl border border-slate-100 shadow-sm h-14 gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Users className="h-4 w-4 text-indigo-500 shrink-0" />
+                          <div className="min-w-0">
+                            <h4 className="font-black text-slate-900 text-xs truncate">Full Course Roster</h4>
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                              All Enrolled Students
+                            </p>
+                          </div>
+                        </div>
+                        <div className="relative w-36">
+                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400" />
+                          <Input
+                            placeholder="Search..."
+                            value={rosterSearchQuery}
+                            onChange={(e) => setRosterSearchQuery(e.target.value)}
+                            className="pl-8 h-8 text-[10px] bg-slate-50/50 border-slate-100 focus-visible:ring-primary/20 rounded-xl"
+                          />
+                        </div>
+                      </div>
+                      <DroppableRosterColumn 
+                        title="Course Students" 
+                        students={(() => {
+                          const allStudents = roster?.all || [];
+                          // Filter out students already in the selected batch
+                          const available = allStudents.filter(s => s.batch?.id !== selectedBatchId);
+                          if (!rosterSearchQuery) return available;
+                          return available.filter(s => 
+                            s.full_name.toLowerCase().includes(rosterSearchQuery.toLowerCase()) ||
+                            s.email.toLowerCase().includes(rosterSearchQuery.toLowerCase())
+                          );
+                        })()} 
+                        colorClass="bg-slate-100 text-slate-700" 
+                        type="unassigned"
+                        onRemove={handleRemoveStudent}
+                      />
+                    </div>
                   </div>
                 ) : (
                   <>

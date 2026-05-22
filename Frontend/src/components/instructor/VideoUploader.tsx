@@ -10,6 +10,7 @@ import { fetchWithAuth } from "@/lib/api";
 import { Label } from "@/components/ui/label";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Lock, PlayCircle, CheckCircle, Loader2, Plus, X, Video, Layers, Image as ImageIcon, Camera, Clock, ExternalLink, Link, Pencil, Save } from "lucide-react";
+import { VideoPlayer } from "../dashboard/VideoPlayer";
 
 const deriveBatchType = (selectedIds: string[], allBatches: {id: string, batch_type: string}[]) => {
   if (selectedIds.length === 0) return 'all';
@@ -18,15 +19,132 @@ const deriveBatchType = (selectedIds: string[], allBatches: {id: string, batch_t
   return unique.length === 1 ? unique[0] : 'all';
 };
 
+import { RosterStudent } from "@/hooks/useInstructorData";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+
 interface VideoUploaderProps {
   courseId: string;
   courseStatus?: string;
   hideVideoList?: boolean;
   onSuccess?: () => void;
   initialModuleId?: string;
+  instructorDetails?: any[];
+  enrolledStudents?: RosterStudent[];
 }
 
-export function VideoUploader({ courseId, courseStatus, hideVideoList = false, onSuccess, initialModuleId }: VideoUploaderProps) {
+export function VideoUploader({ 
+  courseId, 
+  courseStatus, 
+  hideVideoList = false, 
+  onSuccess, 
+  initialModuleId,
+  instructorDetails,
+  enrolledStudents
+}: VideoUploaderProps) {
+  // Fallback states for enrolled students and instructors
+  const [localStudents, setLocalStudents] = useState<RosterStudent[]>([]);
+  const [localInstructors, setLocalInstructors] = useState<any[]>([]);
+  const [isPeopleLoading, setIsPeopleLoading] = useState(false);
+
+  // Determine what list to use: props or local
+  const finalStudents = enrolledStudents !== undefined ? enrolledStudents : localStudents;
+  const finalInstructors = instructorDetails !== undefined ? instructorDetails : localInstructors;
+
+  // Fallback dynamic roster fetch
+  useEffect(() => {
+    if (enrolledStudents === undefined && courseId) {
+      const loadStudents = async () => {
+        try {
+          setIsPeopleLoading(true);
+          const rosterData = await fetchWithAuth(`/batches/course-roster/${courseId}`) as any;
+          if (rosterData) {
+            const allStudents: RosterStudent[] = [];
+            const seenIds = new Set<string>();
+
+            const groups = ['morning', 'afternoon', 'evening', 'unassigned'];
+            groups.forEach(g => {
+              if (Array.isArray(rosterData[g])) {
+                rosterData[g].forEach((stud: any) => {
+                  if (stud && stud.student_id && !seenIds.has(stud.student_id)) {
+                    seenIds.add(stud.student_id);
+                    allStudents.push({
+                      ...stud,
+                      batch: stud.batch || (g !== 'unassigned' ? { name: g.charAt(0).toUpperCase() + g.slice(1), type: g } : null)
+                    });
+                  }
+                });
+              }
+            });
+            setLocalStudents(allStudents);
+          }
+        } catch (e) {
+          console.error("Failed to fetch students in VideoUploader fallback", e);
+        } finally {
+          setIsPeopleLoading(false);
+        }
+      };
+      loadStudents();
+    }
+  }, [courseId, enrolledStudents]);
+
+  // Fallback dynamic instructor fetch
+  useEffect(() => {
+    if (instructorDetails === undefined && courseId) {
+      const loadInstructor = async () => {
+        try {
+          const courseDetails = await fetchWithAuth(`/data/courses/${courseId}`) as any;
+          if (courseDetails) {
+            const instructorIds = new Set<string>();
+            const getUserIdString = (userVal: any): string | null => {
+              if (!userVal) return null;
+              if (typeof userVal === 'string') return userVal;
+              if (typeof userVal === 'object') return userVal._id || userVal.id || null;
+              return null;
+            };
+
+            const primaryId = getUserIdString(courseDetails.instructor_id);
+            if (primaryId) instructorIds.add(primaryId);
+
+            if (Array.isArray(courseDetails.instructor_ids)) {
+              courseDetails.instructor_ids.forEach((id: any) => {
+                const resolvedId = getUserIdString(id);
+                if (resolvedId) instructorIds.add(resolvedId);
+              });
+            }
+
+            const resolvedInstructors: any[] = [];
+            if (instructorIds.size > 0) {
+              await Promise.all(
+                Array.from(instructorIds).map(async (id) => {
+                  try {
+                    const details = await fetchWithAuth(`/admin/lookup-user/${id}`);
+                    if (details) {
+                      resolvedInstructors.push(details);
+                    }
+                  } catch (err) {
+                    console.warn(`Failed to resolve instructor ${id} in VideoUploader`, err);
+                    resolvedInstructors.push({
+                      user_id: id,
+                      full_name: id === courseDetails.instructor_id ? 'Primary Instructor' : 'Co-Instructor',
+                      email: 'Hidden/Restricted',
+                      role: 'instructor'
+                    });
+                  }
+                })
+              );
+            }
+            setLocalInstructors(resolvedInstructors);
+          }
+        } catch (e) {
+          console.error("Failed to resolve instructors in VideoUploader fallback", e);
+        }
+      };
+      loadInstructor();
+    }
+  }, [courseId, instructorDetails]);
+
+  // Filter students based on active selected batch (Moved below state declaration to avoid initialization order ReferenceError)
   const { data: modulesData, isLoading: modulesLoading } = useCourseModules(courseId);
   const modules = useMemo(() => (modulesData || []) as CourseModule[], [modulesData]);
   const { data: videosData, isLoading: videosLoading } = useModuleVideos(null, courseId);
@@ -60,6 +178,13 @@ export function VideoUploader({ courseId, courseStatus, hideVideoList = false, o
     allowed_batches: [] as string[]
   });
 
+  // Filter students based on active selected batch
+  const displayedStudents = useMemo(() => {
+    if (newVideo.allowed_batches.length === 0) return finalStudents;
+    const selectedBatchId = newVideo.allowed_batches[0];
+    return finalStudents.filter(s => s.batch?.id === selectedBatchId);
+  }, [finalStudents, newVideo.allowed_batches]);
+
   const [batches, setBatches] = useState<{ id: string, batch_name: string, batch_type: string }[]>([]);
 
   useEffect(() => {
@@ -79,9 +204,7 @@ export function VideoUploader({ courseId, courseStatus, hideVideoList = false, o
   }, [modules, modulesLoading, initialModuleId]);
 
   const toggleBatch = (id: string) => {
-    const updated = newVideo.allowed_batches.includes(id)
-      ? newVideo.allowed_batches.filter(b => b !== id)
-      : [...newVideo.allowed_batches, id];
+    const updated = newVideo.allowed_batches.includes(id) ? [] : [id];
     setNewVideo(p => ({ ...p, allowed_batches: updated, batch_type: deriveBatchType(updated, batches) }));
   };
 
@@ -328,6 +451,101 @@ export function VideoUploader({ courseId, courseStatus, hideVideoList = false, o
             </div>
           )}
 
+          {/* Contextual Instructors & Students Roster Info Card */}
+          {courseId && (finalInstructors.length > 0 || finalStudents.length > 0) && (
+            <div className="space-y-4 p-5 rounded-[1.75rem] border border-slate-200/50 bg-slate-50/50 backdrop-blur-md relative overflow-hidden transition-all duration-300">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-dashed border-slate-200/80 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">
+                    Active Roster Details
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Badge variant="secondary" className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-white border border-slate-100 text-slate-500 shadow-inner">
+                    {displayedStudents.length} {displayedStudents.length === 1 ? 'Student' : 'Students'}
+                  </Badge>
+                  {newVideo.allowed_batches.length > 0 && (
+                    <Badge className="text-[9px] font-black uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-inner">
+                      Batch Filtered
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              {/* Loader Skeleton */}
+              {isPeopleLoading ? (
+                <div className="flex items-center gap-3 py-2">
+                  <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                  <span className="text-xs text-slate-400 font-bold uppercase tracking-wider animate-pulse">Syncing platform roster...</span>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Instructors Roster */}
+                  {finalInstructors.length > 0 && (
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Assigned Instructors</span>
+                      <div className="flex flex-wrap gap-2.5">
+                        {finalInstructors.map((inst, idx) => (
+                          <div key={inst.user_id || idx} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200/60 bg-white/80 shadow-sm hover:shadow-md transition-all duration-300">
+                            <Avatar className="h-5 w-5 border border-white shadow-sm shrink-0">
+                              <AvatarImage src={inst.avatar_url} />
+                              <AvatarFallback className="bg-emerald-50 text-emerald-600 font-black text-[9px]">
+                                {inst.full_name ? inst.full_name[0].toUpperCase() : 'I'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-bold text-slate-700 block leading-tight">{inst.full_name}</span>
+                              <span className="text-[8px] font-medium text-slate-400 block leading-none">{inst.email}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Students Roster */}
+                  {displayedStudents.length === 0 ? (
+                    <div className="text-center py-4 bg-white/40 border border-dashed border-slate-200 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No enrolled students in this batch</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block">Enrolled Students</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-40 overflow-y-auto pr-1 scrollbar-none">
+                        {displayedStudents.map((stud) => (
+                          <div key={stud.student_id} className="flex items-center gap-2 p-2 rounded-xl border border-slate-100 bg-white hover:border-slate-200 hover:shadow-md transition-all duration-300">
+                            <Avatar className="h-6 w-6 border border-white shadow-sm shrink-0">
+                              <AvatarImage src={stud.avatar_url} />
+                              <AvatarFallback className="bg-primary/5 text-primary font-black text-[10px]">
+                                {stud.full_name ? stud.full_name.split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase() : '?'}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[10px] font-bold text-slate-800 block truncate leading-tight">{stud.full_name}</span>
+                              {stud.batch ? (
+                                <Badge className={cn(
+                                  "text-[7px] font-black uppercase px-1.5 py-0 border rounded leading-none mt-0.5",
+                                  stud.batch.type === 'morning' ? "bg-orange-50/50 text-orange-600 border-orange-100/50" :
+                                  stud.batch.type === 'afternoon' ? "bg-blue-50/50 text-blue-600 border-blue-100/50" :
+                                  "bg-violet-50/50 text-violet-600 border-violet-100/50"
+                                )}>
+                                  {stud.batch.name}
+                                </Badge>
+                              ) : (
+                                <span className="text-[7px] text-slate-400 block font-bold mt-0.5 uppercase tracking-wider leading-none">Unassigned</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Thumbnail (Optional) */}
           <div className="space-y-2">
             <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
@@ -491,23 +709,26 @@ export function VideoUploader({ courseId, courseStatus, hideVideoList = false, o
 
           {/* Drive Link Preview Dialog */}
           <Dialog open={!!playingVideo} onOpenChange={() => setPlayingVideo(null)}>
-            <DialogContent className="max-w-lg p-0 bg-slate-900 rounded-3xl overflow-hidden border-none">
+            <DialogContent className="max-w-5xl p-0 overflow-hidden bg-black border-slate-800 rounded-2xl">
               <DialogHeader className="sr-only"><DialogTitle>{playingVideo?.title}</DialogTitle></DialogHeader>
               {playingVideo && (
-                <div className="p-10 text-center space-y-6">
-                  <div className="h-20 w-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto border border-amber-500/20">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" className="text-amber-400">
-                      <path fill="currentColor" d="M20.21 12l-3.3 5.72h-6.6L13.61 12l-3.3-5.71h6.61l3.29 5.71zm-9.91-5.71L7 6.29L3.71 12l3.3 5.71h6.6L10.31 12zM2.87 13.71L6.16 19.43l3.3-5.72z" />
-                    </svg>
+                <div className="flex flex-col">
+                  <div className="relative aspect-video bg-black w-full">
+                    <VideoPlayer
+                      url={playingVideo.drive_link || playingVideo.video_url || ''}
+                      videoId={playingVideo.id || 'unknown'}
+                      courseId={courseId}
+                    />
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-white">{playingVideo.title}</h3>
-                    <p className="text-slate-400 text-sm mt-1">Hosted on Google Drive</p>
+                  <div className="p-6 bg-slate-900 text-white">
+                    <h3 className="text-xl font-bold mb-2">{playingVideo.title}</h3>
+                    <div className="flex items-center justify-between text-sm text-slate-400">
+                      <span className="flex items-center gap-1.5">
+                        <Clock className="h-4 w-4" />
+                        Uploaded {formatDate(playingVideo.created_at)}
+                      </span>
+                    </div>
                   </div>
-                  <Button className="h-12 px-8 bg-amber-500 hover:bg-amber-400 text-white font-bold rounded-xl"
-                    onClick={() => window.open(playingVideo.drive_link, '_blank')}>
-                    <ExternalLink className="h-4 w-4 mr-2" /> Open in Google Drive
-                  </Button>
                 </div>
               )}
             </DialogContent>

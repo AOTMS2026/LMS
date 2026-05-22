@@ -24,7 +24,7 @@ cloudinary.config({
 
 // Import Mongoose Models
 const { User, Profile, UserRole, OTP, VerifiedEmail, ResumeScan } = require('./models/User');
-const { Course, Enrollment, Module, Resource, CourseRating, Video, Announcement, Timeline } = require('./models/Course');
+const { Course, Enrollment, Module, Resource, CourseRating, Video, Announcement, Timeline, VideoProgress } = require('./models/Course');
 const { Exam, QuestionBank, StudentExamAccess, ExamResult, MockPaper, MockTestConfig } = require('./models/Exam');
 const { LiveClass } = require('./models/Content');
 const { SystemLog, SecurityEvent, LeaderboardStat, Notification, Attendance, Coupon, CouponRedemption, College } = require('./models/System');
@@ -67,7 +67,8 @@ const MODEL_MAP = {
     'course_announcements': Announcement,
     'coupons': Coupon,
     'coupon_redemptions': CouponRedemption,
-    'colleges': College
+    'colleges': College,
+    'video_progress': VideoProgress
 };
 
 const ALLOWED_TABLES = Object.keys(MODEL_MAP);
@@ -3614,6 +3615,213 @@ app.get('/api/courses/enrollment/:courseId', authenticateToken, async (req, res)
     }
 });
 
+// GET progress for a single video (VideoPlayer.tsx)
+app.get('/api/progress/:videoId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { videoId } = req.params;
+
+        const progress = await VideoProgress.findOne({ user_id: userId, video_id: videoId }).lean();
+        if (!progress) {
+            return res.json({ last_watched_time: 0, watched_percentage: 0, completed: false });
+        }
+        res.json(progress);
+    } catch (err) {
+        handleError(res, err, 'get-video-progress');
+    }
+});
+
+// POST save progress from VideoPlayer.tsx
+app.post('/api/progress/save', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { videoId, courseId, watchedPercentage, lastWatchedTime, completed } = req.body;
+
+        if (!videoId || !courseId) {
+            return res.status(400).json({ error: 'videoId and courseId are required' });
+        }
+
+        let progress = await VideoProgress.findOne({ user_id: userId, course_id: courseId, video_id: videoId });
+        if (progress) {
+            progress.watched_percentage = Math.max(progress.watched_percentage || 0, watchedPercentage || 0);
+            progress.last_watched_time = lastWatchedTime || 0;
+            progress.completed = progress.completed || !!completed;
+            progress.updated_at = new Date();
+            await progress.save();
+        } else {
+            progress = new VideoProgress({
+                user_id: userId,
+                course_id: courseId,
+                video_id: videoId,
+                watched_percentage: watchedPercentage || 0,
+                last_watched_time: lastWatchedTime || 0,
+                completed: !!completed
+            });
+            await progress.save();
+        }
+
+        // Recalculate overall course enrollment progress
+        try {
+            const totalVideos = await Video.countDocuments({ course_id: courseId });
+            if (totalVideos > 0) {
+                const completedProgress = await VideoProgress.countDocuments({
+                    user_id: userId,
+                    course_id: courseId,
+                    completed: true
+                });
+                const progressPct = Math.round((completedProgress / totalVideos) * 100);
+                await Enrollment.findOneAndUpdate(
+                    { user_id: userId, course_id: courseId },
+                    { progress_percentage: Math.min(100, progressPct) }
+                );
+            }
+        } catch (err) {
+            console.error('Error updating enrollment progress:', err);
+        }
+
+        res.json({ message: 'Progress saved successfully', progress });
+    } catch (err) {
+        handleError(res, err, 'save-progress');
+    }
+});
+
+// Stream Proxy for Google Drive Videos
+app.get('/api/video/proxy-drive', async (req, res) => {
+    try {
+        const { fileId } = req.query;
+        if (!fileId) {
+            return res.status(400).json({ error: 'fileId query parameter is required' });
+        }
+
+        // Use the universal direct download link for better compatibility
+        const driveUrl = `https://drive.google.com/uc?id=${fileId}&export=download`;
+
+        // Forward Range header from the browser to support seeking/scrubbing
+        const headers = {};
+        if (req.headers.range) {
+            headers['Range'] = req.headers.range;
+        }
+
+        // Fetch from Google Drive with responseType stream
+        const response = await axios({
+            method: 'get',
+            url: driveUrl,
+            headers: headers,
+            responseType: 'stream',
+            validateStatus: false
+        });
+
+        // Copy matching headers from Google Drive response to Express response
+        const headersToForward = [
+            'content-type',
+            'content-length',
+            'content-range',
+            'accept-ranges',
+            'cache-control'
+        ];
+
+        res.status(response.status);
+        headersToForward.forEach(header => {
+            if (response.headers[header]) {
+                res.setHeader(header, response.headers[header]);
+            }
+        });
+
+        // Pipe the stream to response
+        response.data.pipe(res);
+
+        // Handle client abort/close to clean up connection
+        req.on('close', () => {
+            if (response.data && typeof response.data.destroy === 'function') {
+                response.data.destroy();
+            }
+        });
+    } catch (err) {
+        console.error('Error proxying Google Drive video:', err);
+        res.status(500).json({ error: 'Failed to proxy Google Drive video' });
+    }
+});
+
+
+// GET video progress for an entire course (StudentVideoLibrary.tsx)
+app.get('/api/student/video-progress/:courseId', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { courseId } = req.params;
+
+        const progressList = await VideoProgress.find({ user_id: userId, course_id: courseId }).lean();
+        
+        // Map to expected format: { video_id, watched_seconds, total_seconds, completed }
+        const mappedList = progressList.map(p => ({
+            video_id: p.video_id,
+            watched_seconds: p.last_watched_time || 0,
+            total_seconds: p.last_watched_time && p.watched_percentage ? Math.round((p.last_watched_time / (p.watched_percentage / 100))) : 0,
+            completed: !!p.completed
+        }));
+
+        res.json(mappedList);
+    } catch (err) {
+        handleError(res, err, 'get-student-course-video-progress');
+    }
+});
+
+// POST save progress from StudentVideoLibrary.tsx
+app.post('/api/student/video-progress', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { courseId, videoId, watchedSeconds, totalSeconds } = req.body;
+
+        if (!videoId || !courseId) {
+            return res.status(400).json({ error: 'courseId and videoId are required' });
+        }
+
+        const watchedPercentage = totalSeconds > 0 ? Math.min(100, Math.floor((watchedSeconds / totalSeconds) * 100)) : 0;
+        const completed = watchedPercentage >= 95;
+
+        let progress = await VideoProgress.findOne({ user_id: userId, course_id: courseId, video_id: videoId });
+        if (progress) {
+            progress.watched_percentage = Math.max(progress.watched_percentage || 0, watchedPercentage);
+            progress.last_watched_time = watchedSeconds;
+            progress.completed = progress.completed || completed;
+            progress.updated_at = new Date();
+            await progress.save();
+        } else {
+            progress = new VideoProgress({
+                user_id: userId,
+                course_id: courseId,
+                video_id: videoId,
+                watched_percentage: watchedPercentage,
+                last_watched_time: watchedSeconds,
+                completed: completed
+            });
+            await progress.save();
+        }
+
+        // Recalculate overall course enrollment progress
+        try {
+            const totalVideos = await Video.countDocuments({ course_id: courseId });
+            if (totalVideos > 0) {
+                const completedProgress = await VideoProgress.countDocuments({
+                    user_id: userId,
+                    course_id: courseId,
+                    completed: true
+                });
+                const progressPct = Math.round((completedProgress / totalVideos) * 100);
+                await Enrollment.findOneAndUpdate(
+                    { user_id: userId, course_id: courseId },
+                    { progress_percentage: Math.min(100, progressPct) }
+                );
+            }
+        } catch (err) {
+            console.error('Error updating enrollment progress:', err);
+        }
+
+        res.json({ message: 'Video progress updated', progress });
+    } catch (err) {
+        handleError(res, err, 'save-student-video-progress');
+    }
+});
+
 app.get('/api/student/my-courses', authenticateToken, async (req, res) => {
     try {
         // Fetch enrollments and student batch assignments
@@ -5997,12 +6205,25 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
         } else if (role === 'instructor') {
             console.log(`[ACL] Instructor access to ${table}`);
 
-            // Content isolation: Instructors ONLY see their own modules, videos, etc.
+            // Content isolation: Instructors ONLY see their own modules, videos, etc. OR content for courses they are assigned to
             if ([
                 'course_modules', 'course_videos', 'course_resources',
                 'course_announcements', 'course_timeline', 'course_topics'
             ].includes(table)) {
-                const contentFilter = { instructor_id: req.user.id };
+                const myCourses = await Course.find({
+                    $or: [
+                        { instructor_id: req.user.id },
+                        { instructor_ids: req.user.id }
+                    ]
+                }).select('_id').lean();
+                const myCourseIds = myCourses.map(c => c._id);
+
+                const contentFilter = {
+                    $or: [
+                        { instructor_id: req.user.id },
+                        { course_id: { $in: myCourseIds } }
+                    ]
+                };
                 if (Object.keys(query).length > 0) {
                     query = { $and: [query, contentFilter] };
                 } else {
@@ -6519,21 +6740,6 @@ app.delete('/api/data/:table/:id', authenticateToken, async (req, res) => {
         if (table === 'course_videos') {
             await deleteFromS3(itemToDelete.video_url);
             await deleteFromS3(itemToDelete.thumbnail_url);
-
-            // Cascade: Delete the entire unit (Module + siblings) as requested
-            if (itemToDelete.module_id) {
-                console.log(`[CASCADE] Video deleted, purging entire unit for module ${itemToDelete.module_id}`);
-                const siblings = await Model.find({ module_id: itemToDelete.module_id });
-                for (const sib of siblings) {
-                    if (sib._id.toString() !== id) { // Don't try to delete the one we just deleted again
-                        await deleteFromS3(sib.video_url);
-                        await deleteFromS3(sib.thumbnail_url);
-                        await Model.findByIdAndDelete(sib._id);
-                    }
-                }
-                const parentModuleModel = Model.db.model('Module');
-                await parentModuleModel.findByIdAndDelete(itemToDelete.module_id);
-            }
         } else if (table === 'course_resources') {
             await deleteFromS3(itemToDelete.file_url);
         } else if (table === 'course_modules') {
@@ -7156,7 +7362,12 @@ app.post('/api/batches/student-request', authenticateToken, async (req, res) => 
         const existingAssignment = await StudentBatch.findOne({ student_id: userId, course_id: courseId }).populate('batch_id').lean();
 
         const student = await Profile.findOne({ user_id: userId }).lean();
-        const instructorIds = (course.instructor_ids || []).filter(id => id);
+        const instructorIdsList = [];
+        if (course.instructor_id) instructorIdsList.push(course.instructor_id);
+        if (course.instructor_ids && Array.isArray(course.instructor_ids)) {
+            instructorIdsList.push(...course.instructor_ids);
+        }
+        const instructorIds = [...new Set(instructorIdsList.map(id => id.toString()))];
 
         if (!existingAssignment) {
             // Initial Assignment - Auto Approve but Notify Instructor
@@ -7216,6 +7427,7 @@ app.post('/api/batches/student-request', authenticateToken, async (req, res) => 
                 { student_id: userId, course_id: courseId, status: 'pending' },
                 {
                     batch_id: batchId,
+                    requested_session: batch.batch_type,
                     type: 'change',
                     requested_at: new Date()
                 },
@@ -7275,16 +7487,22 @@ app.get('/api/batches/requests/pending', authenticateToken, requireInstructor, a
             .populate('batch_id', 'batch_name batch_type')
             .lean();
 
-        // Filter by instructor's courses
-        const instructorCourses = await Course.find({
-            $or: [
-                { instructor_id: req.user.id },
-                { instructor_ids: req.user.id }
-            ]
-        }).select('_id').lean();
-        const courseIds = instructorCourses.map(c => c._id.toString());
+        const userRole = await getUserRole(req.user.id);
 
-        const filtered = requests.filter(r => r.course_id && r.course_id._id && courseIds.includes(r.course_id._id.toString()));
+        let filtered;
+        if (userRole === 'admin' || userRole === 'manager') {
+            filtered = requests.filter(r => r.course_id && r.course_id._id);
+        } else {
+            // Filter by instructor's courses
+            const instructorCourses = await Course.find({
+                $or: [
+                    { instructor_id: req.user.id },
+                    { instructor_ids: req.user.id }
+                ]
+            }).select('_id').lean();
+            const courseIds = instructorCourses.map(c => c._id.toString());
+            filtered = requests.filter(r => r.course_id && r.course_id._id && courseIds.includes(r.course_id._id.toString()));
+        }
         res.json(filtered.map(r => ({ ...r, id: r._id.toString() })));
     } catch (err) {
         handleError(res, err, 'get-pending-requests');
@@ -7300,12 +7518,16 @@ app.post('/api/batches/requests/:requestId/approve', authenticateToken, requireI
         // Update Assignment
         const previous = await StudentBatch.findOne({ student_id: request.student_id, course_id: request.course_id }).lean();
 
+        // Fetch target batch to get its batch_type for the required enum field
+        const batch = await Batch.findById(request.batch_id).lean();
+        const batchType = batch ? batch.batch_type : 'morning';
+
         // Update or create student batch assignment with the requested session
         await StudentBatch.findOneAndUpdate(
             { student_id: request.student_id, course_id: request.course_id },
             {
                 batch_id: request.batch_id,
-                assigned_session: request.requested_session || 'all',
+                assigned_session: request.requested_session || batchType,
                 previous_batch_id: previous ? previous.batch_id : null,
                 assigned_by: req.user.id,
                 updated_at: new Date()

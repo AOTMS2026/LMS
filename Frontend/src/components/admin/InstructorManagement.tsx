@@ -82,6 +82,8 @@ interface Course {
   category?: string;
   instructor_ids?: string[];
   instructors?: { id: string; full_name: string; avatar_url: string }[];
+  instructor_id?: string;
+  course_id?: string;
 }
 
 interface MockPaper {
@@ -143,6 +145,8 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
     {},
   );
   const [loadingMockData, setLoadingMockData] = useState(false);
+  const [assignmentBatches, setAssignmentBatches] = useState<Batch[]>([]);
+  const [loadingAssignments, setLoadingAssignments] = useState(false);
 
   const loadData = async (showToast = false) => {
     setLoading(true);
@@ -182,8 +186,8 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
 
     try {
       const assignedCourseIds = courses
-        .filter((c) => c.instructor_ids?.includes(instructor.user_id))
-        .map((c) => c.id);
+        .filter((c) => c.instructor_id === instructor.user_id)
+        .map((c) => c.course_id || c.id);
 
       if (assignedCourseIds.length > 0) {
         const batches = (await fetchWithAuth(
@@ -248,9 +252,45 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
     }
   };
 
-  const handleOpenManageAssignments = (instructor: Instructor) => {
+  const handleOpenManageAssignments = async (instructor: Instructor) => {
     setSelectedInstructor(instructor);
     setManageAssignmentsOpen(true);
+    setLoadingAssignments(true);
+    setAssignmentBatches([]);
+    try {
+      const assignedCourseIds = courses
+        .filter((c) => c.instructor_id === instructor.user_id)
+        .map((c) => c.course_id || c.id);
+
+      if (assignedCourseIds.length > 0) {
+        const batches = (await fetchWithAuth(
+          `/data/batches?course_id=in.(${assignedCourseIds.join(",")})`,
+        )) as Batch[];
+
+        if (batches && batches.length > 0) {
+          const batchIds = batches.map((b) => b.id);
+          const studentBatches = (await fetchWithAuth(
+            `/data/student_batches?batch_id=in.(${batchIds.join(",")})`,
+          )) as StudentBatch[];
+
+          const batchesWithCounts = batches.map((b) => ({
+            ...b,
+            studentCount: new Set(
+              studentBatches
+                .filter((sb) => sb.batch_id === b.id)
+                .map((sb) => sb.student_id),
+            ).size,
+          }));
+          setAssignmentBatches(batchesWithCounts);
+        } else {
+          setAssignmentBatches([]);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load assignment batches:", err);
+    } finally {
+      setLoadingAssignments(false);
+    }
   };
 
   const handleAssignCourse = async () => {
@@ -342,8 +382,16 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
       i.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  // Filter courses for the dropdown
-  const filteredCoursesDropdown = courses.filter((course) => {
+  // Filter and deduplicate courses for the dropdown
+  const uniqueCourses = courses.reduce((acc, current) => {
+    const courseId = current.course_id || current.id;
+    if (!acc.some((item) => (item.course_id || item.id) === courseId)) {
+      acc.push(current);
+    }
+    return acc;
+  }, [] as Course[]);
+
+  const filteredCoursesDropdown = uniqueCourses.filter((course) => {
     if (showAllCourses) return true;
     // By default, only show courses where this instructor is NOT already assigned
     return !course.instructor_ids?.includes(selectedInstructor?.user_id || "");
@@ -468,9 +516,15 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredInstructors.map((instructor) => {
-            const assignedCourses = courses.filter((c) =>
-              c.instructor_ids?.includes(instructor.user_id),
-            );
+            const assignedCourses = courses
+              .filter((c) => c.instructor_id === instructor.user_id)
+              .reduce((acc, current) => {
+                const courseId = current.course_id || current.id;
+                if (!acc.some((c) => (c.course_id || c.id) === courseId)) {
+                  acc.push(current);
+                }
+                return acc;
+              }, [] as Course[]);
             const isSuspended = instructor.status === "suspended";
 
             return (
@@ -530,14 +584,6 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
                         <DropdownMenuLabel className="px-3 py-2 text-[10px] font-black uppercase text-slate-400 tracking-[0.2em]">
                           Operations
                         </DropdownMenuLabel>
-                        <DropdownMenuSeparator className="bg-slate-100" />
-                        <DropdownMenuItem
-                          onClick={() => handleOpenAssignModal(instructor)}
-                          className="rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest text-slate-600 focus:bg-slate-900 focus:text-white transition-colors cursor-pointer"
-                        >
-                          <Plus className="h-4 w-4 mr-3 text-indigo-500" />{" "}
-                          Assign Course
-                        </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>
                             handleOpenManageAssignments(instructor)
@@ -991,64 +1037,170 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
         open={manageAssignmentsOpen}
         onOpenChange={setManageAssignmentsOpen}
       >
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Managed Assigned Courses</DialogTitle>
-            <DialogDescription>
-              Courses currently assigned to{" "}
-              <b>{selectedInstructor?.full_name}</b>. You can unassign them from
-              here.
+        <DialogContent className="sm:max-w-2xl bg-white/95 backdrop-blur-xl border-none shadow-2xl rounded-[2.5rem] p-0 overflow-hidden pro-modal">
+          <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-br from-indigo-500/20 via-indigo-50/5 to-transparent pointer-events-none" />
+
+          <DialogHeader className="p-8 pb-4 relative z-10 space-y-4">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <DialogTitle className="flex items-center gap-3 text-2xl font-black text-slate-900 tracking-tight text-center sm:text-left">
+                <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center border border-indigo-100 shadow-inner group shrink-0">
+                  <BookOpen className="h-6 w-6 text-indigo-600 group-hover:rotate-12 transition-transform" />
+                </div>
+                <div className="flex flex-col sm:flex-row items-center sm:gap-2">
+                  <span>Current</span>
+                  <span className="text-indigo-600 italic">Assignments</span>
+                </div>
+              </DialogTitle>
+              <Badge className="bg-indigo-50 text-indigo-600 border-none px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest shrink-0">
+                Faculty workload
+              </Badge>
+            </div>
+            <DialogDescription className="text-slate-500 font-medium text-sm mt-1 text-center sm:text-left">
+              Courses and active batch sessions currently assigned to <b>{selectedInstructor?.full_name}</b>.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4 space-y-3 max-h-[400px] overflow-y-auto">
-            {courses.filter((c) =>
-              c.instructor_ids?.includes(selectedInstructor?.user_id || ""),
-            ).length === 0 ? (
-              <p className="text-center text-muted-foreground py-8">
-                No courses assigned.
-              </p>
-            ) : (
-              courses
-                .filter((c) =>
-                  c.instructor_ids?.includes(selectedInstructor?.user_id || ""),
-                )
-                .map((course) => (
+          <div className="px-8 pb-8 pt-2 space-y-6 relative z-10 max-h-[60vh] overflow-y-auto scrollbar-hide">
+            {loadingAssignments ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  Loading assignment details...
+                </p>
+              </div>
+            ) : (() => {
+              const uniqueAssignedCourses = courses
+                .filter((c) => c.instructor_id === selectedInstructor?.user_id)
+                .reduce((acc, current) => {
+                  const courseId = current.course_id || current.id;
+                  if (!acc.some((c) => (c.course_id || c.id) === courseId)) {
+                    acc.push(current);
+                  }
+                  return acc;
+                }, [] as Course[]);
+
+              if (uniqueAssignedCourses.length === 0) {
+                return (
+                  <div className="p-12 text-center bg-slate-50/50 rounded-[2rem] border-2 border-dashed border-slate-200">
+                    <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                      <BookOpen className="h-8 w-8 text-slate-300" />
+                    </div>
+                    <p className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">
+                      No assigned courses found
+                    </p>
+                    <p className="text-[10px] text-slate-300 font-bold mt-2 uppercase">
+                      ASSIGN COURSES FROM CURRICULUM MANAGEMENT
+                    </p>
+                  </div>
+                );
+              }
+
+              return uniqueAssignedCourses.map((course) => {
+                const courseBatches = assignmentBatches.filter(
+                  (b) => b.course_id === course.id,
+                );
+
+                return (
                   <div
                     key={course.id}
-                    className="flex items-center justify-between p-3 rounded-lg border bg-slate-50/50"
+                    className="bg-white border border-slate-100 rounded-[2rem] p-6 shadow-md hover:shadow-lg transition-all duration-300 space-y-5"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center">
-                        <BookOpen className="h-4 w-4 text-primary" />
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-50 pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                          <BookOpen className="h-5 w-5 text-indigo-600" />
+                        </div>
+                        <div>
+                          <h4 className="text-md font-black text-slate-900 tracking-tight leading-tight">
+                            {course.title}
+                          </h4>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">
+                            {course.category || "Curriculum Course"}
+                          </p>
+                        </div>
                       </div>
-                      <span className="font-medium text-sm">
-                        {course.title}
-                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-10 px-4 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors border border-rose-100/50 hover:border-rose-200 self-start sm:self-center"
+                        onClick={() =>
+                          handleUnassignCourse(course.id, course.title)
+                        }
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Unassign Course
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-destructive hover:bg-destructive/10"
-                      onClick={() =>
-                        handleUnassignCourse(course.id, course.title)
-                      }
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Unassign
-                    </Button>
+
+                    {/* Batches Section */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Associated Batches
+                        </span>
+                        <Badge className="bg-indigo-50 text-indigo-600 border-none text-[10px] font-black rounded-lg h-5 px-2">
+                          {courseBatches.length} {courseBatches.length === 1 ? 'Batch' : 'Batches'}
+                        </Badge>
+                      </div>
+
+                      {courseBatches.length === 0 ? (
+                        <div className="p-6 text-center bg-slate-50/50 rounded-2xl border border-dashed border-slate-200/60">
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                            No active batches assigned for this course
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {courseBatches.map((batch) => (
+                            <div
+                              key={batch.id}
+                              className="bg-slate-50/50 hover:bg-slate-50 border border-slate-100/80 hover:border-indigo-100 rounded-2xl p-4 transition-all duration-200 flex flex-col justify-between space-y-3 shadow-sm"
+                            >
+                              <div>
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-black text-slate-900 uppercase tracking-tight truncate max-w-[120px]">
+                                    {batch.batch_name}
+                                  </p>
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[9px] font-black px-1.5 py-0.5 tracking-tighter uppercase text-slate-500 border-slate-200 shrink-0 whitespace-nowrap bg-white"
+                                  >
+                                    {batch.batch_type}
+                                  </Badge>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-2 bg-indigo-50/50 py-1 px-2 rounded-lg border border-indigo-100/30 w-fit max-w-full truncate">
+                                  <Clock className="h-3 w-3 shrink-0" />
+                                  {batch.start_time && batch.end_time
+                                    ? `${batch.start_time} — ${batch.end_time}`
+                                    : "Full Duration"}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between border-t border-slate-100/50 pt-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                <span>Students</span>
+                                <Badge className="bg-indigo-600 text-white border-none text-[9px] font-black rounded-md h-5 px-2">
+                                  {batch.studentCount || 0} Enrolled
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))
-            )}
+                );
+              });
+            })()}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="p-6 border-t border-slate-100 bg-slate-50/30">
             <Button
               variant="outline"
-              className="w-full"
+              className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-[10px] border-slate-200 hover:bg-slate-50"
               onClick={() => setManageAssignmentsOpen(false)}
             >
-              Close
+              Close Current Assignments
             </Button>
           </DialogFooter>
         </DialogContent>

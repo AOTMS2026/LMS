@@ -1,30 +1,27 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useEnrolledCourses, useStudentVideos, StudentCourse, useStudentVideoProgress, useUpdateVideoProgress } from '@/hooks/useStudentData';
+import { useEnrolledCourses, useStudentVideos, StudentCourse, useStudentVideoProgress } from '@/hooks/useStudentData';
 import { S3CourseVideo } from '@/hooks/useCourseBuilder';
+import { API_URL } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Progress } from '@/components/ui/progress';
 import { 
     Video, 
     Play, 
     Search, 
-    Clock, 
     Calendar, 
     Loader2, 
     BookOpen, 
     MonitorPlay,
-    Filter,
-    Star,
     ExternalLink,
     CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RatingModal } from './RatingModal';
+import { VideoPlayer } from './VideoPlayer';
 
 interface VideoProgress {
     video_id: string;
@@ -33,6 +30,11 @@ interface VideoProgress {
     completed: boolean;
 }
 
+const isGoogleDriveUrl = (url?: string) => {
+    if (!url) return false;
+    return url.includes('drive.google.com') || url.includes('docs.google.com') || url.includes('/uc?id=');
+};
+
 export default function StudentVideoLibrary() {
     const location = useLocation();
     const { data: enrolledCourses, isLoading: isLoadingCourses } = useEnrolledCourses();
@@ -40,11 +42,6 @@ export default function StudentVideoLibrary() {
     const [searchQuery, setSearchQuery] = useState('');
     const [playingVideo, setPlayingVideo] = useState<S3CourseVideo | null>(null);
     const [ratingOpen, setRatingOpen] = useState(false);
-
-    // Progress Tracking Refs
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const progressUpdateInterval = useRef<NodeJS.Timeout | null>(null);
-    const lastUpdateTime = useRef<number>(0);
 
     // Auto-select course from navigation state (e.g., from My Courses click)
     useEffect(() => {
@@ -64,7 +61,6 @@ export default function StudentVideoLibrary() {
 
     const { data: videos, isLoading: isLoadingVideos } = useStudentVideos(selectedCourseId) as { data: S3CourseVideo[] | undefined, isLoading: boolean };
     const { data: progressData } = useStudentVideoProgress(selectedCourseId) as { data: VideoProgress[] | undefined };
-    const updateProgressMutation = useUpdateVideoProgress();
 
     const filteredVideos = videos?.filter((video: S3CourseVideo) => 
         video.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -76,108 +72,53 @@ export default function StudentVideoLibrary() {
         progressData.forEach((p: VideoProgress) => progressMap.set(p.video_id, p));
     }
 
-    const getVideoSrc = (url: string) => {
+    const getS3Url = (url: string) => {
+        if (!url) return '';
         if (url.startsWith('http')) return url;
-        return `/api/s3/public/${url}`; 
-    };
-
-    const handleTimeUpdate = () => {
-        if (!videoRef.current || !playingVideo || !selectedCourseId) return;
-
-        const currentTime = videoRef.current.currentTime;
-        const duration = videoRef.current.duration;
-
-        // Only update every 5 seconds or if significant change
-        if (Math.abs(currentTime - lastUpdateTime.current) > 5) {
-            updateProgressMutation.mutate({
-                courseId: selectedCourseId,
-                videoId: playingVideo.id,
-                watchedSeconds: Math.floor(currentTime),
-                totalSeconds: Math.floor(duration || 0)
-            });
-            lastUpdateTime.current = currentTime;
+        let cleanUrl = url;
+        if (cleanUrl.startsWith('/api/s3/public/')) {
+            cleanUrl = cleanUrl.replace('/api/s3/public/', '');
+        } else if (cleanUrl.startsWith('api/s3/public/')) {
+            cleanUrl = cleanUrl.replace('api/s3/public/', '');
+        } else if (cleanUrl.startsWith('/s3/public/')) {
+            cleanUrl = cleanUrl.replace('/s3/public/', '');
+        } else if (cleanUrl.startsWith('s3/public/')) {
+            cleanUrl = cleanUrl.replace('s3/public/', '');
         }
+        if (cleanUrl.startsWith('/')) {
+            cleanUrl = cleanUrl.slice(1);
+        }
+        return `${API_URL}/s3/public/${cleanUrl}`;
     };
 
-    const handleVideoEnded = () => {
-         if (!videoRef.current || !playingVideo || !selectedCourseId) return;
-         
-         updateProgressMutation.mutate({
-            courseId: selectedCourseId,
-            videoId: playingVideo.id,
-            watchedSeconds: Math.floor(videoRef.current.duration),
-            totalSeconds: Math.floor(videoRef.current.duration)
-        });
-
-        // Trigger Rating Modal
-        setRatingOpen(true);
-    };
-
-    const handlePause = () => {
-        if (!videoRef.current || !playingVideo || !selectedCourseId) return;
+    const getVideoSrc = (url: string) => {
+        if (!url) return '';
+        if (url.startsWith('http') && !url.includes('.amazonaws.com/')) {
+            return url;
+        }
         
-        // Immediate update on pause
-        updateProgressMutation.mutate({
-            courseId: selectedCourseId,
-            videoId: playingVideo.id,
-            watchedSeconds: Math.floor(videoRef.current.currentTime),
-            totalSeconds: Math.floor(videoRef.current.duration || 0)
-        });
+        let videoUrlKey = url;
+        if (videoUrlKey.includes('.amazonaws.com/')) {
+            videoUrlKey = videoUrlKey.split('.amazonaws.com/')[1];
+        }
+        
+        if (videoUrlKey.startsWith('/api/s3/public/')) {
+            videoUrlKey = videoUrlKey.replace('/api/s3/public/', '');
+        } else if (videoUrlKey.startsWith('api/s3/public/')) {
+            videoUrlKey = videoUrlKey.replace('api/s3/public/', '');
+        } else if (videoUrlKey.startsWith('/s3/public/')) {
+            videoUrlKey = videoUrlKey.replace('/s3/public/', '');
+        } else if (videoUrlKey.startsWith('s3/public/')) {
+            videoUrlKey = videoUrlKey.replace('s3/public/', '');
+        }
+        
+        const sanitizedKey = videoUrlKey.startsWith('/') ? videoUrlKey.slice(1) : videoUrlKey;
+        return `${API_URL}/s3/public/${sanitizedKey}`;
     };
 
     const handleCloseVideo = (open: boolean) => {
         if (!open) {
-            if (videoRef.current && playingVideo && selectedCourseId) {
-                // Final update before closing
-                updateProgressMutation.mutate({
-                    courseId: selectedCourseId,
-                    videoId: playingVideo.id,
-                    watchedSeconds: Math.floor(videoRef.current.currentTime),
-                    totalSeconds: Math.floor(videoRef.current.duration || 0)
-                });
-            }
             setPlayingVideo(null);
-        }
-    };
-
-    // Clean up interval on unmount or video close
-    useEffect(() => {
-        const intervalId = progressUpdateInterval.current;
-        const handleBeforeUnload = () => {
-            if (videoRef.current && playingVideo && selectedCourseId) {
-                // Prepare data
-                const data = {
-                    courseId: selectedCourseId,
-                    videoId: playingVideo.id,
-                    watchedSeconds: Math.floor(videoRef.current.currentTime),
-                    totalSeconds: Math.floor(videoRef.current.duration || 0)
-                };
-                // Fire and forget mutation
-                updateProgressMutation.mutate(data);
-            }
-        };
-
-        window.addEventListener('beforeunload', handleBeforeUnload);
-
-        return () => {
-            if (intervalId) {
-                clearInterval(intervalId);
-            }
-            window.removeEventListener('beforeunload', handleBeforeUnload);
-        };
-    }, [playingVideo, selectedCourseId, updateProgressMutation]);
-
-    // Load saved progress when video opens
-    const handleVideoLoad = (e: React.SyntheticEvent<HTMLVideoElement>) => {
-        const video = e.currentTarget;
-        if (playingVideo) {
-            const savedProgress = progressMap.get(playingVideo.id);
-            if (savedProgress && savedProgress.watched_seconds > 0 && !savedProgress.completed) {
-                // Determine if we should resume (e.g. only if < 95% done)
-                if (savedProgress.watched_seconds < (savedProgress.total_seconds * 0.95)) {
-                    video.currentTime = savedProgress.watched_seconds;
-                }
-            }
         }
     };
 
@@ -301,18 +242,13 @@ export default function StudentVideoLibrary() {
                                 >
                                     <Card className="group h-full flex flex-col border-none shadow-sm hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden bg-white cursor-pointer" 
                                     onClick={() => {
-                                        // Drive link: open directly in new tab
-                                        if (!video.video_url && video.drive_link) {
-                                            window.open(video.drive_link, '_blank');
-                                        } else {
-                                            setPlayingVideo(video);
-                                        }
+                                        setPlayingVideo(video);
                                     }}>
                                         <div className="aspect-video bg-slate-900 relative overflow-hidden group-hover:opacity-95 transition-opacity">
                                             {/* Thumbnail */}
                                             {video.thumbnail_url ? (
                                                 <img 
-                                                    src={video.thumbnail_url.startsWith('http') ? video.thumbnail_url : `/s3/public/${video.thumbnail_url}`} 
+                                                    src={getS3Url(video.thumbnail_url)} 
                                                     alt={video.title}
                                                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                                 />
@@ -383,8 +319,8 @@ export default function StudentVideoLibrary() {
                                         </CardContent>
                                     </Card>
                                 </motion.div>
-                            );
-                        })}
+                                );
+                            })}
                         </AnimatePresence>
                     </div>
                 )}
@@ -401,38 +337,18 @@ export default function StudentVideoLibrary() {
                     {playingVideo && (
                         <div className="flex flex-col">
                             <div className="relative aspect-video bg-black w-full flex items-center justify-center">
-                                {playingVideo.video_url ? (
-                                    <video 
-                                        ref={videoRef}
-                                        src={getVideoSrc(playingVideo.video_url)} 
-                                        controls 
-                                        autoPlay 
-                                        className="w-full h-full"
-                                        controlsList="nodownload"
-                                        onTimeUpdate={handleTimeUpdate}
-                                        onEnded={handleVideoEnded}
-                                        onPause={handlePause}
-                                        onLoadedMetadata={handleVideoLoad}
-                                    >
-                                        Your browser does not support the video tag.
-                                    </video>
-                                ) : (
-                                    <div className="p-10 text-center space-y-6 animate-in zoom-in duration-500">
-                                        <div className="h-20 w-20 bg-indigo-500/10 rounded-3xl flex items-center justify-center mx-auto border border-indigo-500/20">
-                                            <ExternalLink className="h-10 w-10 text-indigo-400" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <h3 className="text-xl font-bold text-white tracking-tight">{playingVideo.title}</h3>
-                                            <p className="text-slate-400 text-sm">Access this resource on Google Drive.</p>
-                                        </div>
-                                        <Button 
-                                            className="h-12 px-8 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl"
-                                            onClick={() => window.open(playingVideo.drive_link, '_blank')}
-                                        >
-                                            Open in Google Drive
-                                        </Button>
-                                    </div>
-                                )}
+                                <VideoPlayer
+                                    url={
+                                        playingVideo.drive_link
+                                            ? playingVideo.drive_link
+                                            : (isGoogleDriveUrl(playingVideo.video_url)
+                                                ? playingVideo.video_url
+                                                : getVideoSrc(playingVideo.video_url || ''))
+                                    }
+                                    videoId={playingVideo.id}
+                                    courseId={selectedCourseId || ''}
+                                    onComplete={() => setRatingOpen(true)}
+                                />
                             </div>
                             <div className="p-6 bg-slate-900 text-white">
                                 <h3 className="text-xl font-bold mb-2">{playingVideo.title}</h3>
@@ -442,8 +358,8 @@ export default function StudentVideoLibrary() {
                                         Uploaded {new Date(playingVideo.created_at).toLocaleDateString()}
                                     </span>
                                     {progressMap.get(playingVideo.id)?.completed && (
-                                        <Badge className="bg-green-600 text-white border-none">
-                                            <CheckCircle2 className="h-3 w-3 mr-1" /> Completed
+                                        <Badge className="bg-green-600 text-white border-none flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3" /> Completed
                                         </Badge>
                                     )}
                                 </div>
