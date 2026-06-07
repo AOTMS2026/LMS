@@ -34,11 +34,15 @@ import Careers from "./pages/Careers";
 import Trainers from "./pages/Trainers";
 import Press from "./pages/Press";
 import Features from "./pages/Features";
+import InterviewLogin from "./pages/interview/InterviewLogin";
+import InterviewDashboard from "./pages/interview/InterviewDashboard";
+import InterviewExamEngine from "./pages/interview/InterviewExamEngine";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import ScrollToTop from "@/components/ScrollToTop";
 import { SuspensionOverlay } from "@/components/auth/SuspensionOverlay";
 import PageLoader from "@/components/PageLoader";
 import CustomCursor from "@/components/CustomCursor";
+
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -207,6 +211,10 @@ const App = () => (
               <Route path="/trainers" element={<Trainers />} />
               <Route path="/press" element={<Press />} />
               <Route path="/features" element={<Features />} />
+              <Route path="/interview-login" element={<InterviewLogin />} />
+              <Route path="/interview-dashboard" element={<InterviewDashboard />} />
+              <Route path="/interview-exam" element={<InterviewExamEngine />} />
+
               <Route
                 path="/pending-approval"
                 element={

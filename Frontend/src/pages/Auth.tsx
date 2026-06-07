@@ -1610,6 +1610,12 @@ export default function Auth() {
             </motion.div>
           )}
         </AnimatePresence>
+        <p className="text-center text-slate-500 text-xs mt-4">
+      Interview Candidate?{" "}
+          <a href="/interview-login" className="text-blue-400 hover:underline">
+            Click here to login
+          </a>
+        </p>
 
         {/* Footer Toggle */}
         <div className="pt-8 border-t border-slate-100 text-center">

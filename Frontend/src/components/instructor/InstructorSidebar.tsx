@@ -34,6 +34,7 @@ import {
   MessageSquare,
   Bell,
   CheckCircle2,
+  ClipboardCheck,
 } from "lucide-react";
 
 import logo from "@/assets/logo.png";
@@ -63,6 +64,8 @@ const contentNavItems = [
   { title: "Question Bank", url: "/instructor/question-bank", icon: FolderOpen },
   { title: "Question Access", url: "/instructor/question-access", icon: ShieldCheck },
   { title: "Resume Scan Logs", url: "/instructor/resume-scans", icon: FileText },
+  // ── Interview Examination Module ──
+  { title: "Interview Management", url: "/instructor/interview-management", icon: ClipboardCheck },
 ];
 
 const analyticNavItems = [

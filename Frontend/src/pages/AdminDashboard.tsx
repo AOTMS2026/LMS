@@ -27,6 +27,7 @@ import { QuestionBankManager } from "@/components/manager/QuestionBankManager";
 import { LeaderboardManager } from "@/components/manager/LeaderboardManager";
 import { ManagerVideoLibrary } from "@/components/manager/ManagerVideoLibrary";
 import { UserProfile } from "@/components/dashboard/UserProfile";
+import AdminInterviewMonitor from "@/components/interview/AdminInterviewMonitor";
 import {
   Card,
   CardContent,
@@ -80,6 +81,7 @@ import {
   Sparkles,
   LayoutGrid,
   Star,
+  MonitorCheck,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { CouponManager } from "@/components/admin/CouponManager";
@@ -424,6 +426,7 @@ export default function AdminDashboard() {
       "/admin/grading": "grading",
       "/admin/resume-scans": "resume-scans",
       "/admin/ai-hub": "ai-hub",
+      "/admin/interview-monitor": "interview-monitor",
     };
 
     const path = location.pathname;
@@ -772,6 +775,12 @@ export default function AdminDashboard() {
                         label: "Live Broadcast",
                         icon: Radio,
                         key: "tab-live-broadcast",
+                      },
+                      {
+                        id: "interview-monitor",
+                        label: "Interview Monitor",
+                        icon: MonitorCheck,
+                        key: "tab-interview-monitor",
                       },
                     ]
 .map((tab) => (
@@ -1226,6 +1235,20 @@ export default function AdminDashboard() {
                     animate={{ opacity: 1 }}
                   >
                     <UserProfile />
+                  </motion.div>
+                </TabsContent>
+
+                <TabsContent
+                  key="tab-interview-monitor"
+                  value="interview-monitor"
+                  className="mt-0 outline-none"
+                >
+                  <motion.div
+                    key="motion-interview-monitor"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    <AdminInterviewMonitor />
                   </motion.div>
                 </TabsContent>
               </div>

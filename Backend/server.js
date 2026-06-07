@@ -14,6 +14,8 @@ const cloudinary = require('cloudinary').v2;
 const vm = require('vm'); // Native Node.js module for executing code locally
 const pdfParse = require('pdf-parse');
 const FormData = require('form-data');
+const dns = require('node:dns');
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 // Cloudinary Config
 cloudinary.config({
@@ -31,6 +33,21 @@ const { SystemLog, SecurityEvent, LeaderboardStat, Notification, Attendance, Cou
 const { Conversation, Message } = require('./models/Chat');
 const { Doubt, DoubtReply } = require('./models/Doubt');
 const { Batch, StudentBatch, BatchRequest } = require('./models/Batch');
+
+// ── Interview Examination Module ──
+const {
+    InterviewCandidate,
+    InterviewExamSchedule,
+    InterviewQuestion,
+    InterviewAssignment,
+    InterviewAttempt,
+    InterviewViolation,
+    InterviewScreenshot,
+    InterviewLeaderboard,
+    InterviewAudit
+} = require('./models/InterviewExam');
+const interviewRoutes = require('./routes/interviewRoutes');
+const setupInterviewSocket = require('./services/interviewSocket');
 
 // Map table names to Models for generic routes
 const MODEL_MAP = {
@@ -68,13 +85,25 @@ const MODEL_MAP = {
     'coupons': Coupon,
     'coupon_redemptions': CouponRedemption,
     'colleges': College,
-    'video_progress': VideoProgress
+    'video_progress': VideoProgress,
+    // ── Interview Examination Module ──
+    'interview_candidates': InterviewCandidate,
+    'interview_exam_schedules': InterviewExamSchedule,
+    'interview_questions': InterviewQuestion,
+    'interview_assignments': InterviewAssignment,
+    'interview_attempts': InterviewAttempt,
+    'interview_violations': InterviewViolation,
+    'interview_screenshots': InterviewScreenshot,
+    'interview_leaderboard': InterviewLeaderboard,
+    'interview_audit_logs': InterviewAudit
 };
+
 
 const ALLOWED_TABLES = Object.keys(MODEL_MAP);
 const ADMIN_ONLY_TABLES = ['user_roles', 'system_logs', 'security_events'];
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key_change_me';
+const INTERVIEW_JWT_SECRET = process.env.INTERVIEW_JWT_SECRET || 'interview_fallback_secret_key_change_me';
 
 // ── Token Blacklist (in-memory, auto-cleaned every 8 hours) ──
 const tokenBlacklist = new Set();
@@ -85,6 +114,7 @@ setInterval(() => {
     console.log('[Auth] Token blacklist cleared (scheduled cleanup)');
 }, 8 * 60 * 60 * 1000);
 
+
 const blacklistUserTokens = (userId) => {
     // We store a marker so authenticateToken can check user-level revocation
     tokenBlacklist.add(`user:${userId.toString()}`);
@@ -94,6 +124,7 @@ const blacklistUserTokens = (userId) => {
 };
 const app = express();
 const port = process.env.PORT || 5000;
+
 
 // Create HTTP Server for Socket.io
 const http = require('http');
@@ -173,6 +204,9 @@ io.on('connection', (socket) => {
         }
         console.log(`[Socket] Disconnected: ${socket.id}`);
     });
+
+    // ── Interview Examination Module Socket ──
+    setupInterviewSocket(io, socket);
 });
 
 // Notification Helper
@@ -399,51 +433,71 @@ app.post('/api/admin/broadcast', authenticateToken, requireAdminOrManager, async
             return res.status(400).json({ error: 'No valid emails found for selected users. Please sync platform data and try again.' });
         }
 
-        const n8nWebhookUrl = process.env.N8N_ADMIN_STUDENT_EMAIL_URL || process.env.N8N_EMAIL_WEBHOOK_URL;
+        const n8nWebhookUrl = process.env.N8N_EMAIL1_WEBHOOK_URL;
         if (!n8nWebhookUrl) {
-            console.error('[AI Hub Broadcast] No n8n webhook URL configured. Set N8N_ADMIN_STUDENT_EMAIL_URL in .env');
+            console.error('[AI Hub Broadcast] No n8n webhook URL configured. Set N8N_EMAIL1_WEBHOOK_URL in .env');
             return res.status(500).json({ error: 'Mail webhook not configured. Contact administrator.' });
         }
 
         console.log('[AI Hub Broadcast] Sending to n8n webhook:', n8nWebhookUrl);
+        console.log('[AI Hub Broadcast] Recipients to send:', recipients.map(r => ({ email: r.email, name: r.full_name })));
 
         // Send one webhook call per recipient — matching the email.json spec the n8n workflow expects
+        // validateStatus: () => true prevents axios from throwing on 4xx/5xx so Promise.allSettled
+        // can properly log n8n errors (e.g. inactive workflow returning 404) instead of treating
+        // them as network failures with no useful error body.
         const results = await Promise.allSettled(
-            recipients.map(r =>
-                axios.post(n8nWebhookUrl, {
+            recipients.map(async (r) => {
+                const payload = {
                     email: r.email,
                     full_name: r.full_name,
+                    name: r.full_name,           // n8n field alias
                     user_id: r.user_id,
                     subject,
-                    message,          // ✅ send as both 'message' and 'content' for n8n compatibility
-                    content: message,
+                    message,
+                    content: message,             // n8n field alias
+                    body: message,               // n8n field alias
                     category,
                     broadcast_type: type,
                     sent_at: new Date().toISOString(),
                     triggered_by: req.user?.id || 'admin'
-                }, {
+                };
+                const response = await axios.post(n8nWebhookUrl, payload, {
                     timeout: 15000,
-                    headers: { 'Content-Type': 'application/json' }
-                })
-            )
+                    headers: { 'Content-Type': 'application/json' },
+                    validateStatus: () => true   // ✅ FIX: don't throw on 4xx/5xx; handle below
+                });
+
+                // n8n inactive workflow returns 404; active workflow returns 200
+                if (response.status >= 400) {
+                    const errBody = typeof response.data === 'object'
+                        ? JSON.stringify(response.data)
+                        : response.data;
+                    throw new Error(`n8n returned HTTP ${response.status} for ${r.email}: ${errBody}. Ensure the n8n workflow "${n8nWebhookUrl}" is ACTIVE (not just saved).`);
+                }
+                return response;
+            })
         );
 
         const succeeded = results.filter(r => r.status === 'fulfilled').length;
         const failed = results.filter(r => r.status === 'rejected').length;
         results.forEach((r, i) => {
             if (r.status === 'rejected') {
-                console.error(`[AI Hub Broadcast] ❌ Failed for ${recipients[i]?.email}:`, r.reason?.message, r.reason?.response?.data);
+                console.error(`[AI Hub Broadcast] ❌ Failed for ${recipients[i]?.email}:`, r.reason?.message);
             } else {
-                console.log(`[AI Hub Broadcast] ✅ Sent to ${recipients[i]?.email}:`, r.value?.status);
+                console.log(`[AI Hub Broadcast] ✅ Sent to ${recipients[i]?.email}: HTTP ${r.value?.status}`);
             }
         });
 
         console.log(`[AI Hub Broadcast] Done — ${succeeded} sent, ${failed} failed out of ${recipients.length} total`);
 
         if (succeeded === 0 && failed > 0) {
+            // Surface the first error message so admin knows the real cause (e.g. inactive n8n workflow)
+            const firstError = results.find(r => r.status === 'rejected');
+            const errDetail = firstError?.reason?.message || 'Unknown error';
             return res.status(502).json({
                 success: false,
-                error: `Broadcast failed: n8n webhook did not accept any requests. Check n8n workflow is active at: ${n8nWebhookUrl}`,
+                error: `Broadcast failed: ${errDetail}`,
                 failed,
                 succeeded
             });
@@ -7946,6 +8000,21 @@ app.get('/api/admin/chat-monitor/conversations/:id/messages', authenticateToken,
         handleError(res, err, 'chat-monitor-messages');
     }
 });
+
+// ── Interview Examination Module Routes ──
+app.use('/api/interview',
+    interviewRoutes(
+        io,
+        userSockets,
+        sendNotification,
+        cloudinary,
+        authenticateToken,
+        requireRole,
+        getUserRole,
+        handleError
+    )
+);
+console.log('[Interview] Examination module routes mounted at /api/interview');
 
 // Start Server
 httpServer.listen(port, () => {

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { InstructorSidebar } from "@/components/instructor/InstructorSidebar";
 import { InstructorHeader } from "@/components/instructor/InstructorHeader";
@@ -43,6 +44,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion, AnimatePresence } from "framer-motion";
 import { fetchWithAuth } from "@/lib/api";
+import InstructorInterviewManagement from "@/components/interview/InstructorInterviewManagement";
 import {
   Bell,
   Sparkles,
@@ -525,6 +527,7 @@ export default function InstructorDashboard() {
   const isNotifications = path === "/instructor/notifications";
   const isResources = path === "/instructor/resources";
   const isGrading = path === "/instructor/grading";
+  const isInterviewManagement = path === "/instructor/interview-management";
 
   return (
     <SidebarProvider className="h-screen w-full overflow-hidden mesh-bg font-sans">
@@ -736,6 +739,15 @@ export default function InstructorDashboard() {
                   animate={{ opacity: 1 }}
                 >
                   <SubmissionsGrading />
+                </motion.div>
+              )}
+              {isInterviewManagement && (
+                <motion.div
+                  key="interview-management"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <InstructorInterviewManagement />
                 </motion.div>
               )}
             </AnimatePresence>
