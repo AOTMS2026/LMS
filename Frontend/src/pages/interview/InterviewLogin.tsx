@@ -1,7 +1,7 @@
 /**
  * INTERVIEW LOGIN PAGE
  * File: Frontend/src/pages/interview/InterviewLogin.tsx
- * Route: /interview-login  (add to App.tsx — see App.tsx patch below)
+ * Route: /interview-login
  */
 
 import { useState } from "react";
@@ -42,7 +42,6 @@ export default function InterviewLogin() {
         return;
       }
 
-      // Store interview-specific token separately from LMS user token
       localStorage.setItem("interview_token", data.token);
       localStorage.setItem("interview_candidate", JSON.stringify(data.candidate));
 
@@ -56,85 +55,94 @@ export default function InterviewLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-      {/* Background decorative circles */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 flex items-center justify-center p-4">
+      {/* Background decorative elements matching LMS style */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-indigo-500/10 blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
       </div>
 
-      <Card className="w-full max-w-md bg-slate-800/80 backdrop-blur border-slate-700 shadow-2xl relative">
-        <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-4 w-16 h-16 rounded-full bg-blue-600/20 flex items-center justify-center border border-blue-500/30">
-            <Shield className="w-8 h-8 text-blue-400" />
+      <div className="w-full max-w-md relative">
+        {/* Logo / Brand area */}
+        <div className="text-center mb-8">
+          <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-sm">
+            <Shield className="w-8 h-8 text-primary" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             Interview Examination Portal
-          </CardTitle>
-          <p className="text-slate-400 text-sm mt-1">
+          </h1>
+          <p className="text-slate-500 text-sm mt-1 font-medium">
             Secure Candidate Login
           </p>
-        </CardHeader>
+        </div>
 
-        <CardContent className="pt-4">
-          {error && (
-            <div className="mb-4 flex items-start gap-2 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
-              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-slate-300 text-sm font-medium">Username</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
-                  className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
-                  required
-                  autoComplete="username"
-                />
+        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardContent className="p-8">
+            {error && (
+              <div className="mb-6 flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-100 text-red-600 text-sm">
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0 text-red-500" />
+                <span className="font-medium">{error}</span>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-2">
-              <Label className="text-slate-300 text-sm font-medium">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <Input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="pl-10 bg-slate-700/50 border-slate-600 text-white placeholder:text-slate-500 focus:border-blue-500"
-                  required
-                  autoComplete="current-password"
-                />
+            <form onSubmit={handleLogin} className="space-y-5">
+              <div className="space-y-2">
+                <Label className="text-slate-700 text-sm font-semibold">Username</Label>
+                <div className="relative group">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                  <Input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your username"
+                    className="pl-10 h-11 rounded-xl bg-slate-50 border-slate-200 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+                    required
+                    autoComplete="username"
+                  />
+                </div>
               </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-700 text-sm font-semibold">Password</Label>
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
+                  <Input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="pl-10 h-11 rounded-xl bg-slate-50 border-slate-200 focus:bg-white text-slate-900 placeholder:text-slate-400 transition-all"
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={loading || !username || !password}
+                className="w-full h-11 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-sm transition-all active:scale-95 mt-2"
+              >
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Verifying...
+                  </span>
+                ) : (
+                  "Login to Exam Portal"
+                )}
+              </Button>
+            </form>
+
+            <div className="mt-6 pt-5 border-t border-slate-100">
+              <p className="text-center text-xs text-slate-400 leading-relaxed">
+                Credentials are provided by your examination coordinator.
+                <br />Password reset is not available for security reasons.
+              </p>
             </div>
-
-            <Button
-              type="submit"
-              disabled={loading || !username || !password}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 mt-2"
-            >
-              {loading ? "Verifying..." : "Login to Exam Portal"}
-            </Button>
-          </form>
-
-          {/* Deliberately no "Forgot Password" and no "Register" link */}
-          <div className="mt-6 pt-4 border-t border-slate-700">
-            <p className="text-center text-xs text-slate-500">
-              Credentials are provided by your examination coordinator.
-              <br />Password reset is not available for security reasons.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

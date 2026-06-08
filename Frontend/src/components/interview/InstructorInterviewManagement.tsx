@@ -21,8 +21,8 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Plus, Trash2, Edit2, Users, FileText,
-  Sparkles, RefreshCw, UserPlus, Eye, Send
+  Plus, Trash2, Users, FileText,
+  Sparkles, RefreshCw, UserPlus, Send
 } from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -39,32 +39,45 @@ export default function InstructorInterviewManagement() {
   const { toast } = useToast();
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Interview Management</h1>
-          <p className="text-slate-400 text-sm mt-1">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+            <FileText className="h-6 w-6 text-primary" />
+            Interview Management
+          </h2>
+          <p className="text-slate-500 font-medium text-sm">
             Create exams, manage candidates, generate AI questions
           </p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-slate-800 border border-slate-700">
-          <TabsTrigger value="exams" className="data-[state=active]:bg-blue-600">
+        <TabsList className="h-11 bg-slate-100/80 border border-slate-200 rounded-xl p-1">
+          <TabsTrigger
+            value="exams"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-semibold text-slate-500 transition-all"
+          >
             <FileText className="w-4 h-4 mr-2" /> Exams
           </TabsTrigger>
-          <TabsTrigger value="candidates" className="data-[state=active]:bg-blue-600">
+          <TabsTrigger
+            value="candidates"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-semibold text-slate-500 transition-all"
+          >
             <Users className="w-4 h-4 mr-2" /> Candidates
           </TabsTrigger>
-          <TabsTrigger value="create-candidate" className="data-[state=active]:bg-blue-600">
+          <TabsTrigger
+            value="create-candidate"
+            className="rounded-lg data-[state=active]:bg-white data-[state=active]:text-primary data-[state=active]:shadow-sm font-semibold text-slate-500 transition-all"
+          >
             <UserPlus className="w-4 h-4 mr-2" /> Add Candidate
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="exams"><ExamsTab toast={toast} /></TabsContent>
-        <TabsContent value="candidates"><CandidatesTab toast={toast} /></TabsContent>
-        <TabsContent value="create-candidate"><CreateCandidateTab toast={toast} /></TabsContent>
+        <TabsContent value="exams" className="mt-4"><ExamsTab toast={toast} /></TabsContent>
+        <TabsContent value="candidates" className="mt-4"><CandidatesTab toast={toast} /></TabsContent>
+        <TabsContent value="create-candidate" className="mt-4"><CreateCandidateTab toast={toast} /></TabsContent>
       </Tabs>
     </div>
   );
@@ -164,26 +177,29 @@ function ExamsTab({ toast }: any) {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {/* Create Exam Form */}
       {showCreate ? (
-        <Card className="bg-slate-800 border-slate-700">
-          <CardHeader>
-            <CardTitle className="text-white text-lg">Create New Exam</CardTitle>
+        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+          <CardHeader className="pb-4 border-b border-slate-50">
+            <CardTitle className="text-slate-900 text-lg font-bold flex items-center gap-2">
+              <Plus className="w-5 h-5 text-primary" />
+              Create New Exam
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-6 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Exam Title *" value={form.title} onChange={v => setForm(f => ({ ...f, title: v }))} placeholder="e.g. React Developer Assessment" />
               <Field label="Topic *" value={form.topic} onChange={v => setForm(f => ({ ...f, topic: v }))} placeholder="e.g. React JS" />
               <div>
-                <Label className="text-slate-300 text-sm">Difficulty</Label>
+                <Label className="text-slate-700 text-sm font-semibold">Difficulty</Label>
                 <Select value={form.difficulty} onValueChange={v => setForm(f => ({ ...f, difficulty: v }))}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-1">
+                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-700 mt-1 focus:bg-white">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
+                  <SelectContent className="rounded-xl border-slate-200">
                     {["easy", "medium", "hard"].map(d => (
-                      <SelectItem key={d} value={d} className="text-white capitalize">{d}</SelectItem>
+                      <SelectItem key={d} value={d} className="capitalize font-medium">{d}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -194,53 +210,58 @@ function ExamsTab({ toast }: any) {
               <Field label="Scheduled Date *" value={form.scheduled_date} onChange={v => setForm(f => ({ ...f, scheduled_date: v }))} type="date" />
               <Field label="Scheduled Time *" value={form.scheduled_time} onChange={v => setForm(f => ({ ...f, scheduled_time: v }))} type="time" />
             </div>
-            <div className="flex gap-3 pt-2">
-              <Button onClick={createExam} className="bg-blue-600 hover:bg-blue-700">
+            <div className="flex gap-3 pt-1">
+              <Button onClick={createExam} className="h-10 px-5 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-sm">
                 <Plus className="w-4 h-4 mr-2" /> Create Exam
               </Button>
-              <Button variant="ghost" onClick={() => setShowCreate(false)} className="text-slate-400">
+              <Button variant="outline" onClick={() => setShowCreate(false)} className="h-10 px-5 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50">
                 Cancel
               </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <Button onClick={() => setShowCreate(true)} className="bg-blue-600 hover:bg-blue-700">
+        <Button onClick={() => setShowCreate(true)} className="h-10 px-5 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-sm">
           <Plus className="w-4 h-4 mr-2" /> Create New Exam
         </Button>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Exam List */}
         <div className="space-y-3">
-          <h3 className="text-slate-300 text-sm font-medium">Your Exams ({exams.length})</h3>
+          <h3 className="text-slate-700 text-sm font-bold uppercase tracking-wide">
+            Your Exams ({exams.length})
+          </h3>
           {exams.length === 0 && (
-            <div className="text-slate-500 text-sm p-6 bg-slate-800/50 rounded-xl border border-slate-700 text-center">
-              No exams created yet.
+            <div className="text-slate-400 text-sm p-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 text-center">
+              <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+              <p className="font-medium text-slate-500">No exams created yet.</p>
             </div>
           )}
           {exams.map(exam => (
             <div
               key={exam._id || exam.id}
               onClick={() => handleSelectExam(exam)}
-              className={`p-4 rounded-xl border cursor-pointer transition-all ${
+              className={`p-4 rounded-2xl border cursor-pointer transition-all ${
                 selectedExam?.id === exam.id || selectedExam?._id === exam._id
-                  ? "border-blue-500 bg-blue-600/10"
-                  : "border-slate-700 bg-slate-800/40 hover:border-slate-600"
+                  ? "border-primary/40 bg-primary/5 shadow-sm"
+                  : "border-slate-200 bg-white hover:border-primary/30 hover:bg-slate-50 shadow-sm"
               }`}
             >
               <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-white font-medium">{exam.title}</p>
-                  <p className="text-slate-400 text-xs mt-0.5">{exam.topic} · {exam.difficulty} · {exam.num_questions}Q · {exam.duration_minutes}min</p>
-                  <p className="text-slate-500 text-xs mt-1">📅 {exam.scheduled_date} at {exam.scheduled_time}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-900 font-semibold truncate">{exam.title}</p>
+                  <p className="text-slate-400 text-xs mt-0.5 font-medium">
+                    {exam.topic} · {exam.difficulty} · {exam.num_questions}Q · {exam.duration_minutes}min
+                  </p>
+                  <p className="text-slate-400 text-xs mt-1">📅 {exam.scheduled_date} at {exam.scheduled_time}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-slate-400 border-slate-600 text-xs">
+                <div className="flex items-center gap-2 ml-3">
+                  <Badge variant="outline" className="text-slate-500 border-slate-200 text-xs bg-slate-50">
                     {exam.question_count || 0} Q
                   </Badge>
                   <Button size="sm" variant="ghost" onClick={e => { e.stopPropagation(); deleteExam(exam.id || exam._id); }}
-                    className="text-red-400 hover:text-red-300 hover:bg-red-900/20 h-7 w-7 p-0">
+                    className="text-red-400 hover:text-red-600 hover:bg-red-50 h-7 w-7 p-0 rounded-lg">
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
@@ -253,14 +274,14 @@ function ExamsTab({ toast }: any) {
         {selectedExam && (
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-slate-300 text-sm font-medium">
+              <h3 className="text-slate-700 text-sm font-bold uppercase tracking-wide">
                 Questions — {selectedExam.title} ({questions.length})
               </h3>
               <Button
                 onClick={generateAIQuestions}
                 disabled={generating}
                 size="sm"
-                className="bg-purple-600 hover:bg-purple-700 text-xs"
+                className="h-8 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-semibold shadow-sm"
               >
                 {generating
                   ? <><RefreshCw className="w-3 h-3 mr-1 animate-spin" /> Generating...</>
@@ -270,44 +291,49 @@ function ExamsTab({ toast }: any) {
             </div>
 
             {loadingQuestions && (
-              <div className="text-slate-500 text-sm text-center py-8">Loading questions...</div>
+              <div className="flex items-center justify-center py-10 text-slate-400 text-sm">
+                <div className="h-5 w-5 rounded-full border-2 border-primary/20 border-t-primary animate-spin mr-2" />
+                Loading questions...
+              </div>
             )}
 
             {!loadingQuestions && questions.length === 0 && (
-              <div className="text-center p-6 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
-                <Sparkles className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                <p className="text-slate-400 text-sm">No questions yet.</p>
-                <p className="text-slate-500 text-xs">Click "Generate AI Questions" to auto-generate.</p>
+              <div className="text-center p-8 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+                <Sparkles className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <p className="text-slate-500 text-sm font-medium">No questions yet.</p>
+                <p className="text-slate-400 text-xs">Click "Generate AI Questions" to auto-generate.</p>
               </div>
             )}
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
               {questions.map((q, idx) => (
-                <div key={q._id || q.id} className="bg-slate-800/60 border border-slate-700 rounded-lg p-3">
+                <div key={q._id || q.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-white text-sm flex-1">
-                      <span className="text-slate-500 mr-2">Q{idx + 1}.</span>
+                    <p className="text-slate-700 text-sm flex-1 leading-relaxed">
+                      <span className="text-slate-400 mr-2 font-semibold">Q{idx + 1}.</span>
                       {q.question_text}
                     </p>
                     <Button size="sm" variant="ghost" onClick={() => deleteQuestion(q._id || q.id)}
-                      className="text-red-400 hover:bg-red-900/20 h-6 w-6 p-0 flex-shrink-0">
+                      className="text-red-400 hover:bg-red-50 h-6 w-6 p-0 flex-shrink-0 rounded-lg">
                       <Trash2 className="w-3 h-3" />
                     </Button>
                   </div>
-                  <div className="mt-2 grid grid-cols-2 gap-1">
+                  <div className="mt-3 grid grid-cols-2 gap-1.5">
                     {q.options?.map((opt: any, i: number) => (
-                      <span key={i} className={`text-xs px-2 py-1 rounded ${
-                        opt.is_correct ? "bg-green-900/40 text-green-400 border border-green-700/50" : "bg-slate-700/50 text-slate-400"
+                      <span key={i} className={`text-xs px-2.5 py-1.5 rounded-lg font-medium ${
+                        opt.is_correct
+                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                          : "bg-slate-50 text-slate-500 border border-slate-200"
                       }`}>
                         {String.fromCharCode(65 + i)}. {opt.text}
                       </span>
                     ))}
                   </div>
                   {q.explanation && (
-                    <p className="text-slate-500 text-xs mt-2 italic">💡 {q.explanation}</p>
+                    <p className="text-slate-400 text-xs mt-2 italic">💡 {q.explanation}</p>
                   )}
-                  <Badge variant="outline" className={`mt-1 text-xs border-0 ${q.source === 'ai' ? 'text-purple-400' : 'text-blue-400'}`}>
-                    {q.source === 'ai' ? '🤖 AI' : '✏️ Manual'}
+                  <Badge variant="outline" className={`mt-2 text-xs border-0 bg-transparent ${q.source === 'ai' ? 'text-purple-600' : 'text-primary'}`}>
+                    {q.source === 'ai' ? '🤖 AI Generated' : '✏️ Manual'}
                   </Badge>
                 </div>
               ))}
@@ -369,55 +395,57 @@ function CandidatesTab({ toast }: any) {
   };
 
   const STATUS_COLORS: Record<string, string> = {
-    active: "bg-green-500/20 text-green-400 border-green-500/30",
-    blocked: "bg-red-500/20 text-red-400 border-red-500/30",
-    completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    blocked: "bg-red-50 text-red-600 border-red-200",
+    completed: "bg-blue-50 text-blue-700 border-blue-200",
   };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-slate-300 text-sm font-medium">All Candidates ({candidates.length})</h3>
-        <Button onClick={fetchCandidates} size="sm" variant="ghost" className="text-slate-400">
-          <RefreshCw className="w-4 h-4" />
+        <h3 className="text-slate-700 text-sm font-bold uppercase tracking-wide">
+          All Candidates ({candidates.length})
+        </h3>
+        <Button onClick={fetchCandidates} size="sm" variant="outline" className="h-8 px-3 rounded-xl border-slate-200 text-slate-500 hover:bg-slate-50">
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Refresh
         </Button>
       </div>
 
       {candidates.length === 0 && (
-        <div className="text-center p-8 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
-          <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-          <p className="text-slate-400">No candidates created yet.</p>
-          <p className="text-slate-500 text-sm">Use the "Add Candidate" tab to create accounts.</p>
+        <div className="text-center p-10 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+          <Users className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium">No candidates created yet.</p>
+          <p className="text-slate-400 text-sm">Use the "Add Candidate" tab to create accounts.</p>
         </div>
       )}
 
       <div className="space-y-3">
         {candidates.map(c => (
-          <div key={c._id || c.id} className="bg-slate-800/60 border border-slate-700 rounded-xl p-4">
+          <div key={c._id || c.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <p className="text-white font-medium">{c.full_name}</p>
-                  <Badge className={`text-xs border ${STATUS_COLORS[c.status] || "text-slate-400"}`}>
+                  <p className="text-slate-900 font-semibold">{c.full_name}</p>
+                  <Badge className={`text-xs border font-medium ${STATUS_COLORS[c.status] || "bg-slate-100 text-slate-500 border-slate-200"}`}>
                     {c.status}
                   </Badge>
                 </div>
-                <p className="text-slate-400 text-xs mt-0.5">
+                <p className="text-slate-400 text-xs mt-1 font-medium">
                   @{c.username} · {c.email} · {c.mobile_number}
                 </p>
                 {c.exam_title ? (
-                  <p className="text-blue-400 text-xs mt-1">📋 {c.exam_title} · {c.exam_date} {c.exam_time}</p>
+                  <p className="text-primary text-xs mt-1.5 font-medium">📋 {c.exam_title} · {c.exam_date} {c.exam_time}</p>
                 ) : (
-                  <p className="text-yellow-500/70 text-xs mt-1">⚠️ No exam assigned</p>
+                  <p className="text-amber-500 text-xs mt-1.5 font-medium">⚠️ No exam assigned</p>
                 )}
               </div>
               <div className="flex gap-2 flex-shrink-0">
-                <Button size="sm" variant="ghost" onClick={() => setAssigning(c._id || c.id)}
-                  className="text-blue-400 hover:bg-blue-900/20 text-xs h-7">
-                  <Send className="w-3 h-3 mr-1" /> Assign
+                <Button size="sm" variant="outline" onClick={() => setAssigning(c._id || c.id)}
+                  className="h-8 px-3 rounded-xl border-primary/30 text-primary hover:bg-primary/5 text-xs font-semibold">
+                  <Send className="w-3 h-3 mr-1.5" /> Assign
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => deleteCandidate(c._id || c.id)}
-                  className="text-red-400 hover:bg-red-900/20 h-7 w-7 p-0">
+                  className="text-red-400 hover:bg-red-50 hover:text-red-600 h-8 w-8 p-0 rounded-xl">
                   <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
@@ -425,23 +453,23 @@ function CandidatesTab({ toast }: any) {
 
             {/* Inline assign panel */}
             {assigning === (c._id || c.id) && (
-              <div className="mt-3 pt-3 border-t border-slate-700 flex gap-2 items-center">
+              <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2 items-center">
                 <Select value={selectedExamForAssign} onValueChange={setSelectedExamForAssign}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs flex-1">
+                  <SelectTrigger className="h-9 rounded-xl bg-slate-50 border-slate-200 text-slate-700 text-xs flex-1 focus:bg-white">
                     <SelectValue placeholder="Select exam..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-700">
+                  <SelectContent className="rounded-xl border-slate-200">
                     {exams.map(e => (
-                      <SelectItem key={e._id || e.id} value={e._id || e.id} className="text-white text-xs">
+                      <SelectItem key={e._id || e.id} value={e._id || e.id} className="text-xs font-medium">
                         {e.title} — {e.scheduled_date}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button size="sm" onClick={() => assignToExam(c._id || c.id)} className="bg-blue-600 hover:bg-blue-700 text-xs">
+                <Button size="sm" onClick={() => assignToExam(c._id || c.id)} className="h-9 px-4 rounded-xl bg-primary hover:bg-primary/90 text-white text-xs font-semibold">
                   Confirm
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setAssigning(null)} className="text-slate-400 text-xs">
+                <Button size="sm" variant="ghost" onClick={() => setAssigning(null)} className="h-9 px-3 rounded-xl text-slate-400 text-xs">
                   Cancel
                 </Button>
               </div>
@@ -494,13 +522,18 @@ function CreateCandidateTab({ toast }: any) {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <Card className="bg-slate-800 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-white">New Interview Candidate</CardTitle>
-          <p className="text-slate-400 text-sm">Create login credentials for a candidate. No self-registration is allowed.</p>
+    <div className="space-y-5 max-w-2xl">
+      <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+        <CardHeader className="pb-4 border-b border-slate-50">
+          <CardTitle className="text-slate-900 font-bold flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-primary" />
+            New Interview Candidate
+          </CardTitle>
+          <p className="text-slate-500 text-sm font-medium">
+            Create login credentials for a candidate. No self-registration is allowed.
+          </p>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label="Full Name *" value={form.full_name} onChange={v => setForm(f => ({ ...f, full_name: v }))} placeholder="Candidate full name" />
             <Field label="Email *" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" placeholder="candidate@email.com" />
@@ -508,15 +541,15 @@ function CreateCandidateTab({ toast }: any) {
             <Field label="Username *" value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} placeholder="candidate_username" />
             <Field label="Password *" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" placeholder="Set a secure password" />
             <div>
-              <Label className="text-slate-300 text-sm">Assign Exam (Optional)</Label>
+              <Label className="text-slate-700 text-sm font-semibold">Assign Exam (Optional)</Label>
               <Select value={form.assigned_exam_id} onValueChange={v => setForm(f => ({ ...f, assigned_exam_id: v === "none" ? "" : v }))}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-1">
+                <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-700 mt-1 focus:bg-white">
                   <SelectValue placeholder="Select exam..." />
                 </SelectTrigger>
-                <SelectContent className="bg-slate-800 border-slate-700">
-                  <SelectItem value="none" className="text-slate-400">No exam assigned</SelectItem>
+                <SelectContent className="rounded-xl border-slate-200">
+                  <SelectItem value="none" className="text-slate-400 font-medium">No exam assigned</SelectItem>
                   {exams.map(e => (
-                    <SelectItem key={e._id || e.id} value={e._id || e.id} className="text-white">
+                    <SelectItem key={e._id || e.id} value={e._id || e.id} className="font-medium">
                       {e.title} — {e.scheduled_date}
                     </SelectItem>
                   ))}
@@ -524,27 +557,38 @@ function CreateCandidateTab({ toast }: any) {
               </Select>
             </div>
           </div>
-          <Button onClick={handleCreate} disabled={saving} className="bg-green-600 hover:bg-green-700 w-full">
-            {saving ? "Creating..." : <><UserPlus className="w-4 h-4 mr-2" /> Create Candidate Account</>}
+          <Button
+            onClick={handleCreate}
+            disabled={saving}
+            className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm mt-2"
+          >
+            {saving ? (
+              <span className="flex items-center gap-2">
+                <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                Creating...
+              </span>
+            ) : (
+              <><UserPlus className="w-4 h-4 mr-2" /> Create Candidate Account</>
+            )}
           </Button>
         </CardContent>
       </Card>
 
       {/* Show credentials after creation */}
       {created && (
-        <Card className="bg-green-900/20 border-green-700">
-          <CardHeader>
-            <CardTitle className="text-green-400 text-base">✅ Candidate Account Created</CardTitle>
+        <Card className="border-emerald-200 shadow-sm rounded-2xl overflow-hidden bg-emerald-50/60">
+          <CardHeader className="pb-3 border-b border-emerald-100">
+            <CardTitle className="text-emerald-700 text-base font-bold">✅ Candidate Account Created</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-slate-300 text-sm">Share these credentials with the candidate:</p>
-            <div className="bg-slate-900 rounded-lg p-4 font-mono text-sm space-y-1">
-              <p><span className="text-slate-400">Portal URL:</span> <span className="text-white">{window.location.origin}/interview-login</span></p>
-              <p><span className="text-slate-400">Username:</span> <span className="text-green-400">{created.credentials?.username}</span></p>
-              <p><span className="text-slate-400">Password:</span> <span className="text-green-400">{created.credentials?.password}</span></p>
+          <CardContent className="p-5 space-y-3">
+            <p className="text-slate-600 text-sm font-medium">Share these credentials with the candidate:</p>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 font-mono text-sm space-y-1.5 shadow-sm">
+              <p><span className="text-slate-400">Portal URL:</span> <span className="text-slate-800 font-semibold">{window.location.origin}/interview-login</span></p>
+              <p><span className="text-slate-400">Username:</span> <span className="text-emerald-700 font-bold">{created.credentials?.username}</span></p>
+              <p><span className="text-slate-400">Password:</span> <span className="text-emerald-700 font-bold">{created.credentials?.password}</span></p>
             </div>
-            <p className="text-slate-500 text-xs">⚠️ Store these credentials safely. Password cannot be recovered — only reset.</p>
-            <Button size="sm" variant="ghost" onClick={() => setCreated(null)} className="text-slate-400">
+            <p className="text-slate-400 text-xs">⚠️ Store these credentials safely. Password cannot be recovered — only reset.</p>
+            <Button size="sm" variant="outline" onClick={() => setCreated(null)} className="h-8 px-4 rounded-xl border-slate-200 text-slate-500 hover:bg-white">
               Dismiss
             </Button>
           </CardContent>
@@ -561,13 +605,13 @@ function Field({ label, value, onChange, type = "text", placeholder = "" }: {
 }) {
   return (
     <div>
-      <Label className="text-slate-300 text-sm">{label}</Label>
+      <Label className="text-slate-700 text-sm font-semibold">{label}</Label>
       <Input
         type={type}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500 mt-1"
+        className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 mt-1 focus:bg-white transition-all"
       />
     </div>
   );

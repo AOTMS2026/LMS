@@ -25,6 +25,7 @@ interface ExamInfo {
   passing_percentage: number;
   scheduled_date: string;
   scheduled_time: string;
+  num_questions?: number;
 }
 
 interface DashboardData {
@@ -41,10 +42,26 @@ interface DashboardData {
 }
 
 const STATUS_CONFIG = {
-  upcoming: { label: "Upcoming", color: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30", icon: Clock },
-  active: { label: "Active — Exam In Progress", color: "bg-green-500/20 text-green-400 border-green-500/30", icon: Play },
-  completed: { label: "Completed", color: "bg-blue-500/20 text-blue-400 border-blue-500/30", icon: CheckCircle },
-  blocked: { label: "Blocked", color: "bg-red-500/20 text-red-400 border-red-500/30", icon: XCircle },
+  upcoming: {
+    label: "Upcoming",
+    color: "bg-amber-50 text-amber-700 border-amber-200",
+    icon: Clock,
+  },
+  active: {
+    label: "Active — Exam In Progress",
+    color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: Play,
+  },
+  completed: {
+    label: "Completed",
+    color: "bg-blue-50 text-blue-700 border-blue-200",
+    icon: CheckCircle,
+  },
+  blocked: {
+    label: "Blocked",
+    color: "bg-red-50 text-red-700 border-red-200",
+    icon: XCircle,
+  },
 };
 
 export default function InterviewDashboard() {
@@ -58,9 +75,7 @@ export default function InterviewDashboard() {
   useEffect(() => {
     if (!token) { navigate("/interview-login"); return; }
     fetchDashboard();
-    // Refresh every 30 seconds to update exam status in real time
     const interval = setInterval(fetchDashboard, 30000);
-    // Live clock
     const clockInterval = setInterval(() => setServerTime(new Date()), 1000);
     return () => { clearInterval(interval); clearInterval(clockInterval); };
   }, []);
@@ -95,16 +110,24 @@ export default function InterviewDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white animate-pulse">Loading your exam portal...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-full border-[3px] border-primary/20 border-t-primary animate-spin" />
+          <p className="text-slate-500 font-medium text-sm">Loading your exam portal...</p>
+        </div>
       </div>
     );
   }
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-red-400">Unable to load dashboard. Please login again.</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-500 font-semibold">Unable to load dashboard.</p>
+          <Button onClick={() => navigate("/interview-login")} className="mt-4 rounded-xl bg-primary hover:bg-primary/90">
+            Return to Login
+          </Button>
+        </div>
       </div>
     );
   }
@@ -115,78 +138,60 @@ export default function InterviewDashboard() {
   const canStartExam = exam_status === "active";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <header className="bg-slate-800/60 backdrop-blur border-b border-slate-700 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center">
-            <User className="w-5 h-5 text-white" />
+      <header className="bg-white border-b border-slate-200 px-6 py-4 shadow-sm">
+        <div className="max-w-3xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+              <User className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-slate-900 font-bold text-sm">{candidate.full_name}</p>
+              <p className="text-slate-500 text-xs">{candidate.email}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-white font-semibold">{candidate.full_name}</p>
-            <p className="text-slate-400 text-xs">{candidate.email}</p>
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-slate-400 text-xs font-medium">Current Time</p>
+              <p className="text-slate-700 text-sm font-mono font-semibold">
+                {serverTime.toLocaleTimeString("en-IN")}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              className="h-9 px-4 rounded-xl border-slate-200 text-slate-600 hover:text-red-600 hover:border-red-200 hover:bg-red-50 transition-all"
+            >
+              <LogOut className="w-4 h-4 mr-1.5" /> Logout
+            </Button>
           </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-slate-400 text-xs">Current Time</p>
-            <p className="text-white text-sm font-mono">
-              {serverTime.toLocaleTimeString("en-IN")}
-            </p>
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            className="text-slate-400 hover:text-white hover:bg-slate-700"
-          >
-            <LogOut className="w-4 h-4 mr-1" /> Logout
-          </Button>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto p-6 space-y-6">
+      <main className="max-w-3xl mx-auto p-6 space-y-5">
         {/* Status Banner */}
-        <div className={`flex items-center gap-3 p-4 rounded-xl border ${statusConfig.color}`}>
-          <StatusIcon className="w-5 h-5" />
-          <span className="font-medium">{statusConfig.label}</span>
+        <div className={`flex items-center gap-3 p-4 rounded-2xl border font-semibold text-sm ${statusConfig.color}`}>
+          <StatusIcon className="w-5 h-5 flex-shrink-0" />
+          <span>{statusConfig.label}</span>
         </div>
 
         {/* Exam Card */}
         {exam ? (
-          <Card className="bg-slate-800/60 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white text-xl">{exam.title}</CardTitle>
-              <p className="text-slate-400 text-sm">Topic: {exam.topic}</p>
+          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+            <CardHeader className="pb-4 border-b border-slate-50">
+              <CardTitle className="text-slate-900 text-xl font-bold">{exam.title}</CardTitle>
+              <p className="text-slate-500 text-sm font-medium">Topic: {exam.topic}</p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="p-6 space-y-5">
               {/* Exam Details Grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <InfoTile
-                  icon={Calendar}
-                  label="Date"
-                  value={exam.scheduled_date}
-                />
-                <InfoTile
-                  icon={Clock}
-                  label="Time"
-                  value={exam.scheduled_time}
-                />
-                <InfoTile
-                  icon={Clock}
-                  label="Duration"
-                  value={`${exam.duration_minutes} minutes`}
-                />
-                <InfoTile
-                  icon={BookOpen}
-                  label="Questions"
-                  value={String(exam.num_questions || "—")}
-                />
-                <InfoTile
-                  icon={CheckCircle}
-                  label="Passing"
-                  value={`${exam.passing_percentage}%`}
-                />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <InfoTile icon={Calendar} label="Date" value={exam.scheduled_date} />
+                <InfoTile icon={Clock} label="Time" value={exam.scheduled_time} />
+                <InfoTile icon={Clock} label="Duration" value={`${exam.duration_minutes} minutes`} />
+                <InfoTile icon={BookOpen} label="Questions" value={String(exam.num_questions || "—")} />
+                <InfoTile icon={CheckCircle} label="Passing" value={`${exam.passing_percentage}%`} />
                 <InfoTile
                   icon={AlertTriangle}
                   label="Difficulty"
@@ -195,9 +200,11 @@ export default function InterviewDashboard() {
               </div>
 
               {/* Instructions */}
-              <div className="bg-slate-900/50 border border-slate-700 rounded-lg p-4 space-y-2">
-                <h3 className="text-white font-semibold text-sm">📋 Exam Instructions</h3>
-                <ul className="text-slate-300 text-sm space-y-1 list-disc list-inside">
+              <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-5 space-y-2">
+                <h3 className="text-slate-800 font-bold text-sm flex items-center gap-2">
+                  📋 Exam Instructions
+                </h3>
+                <ul className="text-slate-600 text-sm space-y-1.5 list-disc list-inside leading-relaxed">
                   <li>The exam will be available only during the scheduled time window.</li>
                   <li>Switching browser tabs or windows will trigger a warning.</li>
                   <li>Three violations will automatically submit or block your exam.</li>
@@ -209,15 +216,15 @@ export default function InterviewDashboard() {
               </div>
 
               {/* CTA */}
-              <div className="pt-2">
+              <div className="pt-1">
                 <Button
                   onClick={handleStartExam}
                   disabled={!canStartExam}
                   size="lg"
-                  className={`w-full font-bold py-3 text-base transition-all ${
+                  className={`w-full h-12 rounded-xl font-bold text-base transition-all active:scale-95 ${
                     canStartExam
-                      ? "bg-green-600 hover:bg-green-700 text-white shadow-lg shadow-green-900/30"
-                      : "bg-slate-700 text-slate-500 cursor-not-allowed"
+                      ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
                   }`}
                 >
                   {exam_status === "upcoming" && `Start Exam (Opens at ${exam.scheduled_time})`}
@@ -226,7 +233,7 @@ export default function InterviewDashboard() {
                   {exam_status === "blocked" && "Account Blocked"}
                 </Button>
                 {exam_status === "upcoming" && (
-                  <p className="text-center text-slate-500 text-xs mt-2">
+                  <p className="text-center text-slate-400 text-xs mt-2 font-medium">
                     The button will activate at your scheduled exam time.
                   </p>
                 )}
@@ -234,11 +241,13 @@ export default function InterviewDashboard() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="bg-slate-800/60 border-slate-700">
-            <CardContent className="py-12 text-center">
-              <BookOpen className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-400 text-lg">No exam assigned yet.</p>
-              <p className="text-slate-500 text-sm mt-1">
+          <Card className="border-slate-200 shadow-sm rounded-2xl bg-white">
+            <CardContent className="py-16 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <BookOpen className="w-8 h-8 text-slate-300" />
+              </div>
+              <p className="text-slate-700 text-lg font-semibold">No exam assigned yet.</p>
+              <p className="text-slate-400 text-sm mt-1">
                 Your examination coordinator will assign an exam to your account.
               </p>
             </CardContent>
@@ -251,12 +260,12 @@ export default function InterviewDashboard() {
 
 function InfoTile({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="bg-slate-900/50 rounded-lg p-3 flex flex-col gap-1">
-      <div className="flex items-center gap-1.5 text-slate-400 text-xs">
+    <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col gap-1">
+      <div className="flex items-center gap-1.5 text-slate-400 text-xs font-medium">
         <Icon className="w-3.5 h-3.5" />
         {label}
       </div>
-      <span className="text-white font-medium text-sm">{value}</span>
+      <span className="text-slate-900 font-semibold text-sm">{value}</span>
     </div>
   );
 }

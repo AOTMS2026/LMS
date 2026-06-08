@@ -42,6 +42,7 @@ import {
   ClipboardList,
   RefreshCcw,
   Zap,
+  MonitorCheck,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import { useAuth } from "@/hooks/useAuth";
@@ -91,6 +92,8 @@ const navGroups = [
       { title: "Chat Monitor", url: "/admin/chat", icon: MessageSquare },
       { title: "Live Monitoring", url: "/admin/live-monitoring", icon: Activity },
       { title: "Quality Assurance", url: "/admin/qa", icon: ShieldCheck },
+      // ── Interview Examination Module ──
+      { title: "Interview Monitor", url: "/admin/interview-monitor", icon: MonitorCheck },
     ],
   },
   {
@@ -123,12 +126,8 @@ export function AdminSidebar() {
     });
 
     try {
-      // Invalidate all queries to trigger a global refresh
       await queryClient.invalidateQueries();
-      
-      // Artificial delay for visual feedback if lightning fast
       await new Promise(r => setTimeout(r, 600));
-      
       toast.success("Platform Synchronized", {
         id: tId,
         description: "All modules are now up to date."
@@ -217,8 +216,8 @@ export function AdminSidebar() {
                         tooltip={item.title}
                         className={cn(
                           "h-12 px-4 rounded-xl transition-all duration-300 group relative overflow-hidden",
-                          isActive(item.url) 
-                            ? "bg-primary text-white shadow-[0_10px_20px_rgba(var(--primary),0.2)]" 
+                          isActive(item.url)
+                            ? "bg-primary text-white shadow-[0_10px_20px_rgba(var(--primary),0.2)]"
                             : "hover:bg-primary/5 text-slate-600 hover:text-primary"
                         )}
                       >
@@ -231,9 +230,9 @@ export function AdminSidebar() {
                               )}
                             />
                           </div>
-                          
+
                           {!collapsed && (
-                            <motion.span 
+                            <motion.span
                               className={cn(
                                 "font-bold text-xs uppercase tracking-wider z-10",
                                 isActive(item.url) ? "text-white" : "group-hover:text-primary"
@@ -246,7 +245,7 @@ export function AdminSidebar() {
                           )}
 
                           {isActive(item.url) && (
-                            <motion.div 
+                            <motion.div
                               layoutId="active-pill-admin"
                               className="absolute inset-0 bg-primary z-0"
                               initial={{ opacity: 0 }}
@@ -293,5 +292,3 @@ export function AdminSidebar() {
     </Sidebar>
   );
 }
-
-

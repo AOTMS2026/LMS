@@ -2,10 +2,6 @@
  * INTERVIEW EXAM ENGINE — Full Anti-Cheat Examination Page
  * File: Frontend/src/pages/interview/InterviewExamEngine.tsx
  * Route: /interview-exam
- *
- * FIX APPLIED (Bug #2): useInterviewSocket hook is now imported and wired in
- * so that admin control events (pause, resume, force-submit, block) are
- * received and acted upon in real time.
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -47,16 +43,10 @@ export default function InterviewExamEngine() {
   // ─── Admin Real-Time Control via Socket ──────────────────────────────────
   useInterviewSocket({
     candidateId: candidateInfo?.id || null,
-    onPause: () => {
-      setPaused(true);
-    },
-    onResume: () => {
-      setPaused(false);
-    },
+    onPause: () => { setPaused(true); },
+    onResume: () => { setPaused(false); },
     onForceSubmit: () => {
-      if (!submitted && !submitting) {
-        submitExam("admin_force_submit");
-      }
+      if (!submitted && !submitting) submitExam("admin_force_submit");
     },
     onBlock: () => {
       setBlocked(true);
@@ -66,7 +56,6 @@ export default function InterviewExamEngine() {
     },
   });
 
-  // ─── Load exam on mount ───────────────────────────────────────────────────
   useEffect(() => {
     if (!token) { navigate("/interview-login"); return; }
     startExam();
@@ -94,7 +83,6 @@ export default function InterviewExamEngine() {
       examConfig.current = data.exam?.anti_cheat;
       maxViolations.current = data.exam?.anti_cheat?.max_tab_switches || 3;
 
-      // Enter fullscreen
       if (data.exam?.anti_cheat?.enforce_fullscreen) {
         requestFullscreen();
       }
@@ -105,7 +93,7 @@ export default function InterviewExamEngine() {
     }
   };
 
-  // ─── Countdown Timer (pauses when admin pauses the exam) ──────────────────
+  // ─── Countdown Timer ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!examData || submitted || blocked || paused) return;
     if (timeLeft <= 0) { handleAutoSubmit("time_expired"); return; }
@@ -128,8 +116,6 @@ export default function InterviewExamEngine() {
 
   const autoSaveAll = useCallback(async () => {
     if (!attemptId || submitted) return;
-    // Save all current answers in bulk via submit endpoint (partial = just save)
-    // We save each answer individually to the server
     for (const [qId, ans] of Object.entries(answers)) {
       try {
         await fetch(`${API_BASE}/api/interview/exam/save-answer`, {
@@ -146,9 +132,7 @@ export default function InterviewExamEngine() {
     if (!examData) return;
 
     const handleVisibilityChange = () => {
-      if (document.hidden && !submitted && !blocked) {
-        logViolation("tab_switch");
-      }
+      if (document.hidden && !submitted && !blocked) logViolation("tab_switch");
     };
     const handleBlur = () => {
       if (!submitted && !blocked) logViolation("window_blur");
@@ -201,10 +185,8 @@ export default function InterviewExamEngine() {
   const logViolation = async (type: string) => {
     violationCount.current += 1;
     const count = violationCount.current;
-
     setTabWarnings(count);
 
-    // Show warning dialog
     if (count === 1) {
       setWarningMessage("⚠️ Warning 1: Tab switching detected. Please remain on this page.");
     } else if (count === 2) {
@@ -214,7 +196,6 @@ export default function InterviewExamEngine() {
     }
     setShowWarning(true);
 
-    // Report to backend
     try {
       const res = await fetch(`${API_BASE}/api/interview/violations`, {
         method: "POST",
@@ -233,20 +214,12 @@ export default function InterviewExamEngine() {
       }
     } catch (_) { /* log regardless */ }
 
-    // Auto-take screenshot if configured
     captureScreenshot(type);
   };
 
   const captureScreenshot = async (triggerEvent: string) => {
     if (!examConfig.current?.capture_screenshots) return;
-    try {
-      // Use MediaDevices API if available and permitted
-      // This is best-effort — browser permission may deny it
-      if (navigator.mediaDevices?.getDisplayMedia) {
-        // We don't actually call getDisplayMedia here as it requires user gesture
-        // Instead we mark the event and the server records the violation
-      }
-    } catch (_) { /* browser may block */ }
+    // Best-effort: server records the violation event
   };
 
   const requestFullscreen = () => {
@@ -282,7 +255,6 @@ export default function InterviewExamEngine() {
       });
       if (res.ok) {
         setSubmitted(true);
-        // Exit fullscreen
         if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
       }
     } catch (e) {
@@ -300,31 +272,34 @@ export default function InterviewExamEngine() {
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
-  const timeColor = timeLeft < 300 ? "text-red-400" : timeLeft < 600 ? "text-yellow-400" : "text-green-400";
+  const timeColor =
+    timeLeft < 300 ? "text-red-600" : timeLeft < 600 ? "text-amber-600" : "text-emerald-600";
+  const timeBg =
+    timeLeft < 300 ? "bg-red-50 border-red-200" : timeLeft < 600 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200";
 
   // ─── Post-Submission Screen ───────────────────────────────────────────────
   if (submitted) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
         <div className="text-center max-w-md">
-          <div className="w-20 h-20 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center mx-auto mb-6">
-            <Send className="w-10 h-10 text-green-400" />
+          <div className="w-20 h-20 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto mb-6 shadow-sm">
+            <Send className="w-10 h-10 text-emerald-600" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">
             Thank You For Completing The Interview Examination
           </h1>
-          <p className="text-slate-400 mt-4">
-            Exam: <span className="text-white font-medium">{examData?.title}</span>
+          <p className="text-slate-500 mt-4 font-medium">
+            Exam: <span className="text-slate-800 font-bold">{examData?.title}</span>
           </p>
           <p className="text-slate-400 text-sm mt-1">
             Submitted at: {new Date().toLocaleString("en-IN")}
           </p>
-          <p className="text-slate-500 text-xs mt-4">
+          <p className="text-slate-400 text-xs mt-4">
             Your results will be reviewed by the examination team.
           </p>
           <Button
-            onClick={() => { navigate("/interview-dashboard"); }}
-            className="mt-6 bg-blue-600 hover:bg-blue-700"
+            onClick={() => navigate("/interview-dashboard")}
+            className="mt-6 h-11 px-8 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-sm"
           >
             Return to Dashboard
           </Button>
@@ -335,8 +310,11 @@ export default function InterviewExamEngine() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white animate-pulse text-lg">Loading your examination...</div>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-10 w-10 rounded-full border-[3px] border-primary/20 border-t-primary animate-spin" />
+          <p className="text-slate-500 font-medium">Loading your examination...</p>
+        </div>
       </div>
     );
   }
@@ -347,20 +325,22 @@ export default function InterviewExamEngine() {
 
   return (
     <div
-      className="min-h-screen bg-slate-950 flex flex-col select-none"
+      className="min-h-screen bg-slate-50 flex flex-col select-none"
       style={{ userSelect: "none", WebkitUserSelect: "none" }}
     >
       {/* Warning Overlay */}
       {showWarning && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-red-900/90 border border-red-500 rounded-xl p-8 max-w-md text-center shadow-2xl">
-            <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-3">Violation Detected</h2>
-            <p className="text-red-200 mb-6">{warningMessage}</p>
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-red-200 rounded-2xl p-8 max-w-md text-center shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-3">Violation Detected</h2>
+            <p className="text-slate-600 mb-6 leading-relaxed">{warningMessage}</p>
             {violationCount.current < maxViolations.current && (
               <Button
                 onClick={() => { setShowWarning(false); requestFullscreen(); }}
-                className="bg-red-600 hover:bg-red-700 text-white px-8"
+                className="bg-red-600 hover:bg-red-700 text-white px-8 h-11 rounded-xl font-semibold shadow-sm"
               >
                 I Understand — Continue Exam
               </Button>
@@ -369,58 +349,64 @@ export default function InterviewExamEngine() {
         </div>
       )}
 
-      {/* Pause Overlay — shown when admin pauses exam */}
+      {/* Pause Overlay */}
       {paused && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4">
-          <div className="bg-slate-800 border border-slate-600 rounded-xl p-8 max-w-md text-center shadow-2xl">
-            <PauseCircle className="w-12 h-12 text-yellow-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Exam Paused</h2>
-            <p className="text-slate-400 text-sm">
-              Your exam has been temporarily paused by the administrator.<br />
-              Please wait — the exam will resume shortly.
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white border border-amber-200 rounded-2xl p-8 max-w-md text-center shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center mx-auto mb-4">
+              <PauseCircle className="w-8 h-8 text-amber-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Exam Paused</h2>
+            <p className="text-slate-500 text-sm leading-relaxed">
+              Your exam has been temporarily paused by the administrator.
+              <br />Please wait — the exam will resume shortly.
             </p>
           </div>
         </div>
       )}
 
       {/* Top Bar */}
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
+      <header className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div>
-          <h1 className="text-white font-semibold text-sm">{examData?.title}</h1>
+          <h1 className="text-slate-900 font-bold text-sm">{examData?.title}</h1>
           <p className="text-slate-400 text-xs">
             Q {currentIdx + 1} of {questions.length} &bull; {answeredCount} answered
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
           {tabWarnings > 0 && (
-            <div className="flex items-center gap-1 text-yellow-400 text-xs">
+            <div className="flex items-center gap-1.5 text-amber-600 text-xs font-semibold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
               <AlertTriangle className="w-3.5 h-3.5" />
               <span>{tabWarnings} warning{tabWarnings > 1 ? "s" : ""}</span>
             </div>
           )}
-          <div className={`font-mono font-bold text-lg ${timeColor}`}>
+          <div className={`font-mono font-bold text-lg px-3 py-1 rounded-xl border ${timeBg} ${timeColor}`}>
             ⏱ {formatTime(timeLeft)}
           </div>
         </div>
       </header>
 
       {/* Progress */}
-      <div className="bg-slate-800/50 px-4 py-1">
-        <Progress value={progressPercent} className="h-1" />
+      <div className="bg-white border-b border-slate-100 px-4 py-2">
+        <div className="flex justify-between text-xs text-slate-400 mb-1 font-medium">
+          <span>Progress</span>
+          <span>{answeredCount} / {questions.length} answered</span>
+        </div>
+        <Progress value={progressPercent} className="h-1.5 bg-slate-100" />
       </div>
 
       {/* Question Area */}
       <main className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto p-6">
           {currentQ && (
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Question */}
-              <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-6">
+              <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                 <div className="flex items-start gap-3">
-                  <span className="bg-blue-600 text-white text-sm font-bold rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
+                  <span className="bg-primary text-white text-sm font-bold rounded-xl w-8 h-8 flex items-center justify-center flex-shrink-0">
                     {currentQ.order}
                   </span>
-                  <p className="text-white text-base leading-relaxed">{currentQ.question_text}</p>
+                  <p className="text-slate-800 text-base leading-relaxed font-medium">{currentQ.question_text}</p>
                 </div>
               </div>
 
@@ -434,17 +420,19 @@ export default function InterviewExamEngine() {
                       onClick={() => handleAnswerSelect(currentQ.id, opt.id)}
                       className={`w-full text-left p-4 rounded-xl border transition-all ${
                         isSelected
-                          ? "bg-blue-600/20 border-blue-500 text-white"
-                          : "bg-slate-800/40 border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-slate-700/40"
+                          ? "bg-primary/5 border-primary/40 shadow-sm"
+                          : "bg-white border-slate-200 hover:border-primary/30 hover:bg-slate-50"
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${
-                          isSelected ? "border-blue-400 bg-blue-600" : "border-slate-500"
+                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                          isSelected ? "border-primary bg-primary" : "border-slate-300"
                         }`}>
                           {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
                         </div>
-                        <span className="text-sm">{opt.text}</span>
+                        <span className={`text-sm font-medium ${isSelected ? "text-primary" : "text-slate-700"}`}>
+                          {opt.text}
+                        </span>
                       </div>
                     </button>
                   );
@@ -456,12 +444,12 @@ export default function InterviewExamEngine() {
       </main>
 
       {/* Navigation Footer */}
-      <footer className="bg-slate-800 border-t border-slate-700 px-4 py-3 flex items-center justify-between sticky bottom-0">
+      <footer className="bg-white border-t border-slate-200 px-4 py-3 flex items-center justify-between sticky bottom-0 shadow-sm">
         <Button
           variant="outline"
           onClick={() => setCurrentIdx(prev => Math.max(0, prev - 1))}
           disabled={currentIdx === 0}
-          className="border-slate-600 text-slate-300 hover:bg-slate-700"
+          className="h-10 px-4 rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
         >
           <ChevronLeft className="w-4 h-4 mr-1" /> Previous
         </Button>
@@ -472,12 +460,12 @@ export default function InterviewExamEngine() {
             <button
               key={q.id}
               onClick={() => setCurrentIdx(i)}
-              className={`w-6 h-6 rounded text-xs font-bold transition-all ${
+              className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
                 i === currentIdx
-                  ? "bg-blue-600 text-white"
+                  ? "bg-primary text-white shadow-sm"
                   : answers[q.id]
-                  ? "bg-green-600/70 text-white"
-                  : "bg-slate-700 text-slate-400"
+                  ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                  : "bg-slate-100 text-slate-400 hover:bg-slate-200"
               }`}
             >
               {i + 1}
@@ -489,7 +477,7 @@ export default function InterviewExamEngine() {
           {currentIdx < questions.length - 1 ? (
             <Button
               onClick={() => setCurrentIdx(prev => Math.min(questions.length - 1, prev + 1))}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="h-10 px-5 rounded-xl bg-primary hover:bg-primary/90 text-white font-semibold shadow-sm"
             >
               Next <ChevronRight className="w-4 h-4 ml-1" />
             </Button>
@@ -497,7 +485,7 @@ export default function InterviewExamEngine() {
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="bg-green-600 hover:bg-green-700 font-bold px-6"
+              className="h-10 px-6 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm"
             >
               {submitting ? "Submitting..." : "Submit Exam"}
               <Send className="w-4 h-4 ml-2" />

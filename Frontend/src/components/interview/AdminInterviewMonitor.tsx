@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
 import {
   RefreshCw, PauseCircle, PlayCircle, StopCircle,
-  Shield, AlertTriangle, UserX, Eye, Trophy
+  Shield, AlertTriangle, UserX, Eye, Trophy, MonitorCheck
 } from "lucide-react";
 import { io as socketIO } from "socket.io-client";
 
@@ -28,11 +28,11 @@ const authHeaders = () => ({
 });
 
 const STATUS_STYLE: Record<string, string> = {
-  Active: "bg-green-500/20 text-green-400 border-green-500/30",
-  Warning: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  Suspicious: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  Blocked: "bg-red-500/20 text-red-400 border-red-500/30",
-  Completed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  Active: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  Warning: "bg-amber-50 text-amber-700 border-amber-200",
+  Suspicious: "bg-orange-50 text-orange-700 border-orange-200",
+  Blocked: "bg-red-50 text-red-600 border-red-200",
+  Completed: "bg-blue-50 text-blue-700 border-blue-200",
 };
 
 export default function AdminInterviewMonitor() {
@@ -52,7 +52,6 @@ export default function AdminInterviewMonitor() {
     fetchExams();
     const interval = setInterval(fetchData, 20000);
 
-    // Socket.IO for real-time events
     const socket = socketIO(API_BASE);
     socketRef.current = socket;
 
@@ -144,49 +143,71 @@ export default function AdminInterviewMonitor() {
     return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
   };
 
+  const VIEW_TABS = [
+    { key: "monitor", label: "Monitor", icon: Eye },
+    { key: "results", label: "Results", icon: Shield },
+    { key: "leaderboard", label: "Leaderboard", icon: Trophy },
+  ];
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Interview Live Monitor</h1>
-          <p className="text-slate-400 text-xs mt-1">
+    <div className="space-y-6 animate-in fade-in duration-500">
+      {/* Page Header */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+            <MonitorCheck className="h-6 w-6 text-primary" />
+            Interview Live Monitor
+          </h2>
+          <p className="text-slate-500 text-sm font-medium">
             Last refreshed: {lastRefresh.toLocaleTimeString()} · {displayedAttempts.length} active candidates
           </p>
         </div>
+
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Exam Filter */}
           <Select value={selectedExam} onValueChange={handleExamChange}>
-            <SelectTrigger className="bg-slate-800 border-slate-700 text-white w-52">
+            <SelectTrigger className="h-10 w-52 rounded-xl bg-white border-slate-200 text-slate-700 shadow-sm text-sm font-medium">
               <SelectValue placeholder="All Exams" />
             </SelectTrigger>
-            <SelectContent className="bg-slate-800 border-slate-700">
-              <SelectItem value="all" className="text-white">All Exams</SelectItem>
+            <SelectContent className="rounded-xl border-slate-200">
+              <SelectItem value="all" className="font-medium">All Exams</SelectItem>
               {exams.map(e => (
-                <SelectItem key={e._id || e.id} value={e._id || e.id} className="text-white text-sm">
+                <SelectItem key={e._id || e.id} value={e._id || e.id} className="font-medium text-sm">
                   {e.title}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
-          <div className="flex gap-1">
-            {["monitor", "results", "leaderboard"].map(v => (
-              <Button key={v} size="sm" variant={view === v ? "default" : "ghost"}
+          {/* View Toggle */}
+          <div className="flex gap-1 bg-slate-100/80 border border-slate-200 rounded-xl p-1">
+            {VIEW_TABS.map(({ key, label, icon: Icon }) => (
+              <Button
+                key={key}
+                size="sm"
                 onClick={() => {
-                  setView(v as any);
-                  if (v === "results" && selectedExam !== "all") fetchResults(selectedExam);
-                  if (v === "leaderboard" && selectedExam !== "all") fetchLeaderboard(selectedExam);
+                  setView(key as any);
+                  if (key === "results" && selectedExam !== "all") fetchResults(selectedExam);
+                  if (key === "leaderboard" && selectedExam !== "all") fetchLeaderboard(selectedExam);
                 }}
-                className={view === v ? "bg-blue-600" : "text-slate-400"}>
-                {v === "monitor" && <Eye className="w-3.5 h-3.5 mr-1" />}
-                {v === "results" && <Shield className="w-3.5 h-3.5 mr-1" />}
-                {v === "leaderboard" && <Trophy className="w-3.5 h-3.5 mr-1" />}
-                {v.charAt(0).toUpperCase() + v.slice(1)}
+                className={`h-8 px-3 rounded-lg text-xs font-semibold transition-all ${
+                  view === key
+                    ? "bg-white text-primary shadow-sm"
+                    : "bg-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5 mr-1.5" />
+                {label}
               </Button>
             ))}
           </div>
 
-          <Button onClick={fetchData} size="sm" variant="ghost" className="text-slate-400">
+          <Button
+            onClick={fetchData}
+            size="sm"
+            variant="outline"
+            className="h-10 w-10 p-0 rounded-xl border-slate-200 text-slate-500 hover:bg-slate-50"
+          >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </Button>
         </div>
@@ -196,70 +217,75 @@ export default function AdminInterviewMonitor() {
       {view === "monitor" && (
         <>
           {displayedAttempts.length === 0 && (
-            <div className="text-center py-16 bg-slate-800/30 rounded-xl border border-dashed border-slate-700">
-              <Eye className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-              <p className="text-slate-400">No active exam sessions right now.</p>
+            <div className="text-center py-16 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+              <Eye className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-500 font-medium">No active exam sessions right now.</p>
+              <p className="text-slate-400 text-sm">Active candidates will appear here in real time.</p>
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {displayedAttempts.map(a => (
-              <Card key={a.attempt_id} className="bg-slate-800/60 border-slate-700">
-                <CardHeader className="pb-2">
+              <Card key={a.attempt_id} className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3 border-b border-slate-50">
                   <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-white font-semibold">{a.candidate_name}</p>
-                      <p className="text-slate-400 text-xs">{a.candidate_email}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-900 font-bold truncate">{a.candidate_name}</p>
+                      <p className="text-slate-400 text-xs font-medium truncate">{a.candidate_email}</p>
                     </div>
-                    <Badge className={`text-xs border ${STATUS_STYLE[a.display_status] || STATUS_STYLE.Active}`}>
+                    <Badge className={`text-xs border font-semibold ml-2 flex-shrink-0 ${STATUS_STYLE[a.display_status] || STATUS_STYLE.Active}`}>
                       {a.display_status}
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <p className="text-slate-400 text-xs truncate">📋 {a.exam_title}</p>
+                <CardContent className="p-4 space-y-3">
+                  <p className="text-slate-400 text-xs font-medium truncate">📋 {a.exam_title}</p>
 
                   {/* Progress */}
                   <div>
-                    <div className="flex justify-between text-xs text-slate-400 mb-1">
+                    <div className="flex justify-between text-xs text-slate-400 mb-1.5 font-medium">
                       <span>Progress</span>
                       <span>{a.progress_percent}%</span>
                     </div>
-                    <Progress value={a.progress_percent} className="h-1.5" />
+                    <Progress value={a.progress_percent} className="h-1.5 bg-slate-100" />
                   </div>
 
                   {/* Stats */}
                   <div className="grid grid-cols-3 gap-2 text-center">
-                    <div className="bg-slate-900/50 rounded p-2">
-                      <p className="text-white font-bold text-sm">{formatTime(a.time_remaining_seconds)}</p>
-                      <p className="text-slate-500 text-xs">Time Left</p>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-2">
+                      <p className="text-slate-900 font-bold text-sm">{formatTime(a.time_remaining_seconds)}</p>
+                      <p className="text-slate-400 text-xs font-medium">Time Left</p>
                     </div>
-                    <div className={`rounded p-2 ${a.tab_switch_count > 0 ? "bg-red-900/20" : "bg-slate-900/50"}`}>
-                      <p className={`font-bold text-sm ${a.tab_switch_count > 0 ? "text-red-400" : "text-white"}`}>
+                    <div className={`rounded-xl p-2 border ${a.tab_switch_count > 0 ? "bg-red-50 border-red-100" : "bg-slate-50 border-slate-100"}`}>
+                      <p className={`font-bold text-sm ${a.tab_switch_count > 0 ? "text-red-600" : "text-slate-900"}`}>
                         {a.tab_switch_count}
                       </p>
-                      <p className="text-slate-500 text-xs">Tab Switches</p>
+                      <p className="text-slate-400 text-xs font-medium">Tab Switches</p>
                     </div>
-                    <div className="bg-slate-900/50 rounded p-2">
-                      <p className="text-white font-bold text-sm">{a.screenshot_count}</p>
-                      <p className="text-slate-500 text-xs">Screenshots</p>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-2">
+                      <p className="text-slate-900 font-bold text-sm">{a.screenshot_count}</p>
+                      <p className="text-slate-400 text-xs font-medium">Screenshots</p>
                     </div>
                   </div>
 
                   {/* Admin Controls */}
                   <div className="flex gap-1 flex-wrap pt-1">
-                    <Button size="sm" variant="ghost" className="text-yellow-400 hover:bg-yellow-900/20 text-xs h-7 px-2"
+                    <Button size="sm" variant="ghost"
+                      className="h-7 px-2 rounded-lg text-amber-600 hover:bg-amber-50 text-xs font-semibold"
                       onClick={() => sendControl("pause", a.attempt_id, a.candidate_id)}>
                       <PauseCircle className="w-3 h-3 mr-1" /> Pause
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-green-400 hover:bg-green-900/20 text-xs h-7 px-2"
+                    <Button size="sm" variant="ghost"
+                      className="h-7 px-2 rounded-lg text-emerald-600 hover:bg-emerald-50 text-xs font-semibold"
                       onClick={() => sendControl("resume", a.attempt_id, a.candidate_id)}>
                       <PlayCircle className="w-3 h-3 mr-1" /> Resume
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-orange-400 hover:bg-orange-900/20 text-xs h-7 px-2"
+                    <Button size="sm" variant="ghost"
+                      className="h-7 px-2 rounded-lg text-orange-600 hover:bg-orange-50 text-xs font-semibold"
                       onClick={() => sendControl("force_submit", a.attempt_id, a.candidate_id)}>
                       <StopCircle className="w-3 h-3 mr-1" /> Submit
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-red-400 hover:bg-red-900/20 text-xs h-7 px-2"
+                    <Button size="sm" variant="ghost"
+                      className="h-7 px-2 rounded-lg text-red-500 hover:bg-red-50 text-xs font-semibold"
                       onClick={() => sendControl("block_candidate", a.attempt_id, a.candidate_id)}>
                       <UserX className="w-3 h-3 mr-1" /> Block
                     </Button>
@@ -273,52 +299,56 @@ export default function AdminInterviewMonitor() {
 
       {/* RESULTS VIEW */}
       {view === "results" && (
-        <div className="space-y-3">
+        <div className="space-y-4">
           {selectedExam === "all" && (
-            <p className="text-yellow-400 text-sm">Select a specific exam to view results.</p>
+            <div className="flex items-center gap-2 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              Select a specific exam to view results.
+            </div>
           )}
           {results.length === 0 && selectedExam !== "all" && (
-            <p className="text-slate-400 text-sm text-center py-8">No submissions yet for this exam.</p>
+            <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+              <Shield className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-400 font-medium">No submissions yet for this exam.</p>
+            </div>
           )}
           {results.map((r, i) => (
-            <Card key={i} className="bg-slate-800/60 border-slate-700">
-              <CardContent className="pt-4">
+            <Card key={i} className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+              <CardContent className="p-5">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
-                  {/* Candidate */}
                   <div className="min-w-0">
-                    <p className="text-white font-semibold">{r.candidate?.name}</p>
-                    <p className="text-slate-400 text-xs">{r.candidate?.email}</p>
+                    <p className="text-slate-900 font-bold">{r.candidate?.name}</p>
+                    <p className="text-slate-400 text-xs font-medium">{r.candidate?.email}</p>
                   </div>
-                  {/* Score */}
                   <div className="text-right">
-                    <p className={`text-2xl font-bold ${r.exam?.passed ? "text-green-400" : "text-red-400"}`}>
+                    <p className={`text-3xl font-black ${r.exam?.passed ? "text-emerald-600" : "text-red-500"}`}>
                       {Math.round(r.exam?.percentage || 0)}%
                     </p>
-                    <Badge className={r.exam?.passed ? "bg-green-900/30 text-green-400 border-green-700/50" : "bg-red-900/30 text-red-400 border-red-700/50"}>
+                    <Badge className={`font-semibold border ${r.exam?.passed ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
                       {r.exam?.pass_fail}
                     </Badge>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 text-center">
                   {[
-                    { label: "Total Qs", val: r.exam?.total_questions },
-                    { label: "Correct", val: r.exam?.correct_answers, color: "text-green-400" },
-                    { label: "Wrong", val: r.exam?.wrong_answers, color: "text-red-400" },
-                    { label: "Unanswered", val: r.exam?.unanswered, color: "text-yellow-400" },
+                    { label: "Total Qs", val: r.exam?.total_questions, color: "text-slate-900" },
+                    { label: "Correct", val: r.exam?.correct_answers, color: "text-emerald-600" },
+                    { label: "Wrong", val: r.exam?.wrong_answers, color: "text-red-500" },
+                    { label: "Unanswered", val: r.exam?.unanswered, color: "text-amber-600" },
                   ].map(item => (
-                    <div key={item.label} className="bg-slate-900/50 rounded-lg p-2">
-                      <p className={`font-bold text-lg ${item.color || "text-white"}`}>{item.val}</p>
-                      <p className="text-slate-500 text-xs">{item.label}</p>
+                    <div key={item.label} className="bg-slate-50 border border-slate-100 rounded-xl p-3">
+                      <p className={`font-black text-xl ${item.color}`}>{item.val}</p>
+                      <p className="text-slate-400 text-xs font-medium mt-0.5">{item.label}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-3 flex gap-4 text-xs text-slate-400 flex-wrap">
+                <div className="mt-4 flex gap-4 text-xs text-slate-400 flex-wrap font-medium">
                   <span>⏱ {Math.round((r.timing?.time_taken_seconds || 0) / 60)} min taken</span>
                   <span>🔀 {r.integrity?.tab_switch_count} tab switches</span>
                   <span>📸 {r.integrity?.screenshot_count} screenshots</span>
-                  <span>Status: <span className="text-white">{r.timing?.status}</span></span>
+                  <span>Status: <span className="text-slate-700 font-semibold">{r.timing?.status}</span></span>
                 </div>
               </CardContent>
             </Card>
@@ -330,35 +360,46 @@ export default function AdminInterviewMonitor() {
       {view === "leaderboard" && (
         <div className="space-y-3">
           {selectedExam === "all" && (
-            <p className="text-yellow-400 text-sm">Select a specific exam to view the leaderboard.</p>
+            <div className="flex items-center gap-2 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm font-medium">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              Select a specific exam to view the leaderboard.
+            </div>
           )}
           {leaderboard.length === 0 && selectedExam !== "all" && (
-            <p className="text-slate-400 text-sm text-center py-8">No leaderboard data yet.</p>
+            <div className="text-center py-12 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200">
+              <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-slate-400 font-medium">No leaderboard data yet.</p>
+            </div>
           )}
           {leaderboard.map((entry, i) => (
-            <div key={i} className={`flex items-center gap-4 p-4 rounded-xl border ${
-              i === 0 ? "bg-yellow-900/20 border-yellow-700/50" :
-              i === 1 ? "bg-slate-700/40 border-slate-600" :
-              i === 2 ? "bg-orange-900/20 border-orange-700/50" :
-              "bg-slate-800/40 border-slate-700"
-            }`}>
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg ${
-                i === 0 ? "bg-yellow-500 text-yellow-900" :
-                i === 1 ? "bg-slate-400 text-slate-900" :
-                i === 2 ? "bg-orange-600 text-white" :
-                "bg-slate-700 text-slate-300"
+            <div
+              key={i}
+              className={`flex items-center gap-4 p-4 rounded-2xl border shadow-sm transition-all ${
+                i === 0 ? "bg-amber-50/80 border-amber-200" :
+                i === 1 ? "bg-slate-50 border-slate-200" :
+                i === 2 ? "bg-orange-50/60 border-orange-200" :
+                "bg-white border-slate-200"
+              }`}
+            >
+              <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-lg flex-shrink-0 ${
+                i === 0 ? "bg-amber-400 text-amber-900 shadow-sm" :
+                i === 1 ? "bg-slate-300 text-slate-700 shadow-sm" :
+                i === 2 ? "bg-orange-400 text-white shadow-sm" :
+                "bg-slate-100 text-slate-500"
               }`}>
                 {entry.rank}
               </div>
-              <div className="flex-1">
-                <p className="text-white font-medium">{entry.candidate_name}</p>
-                <p className="text-slate-400 text-xs">{entry.candidate_email}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-slate-900 font-bold truncate">{entry.candidate_name}</p>
+                <p className="text-slate-400 text-xs font-medium truncate">{entry.candidate_email}</p>
               </div>
-              <div className="text-right">
-                <p className={`text-xl font-bold ${entry.passed ? "text-green-400" : "text-red-400"}`}>
+              <div className="text-right flex-shrink-0">
+                <p className={`text-2xl font-black ${entry.passed ? "text-emerald-600" : "text-red-500"}`}>
                   {Math.round(entry.percentage)}%
                 </p>
-                <p className="text-slate-400 text-xs">{entry.correct_answers} correct · {Math.round((entry.time_taken_seconds || 0) / 60)} min</p>
+                <p className="text-slate-400 text-xs font-medium">
+                  {entry.correct_answers} correct · {Math.round((entry.time_taken_seconds || 0) / 60)} min
+                </p>
               </div>
             </div>
           ))}
