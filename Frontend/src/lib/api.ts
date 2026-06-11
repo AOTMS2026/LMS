@@ -1,10 +1,10 @@
-const PRODUCTION_API = "https://loyola-lms.onrender.com/api";
+const PROD_API = "https://loyola-lms.onrender.com/api";
 
 export const API_URL =
   import.meta.env.VITE_API_URL ||
-  (window.location.hostname === "localhost"
+  (typeof window !== "undefined" && window.location.hostname === "localhost"
     ? "http://localhost:5000/api"
-    : PRODUCTION_API);
+    : PROD_API);
 
 export const fetchWithAuth = async <T = unknown>(
   url: string,
