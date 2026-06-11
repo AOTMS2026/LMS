@@ -2798,6 +2798,11 @@ app.delete('/api/admin/permanent-delete/:dataType', authenticateToken, requireAd
     }
 });
 
+// Health check endpoint (used by keep-alive ping and monitoring)
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
+});
+
 // Manager: get own department info
 app.get('/api/manager/me', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
@@ -8337,6 +8342,22 @@ console.log('[Interview] Examination module routes mounted at /api/interview');
 httpServer.listen(port, () => {
     console.log(`Server running on port ${port} - Socket.io Enabled`);
     console.log(`[System] Auto-restart triggered at ${new Date().toISOString()}`);
+
+    // Keep Render free tier awake — ping self every 10 minutes
+    if (process.env.RENDER_EXTERNAL_URL || process.env.NODE_ENV === 'production') {
+        const selfUrl = process.env.RENDER_EXTERNAL_URL || 'https://loyola-lms.onrender.com';
+        setInterval(async () => {
+            try {
+                const https = require('https');
+                https.get(`${selfUrl}/api/health`, (res) => {
+                    console.log(`[Keep-Alive] Self-ping status: ${res.statusCode}`);
+                }).on('error', (e) => {
+                    console.warn(`[Keep-Alive] Self-ping failed: ${e.message}`);
+                });
+            } catch (e) {}
+        }, 10 * 60 * 1000); // every 10 minutes
+        console.log(`[Keep-Alive] Self-ping enabled → ${selfUrl}/api/health`);
+    }
 });
 
 // Trigger nodemon restart
