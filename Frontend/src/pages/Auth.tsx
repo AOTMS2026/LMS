@@ -263,7 +263,7 @@ export default function Auth() {
     }
   }, [forgotResendTimer]);
 
-  const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" ? "http://localhost:5000/api" : "https://loyola-lms.onrender.com/api");
 
   // ── Forgot Password Handlers ───────────────────────────────────────────────
   const handleForgotSendOtp = async () => {

@@ -124,7 +124,7 @@ interface Batch {
     end_time?: string;
 }
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : 'https://loyola-lms.onrender.com/api');
 
 interface QuestionBankApprovalProps {
     onSync?: () => void;

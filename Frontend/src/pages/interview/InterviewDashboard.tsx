@@ -14,7 +14,7 @@ import {
   CheckCircle, XCircle, LogOut, Play, User
 } from "lucide-react";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" ? "http://localhost:5000" : "https://loyola-lms.onrender.com");
 
 interface ExamInfo {
   id: string;

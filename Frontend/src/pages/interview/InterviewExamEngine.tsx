@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { AlertTriangle, ChevronLeft, ChevronRight, Send, PauseCircle } from "lucide-react";
 import { useInterviewSocket } from "@/hooks/useInterviewSocket";
 
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL || (window.location.hostname === "localhost" ? "http://localhost:5000" : "https://loyola-lms.onrender.com");
 
 interface Option { id: string; text: string; }
 interface Question { id: string; order: number; question_text: string; marks: number; options: Option[]; }

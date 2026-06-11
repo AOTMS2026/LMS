@@ -4,7 +4,7 @@ import { useAuth } from './useAuth';
 
 // Determine the base URL for the socket connection
 const getSocketUrl = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const apiUrl = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://loyola-lms.onrender.com');
   return apiUrl.replace('/api', '');
 };
 
