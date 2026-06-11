@@ -214,12 +214,7 @@ export function EnrollmentsList({
     return matchesSearch && matchesCourse && matchesStatus && matchesTimeframe;
   });
 
-  const totalValue = filteredEnrollments.reduce((acc, e) => {
-    const full = safeParsePrice(e.final_price || e.price);
-    const paid = (e.payment_term === 'full' || e.payment_term === 'term2') ? full : 
-                 (e.payment_term === 'term1') ? Math.round(full * 0.6) : 0;
-    return acc + paid;
-  }, 0);
+
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -263,12 +258,11 @@ export function EnrollmentsList({
 
   return (
     <div className="space-y-10">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {[
           { icon: Users, label: "Total Enrollments", value: filteredEnrollments.length, color: "text-slate-900", bg: "bg-slate-100" },
           { icon: BookOpen, label: "Active Courses", value: courses.length, color: "text-slate-900", bg: "bg-slate-100" },
           { icon: TrendingUp, label: "Active Students", value: new Set(filteredEnrollments.map(e => e.user_id)).size, color: "text-slate-900", bg: "bg-slate-100" },
-          { icon: CreditCard, label: "Total Revenue", value: `₹${totalValue.toLocaleString('en-IN')}`, color: "text-slate-900", bg: "bg-slate-100" },
         ].map((stat, i) => (
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -391,12 +385,9 @@ export function EnrollmentsList({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50/50 border-b border-slate-100">
-                      <th className="px-8 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[30%]">Student Profile</th>
-                      <th className="px-6 py-8 text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] w-[18%]">Enrolled Course</th>
-                      <th className="px-4 py-8 text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] text-center w-[12%]">Term 1</th>
-                      <th className="px-4 py-8 text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] text-center w-[12%]">Term 2</th>
-                      <th className="px-8 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[18%]">Payment Summary</th>
-                      <th className="px-8 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[10%]">Actions</th>
+                      <th className="px-8 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] w-[40%]">Student Profile</th>
+                      <th className="px-6 py-8 text-[11px] font-black text-slate-800 uppercase tracking-[0.2em] w-[40%]">Enrolled Course</th>
+                      <th className="px-8 py-8 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right w-[20%]">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -468,54 +459,7 @@ export function EnrollmentsList({
                                   </div>
                                 )}
                               </div>
-                            </td>
-                            <td className="px-4 py-6 text-center">
-                              <div className="space-y-1.5">
-                                <p className="text-sm font-black text-indigo-600 tracking-tighter italic">₹{term1Fee.toLocaleString('en-IN')}</p>
-                                <Badge className={cn(
-                                  "rounded-lg px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border-none shadow-sm",
-                                  (isTerm1 || isTerm2 || isPaidFull) ? "bg-indigo-50 text-indigo-600" : "bg-slate-100 text-slate-400 animate-pulse"
-                                )}>
-                                  {(isTerm1 || isTerm2 || isPaidFull) ? "Cleared" : "Pending"}
-                                </Badge>
-                              </div>
-                            </td>
-                            <td className="px-4 py-6 text-center">
-                              <div className="space-y-1.5">
-                                <p className={cn(
-                                  "text-sm font-black tracking-tighter italic",
-                                  (isTerm2 || isPaidFull) ? "text-emerald-600" : isTerm1 ? "text-amber-500" : "text-slate-300"
-                                )}>
-                                  ₹{(isTerm2 || isPaidFull) ? term2Fee.toLocaleString('en-IN') : (safeParsePrice((enrollment as any).remaining_balance) || term2Fee).toLocaleString('en-IN')}
-                                </p>
-                                <Badge className={cn(
-                                  "rounded-lg px-2 py-0.5 text-[8px] font-black uppercase tracking-widest border-none shadow-sm",
-                                  (isTerm2 || isPaidFull) ? "bg-emerald-50 text-emerald-600" : isTerm1 ? "bg-amber-50 text-amber-600 animate-pulse" : "bg-slate-100 text-slate-300"
-                                )}>
-                                  {(isTerm2 || isPaidFull) ? "Cleared" : isTerm1 ? "Awaited" : "Locked"}
-                                </Badge>
-                              </div>
-                            </td>
-                            <td className="px-8 py-6">
-                              <div className="space-y-2">
-                                <div className="flex justify-between items-end">
-                                  <div className="space-y-0.5">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deposited</p>
-                                    <p className="text-xs font-black text-emerald-600 tracking-tighter">₹{depositedValue.toLocaleString('en-IN')}</p>
-                                  </div>
-                                  <div className="space-y-0.5 text-right font-black">
-                                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Value</p>
-                                    <p className="text-xs text-slate-900 tracking-tighter italic">₹{fullFee.toLocaleString('en-IN')}</p>
-                                  </div>
-                                </div>
-                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 border border-slate-200/20">
-                                  <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${Math.min(100, (depositedValue / (fullFee || 1)) * 100)}%` }}
-                                    className="h-full bg-indigo-600 rounded-full shadow-[0_0_15px_rgba(79,70,229,0.3)]" />
-                                </div>
-                              </div>
-                            </td>
+                            </td>     </td>
                             <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-3 transition-all duration-300">
                                 {enrollment.status === 'pending' || !enrollment.status ? (
@@ -619,39 +563,7 @@ export function EnrollmentsList({
                           <Globe className="h-3 w-3" />
                           <span>Course Bundle Access</span>
                         </div>
-                      </div>
-
-                      <div className="bg-slate-50/50 p-5 rounded-3xl space-y-4 border border-slate-100">
-                        <div className="flex justify-between items-end">
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Financial Status</p>
-                            <div className="flex items-center gap-3">
-                              <span className="text-xl font-black text-slate-900 italic tracking-tighter">₹{depositedValue.toLocaleString('en-IN')}</span>
-                              <span className="text-xs font-bold text-slate-300 line-through">₹{fullFee.toLocaleString('en-IN')}</span>
-                            </div>
-                          </div>
-                          <div className="text-right space-y-1">
-                             <div className="flex gap-2 justify-end">
-                                <Badge variant="outline" className={cn(
-                                  "rounded-lg px-2 py-0 text-[8px] font-black uppercase tracking-widest border-slate-100",
-                                  isTerm1 || isTerm2 || isPaidFull ? "bg-slate-900 text-white" : "bg-white text-slate-300"
-                                )}>T1</Badge>
-                                <Badge variant="outline" className={cn(
-                                  "rounded-lg px-2 py-0 text-[8px] font-black uppercase tracking-widest border-slate-100",
-                                  isTerm2 || isPaidFull ? "bg-slate-900 text-white" : "bg-white text-slate-300"
-                                )}>T2</Badge>
-                             </div>
-                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Terms Cleared</p>
-                          </div>
-                        </div>
-                        <div className="relative h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                           <motion.div 
-                             initial={{ width: 0 }}
-                             animate={{ width: `${Math.min(100, (depositedValue / (fullFee || 1)) * 100)}%` }}
-                             className="h-full bg-slate-900 rounded-full shadow-[0_0_10px_rgba(15,23,42,0.2)]"
-                           />
-                        </div>
-                      </div>
+                              </div>
 
                       <div className="flex items-center lg:justify-end gap-3">
                         <Button 
@@ -700,184 +612,87 @@ export function EnrollmentsList({
       </div>
 
       <Dialog open={!!selectedEnrollment} onOpenChange={(open) => !open && setSelectedEnrollment(null)}>
-        <DialogContent className="w-[95vw] sm:max-w-4xl h-[92vh] p-0 overflow-hidden bg-[#fafafa] border-none shadow-[0_50px_200px_rgba(0,0,0,0.15)] rounded-[3rem] flex flex-col">
-          <div className="flex-1 overflow-y-auto scrollbar-none pb-20">
-            <div className="flex flex-col md:flex-row min-h-full">
-              <div className="w-full md:w-80 bg-white p-12 md:border-r border-slate-100 flex flex-col shrink-0">
-                <div className="space-y-12">
-                  <div className="space-y-4">
-                    <Badge className="bg-indigo-600 text-white rounded-lg px-3 py-1 text-[9px] uppercase font-black tracking-widest border-none shadow-lg shadow-indigo-200">Management Panel</Badge>
-                    <h3 className="text-4xl font-black text-slate-900 tracking-tighter leading-[0.9]">Enrollment<br /><span className="text-indigo-600">Details</span></h3>
-                  </div>
+        <DialogContent className="w-[95vw] sm:max-w-md p-0 overflow-hidden bg-white border-none shadow-2xl rounded-[2.5rem] flex flex-col">
+          <DialogHeader className="bg-slate-50/50 border-b border-slate-100 p-8">
+            <div className="space-y-1">
+              <Badge className="bg-indigo-600 text-white rounded-lg px-3 py-1 text-[9px] uppercase font-black tracking-widest border-none shadow-lg shadow-indigo-200">Management Panel</Badge>
+              <DialogTitle className="text-2xl font-black text-slate-900 tracking-tighter leading-[0.9] mt-2">
+                Enrollment Details
+              </DialogTitle>
+              <DialogDescription className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                Review Candidate Registration
+              </DialogDescription>
+            </div>
+          </DialogHeader>
 
-                  <div className="space-y-8">
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-3">
-                        <div className="h-2 w-2 rounded-full bg-emerald-500 animate-ping" /> Transaction (UTR) ID
-                      </label>
-                      <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100 shadow-inner">
-                        <span className="text-sm font-mono font-black text-slate-900 tracking-wider break-all leading-relaxed">{selectedEnrollment?.utr_number || "NO_UTR_DATA"}</span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-6 pt-2">
-                      <div className="flex items-center gap-4 group">
-                        <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg transition-transform group-hover:scale-110">
-                          <Users className="h-6 w-6 text-white" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-base font-black text-slate-900 group-hover:text-indigo-600 transition-colors leading-tight">
-                            {selectedEnrollment ? getEnrollmentName(selectedEnrollment) : 'Unknown Student'}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4 group">
-                        <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-xl transition-transform group-hover:scale-110">
-                          <GraduationCap className="h-6 w-6 text-indigo-600" />
-                        </div>
-                        <div className="space-y-0.5">
-                          <p className="text-base font-black text-slate-900 group-hover:text-indigo-600 transition-colors leading-tight">
-                            {selectedEnrollment ? getCourseName(selectedEnrollment) : 'Unknown Course'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-5 pt-4 border-t border-slate-100">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Financial Breakdown (60/40)</p>
-                      <div className="grid grid-cols-1 gap-4">
-                        {(() => {
-                          const full = safeParsePrice(selectedEnrollment?.final_price || selectedEnrollment?.price);
-                          const term1 = Math.round(full * 0.6);
-                          const term2 = Math.round(full * 0.4);
-                          const pTerm = selectedEnrollment?.payment_term;
-
-                          return (
-                            <>
-                              <div className="flex items-center justify-between p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/50">
-                                <div className="space-y-1">
-                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Term 01 (60%)</p>
-                                  <p className="text-lg font-black text-indigo-900 italic">₹{term1.toLocaleString('en-IN')}</p>
-                                </div>
-                                <Badge className={cn(
-                                  "rounded-lg px-2 py-1 text-[8px] font-black uppercase tracking-widest border-none",
-                                  (pTerm === 'full' || pTerm === 'term1' || pTerm === 'term2') ? "bg-indigo-600 text-white" : "bg-slate-200 text-slate-400"
-                                )}>
-                                  {(pTerm === 'full' || pTerm === 'term1' || pTerm === 'term2') ? "Cleared" : "Pending"}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center justify-between p-4 rounded-2xl bg-amber-50/50 border border-amber-100/50">
-                                <div className="space-y-1">
-                                  <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Term 02 (40%)</p>
-                                  <p className="text-lg font-black text-amber-900 italic">₹{term2.toLocaleString('en-IN')}</p>
-                                </div>
-                                <Badge
-                                  onClick={() => {
-                                    if (pTerm === 'term1' || (pTerm === 'term2' && selectedEnrollment?.status === 'pending')) {
-                                      const msg = pTerm === 'term1' ?
-                                        'Trigger Term 2 payment requirement for this student?' :
-                                        'Confirm final payment receipt and Activate student?';
-
-                                      if (window.confirm(msg)) {
-                                        onUpdatePayment?.(selectedEnrollment!.id, 'term2');
-                                        setSelectedEnrollment({
-                                          ...selectedEnrollment!,
-                                          payment_term: 'term2',
-                                          status: pTerm === 'term1' ? 'deactivate' : 'active'
-                                        });
-                                      }
-                                    }
-                                  }}
-                                  className={cn(
-                                    "rounded-lg px-2 py-1 text-[8px] font-black uppercase tracking-widest border-none transition-all",
-                                    (pTerm === 'full' || (pTerm === 'term2' && selectedEnrollment?.status === 'active')) ? "bg-emerald-600 text-white" :
-                                      (pTerm === 'term1') ? "bg-amber-600 text-white animate-pulse cursor-pointer hover:scale-105 active:scale-95" :
-                                        (pTerm === 'term2' && selectedEnrollment?.status === 'pending') ? "bg-blue-600 text-white animate-pulse cursor-pointer hover:scale-105 active:scale-95" :
-                                          (pTerm === 'term2' && selectedEnrollment?.status === 'deactivate') ? "bg-rose-500 text-white" :
-                                            "bg-slate-200 text-slate-400"
-                                  )}
-                                >
-                                  {(pTerm === 'full' || (pTerm === 'term2' && selectedEnrollment?.status === 'active')) ? "Cleared" :
-                                    (pTerm === 'term1') ? "Confirm Pay?" :
-                                      (pTerm === 'term2' && selectedEnrollment?.status === 'pending') ? "Clear Now?" :
-                                        (pTerm === 'term2' && selectedEnrollment?.status === 'deactivate') ? "Awaiting Pay" :
-                                          "Locked"}
-                                </Badge>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
+          <div className="p-8 space-y-6 overflow-y-auto max-h-[60vh] custom-scrollbar">
+            {/* Student & Course Details */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 group">
+                <div className="h-12 w-12 rounded-2xl bg-slate-900 flex items-center justify-center shadow-lg">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Student Name</p>
+                  <p className="text-base font-black text-slate-900 leading-tight">
+                    {selectedEnrollment ? getEnrollmentName(selectedEnrollment) : 'Unknown Student'}
+                  </p>
+                  <p className="text-xs text-slate-500 font-medium leading-none">
+                    {selectedEnrollment ? getEnrollmentEmail(selectedEnrollment) : 'N/A'}
+                  </p>
                 </div>
               </div>
 
-              <div className="flex-1 p-8 md:p-14">
-                <div className="h-full bg-white rounded-[3rem] p-10 shadow-2xl shadow-slate-200/50 flex flex-col border border-slate-100 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-8">
-                    <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
-                      <CreditCard className="h-6 w-6" />
-                    </div>
-                  </div>
-
-                  <div className="flex-1 flex flex-col items-center justify-center relative z-10">
-                    {selectedEnrollment?.payment_proof_url ? (
-                      <div className="relative group/proof cursor-zoom-in max-w-full">
-                        <img
-                          src={selectedEnrollment.payment_proof_url}
-                          alt="Payment Proof"
-                          className="max-h-[45vh] lg:max-h-[55vh] rounded-[2rem] object-contain shadow-[0_30px_60px_rgba(0,0,0,0.12)] transition-all duration-700 group-hover/proof:scale-[1.03]" />
-                        <div className="absolute inset-0 bg-indigo-600/0 group-hover/proof:bg-indigo-600/5 transition-all duration-700 rounded-[2rem]" />
-                      </div>
-                    ) : (
-                      <div className="text-center space-y-6 py-20 opacity-20">
-                        <div className="h-32 w-32 mx-auto rounded-full bg-slate-100 flex items-center justify-center border-4 border-dashed border-slate-200">
-                          <RefreshCw className="h-10 w-10 text-slate-400" />
-                        </div>
-                        <p className="font-black text-slate-400 uppercase tracking-[0.3em] text-[10px]">No Payment Document</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-10 p-6 bg-slate-50/50 rounded-3xl border border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Zap className="h-5 w-5 text-amber-500 fill-amber-500" />
-                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Payment Proof Verified</p>
-                    </div>
-                    <Badge className="bg-emerald-50 text-emerald-600 border-none px-3 font-black text-[9px] uppercase tracking-tighter">Verified</Badge>
-                  </div>
+              <div className="flex items-center gap-4 group">
+                <div className="h-12 w-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shadow-md">
+                  <GraduationCap className="h-6 w-6 text-indigo-600" />
                 </div>
+                <div className="space-y-0.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Course Selected</p>
+                  <p className="text-base font-black text-slate-900 leading-tight">
+                    {selectedEnrollment ? getCourseName(selectedEnrollment) : 'Unknown Course'}
+                  </p>
+                  <p className="text-xs text-emerald-600 font-bold uppercase tracking-wider">
+                    Free Course
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100/50 text-center">
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2 block">Admission Status</span>
+              <div className="inline-block">
+                {selectedEnrollment && getStatusBadge(selectedEnrollment.status || 'pending')}
               </div>
             </div>
           </div>
 
-          <div className="absolute bottom-0 left-0 right-0 p-8 bg-white/80 backdrop-blur-xl border-t border-slate-100 flex flex-wrap justify-end gap-5 rounded-b-[3rem] z-20">
-            <Button variant="ghost" onClick={() => setSelectedEnrollment(null)} className="text-slate-400 font-black uppercase tracking-widest text-[10px] h-14 px-8 rounded-2xl hover:bg-slate-50 transition-all">Close Viewer</Button>
+          <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-3 rounded-b-[2.5rem]">
+            <Button variant="ghost" onClick={() => setSelectedEnrollment(null)} className="text-slate-400 font-black uppercase tracking-widest text-[10px] h-12 px-6 rounded-xl hover:bg-slate-100 transition-all">Close</Button>
             
             {selectedEnrollment?.status === 'pending' && (
               <>
                 <Button 
                   variant="destructive"
-                  className="rounded-2xl h-14 px-8 font-black uppercase tracking-widest text-[10px] shadow-xl shadow-rose-100 border-none transition-all hover:translate-y-[-4px]" 
+                  className="rounded-xl h-12 px-6 font-black uppercase tracking-widest text-[10px] shadow-lg transition-all" 
                   onClick={() => { if(selectedEnrollment) handleUpdateStatus(selectedEnrollment.id, 'rejected'); setSelectedEnrollment(null); }}
                 >
-                  Reject Admission
+                  Reject
                 </Button>
                 <Button 
-                  className="bg-indigo-600 hover:bg-slate-900 text-white rounded-2xl h-14 px-12 font-black uppercase tracking-widest text-[10px] transition-all shadow-2xl shadow-indigo-200 hover:translate-y-[-4px] active:translate-y-0" 
+                  className="bg-indigo-600 hover:bg-slate-900 text-white rounded-xl h-12 px-8 font-black uppercase tracking-widest text-[10px] transition-all shadow-xl shadow-indigo-200" 
                   onClick={() => { if(selectedEnrollment) handleUpdateStatus(selectedEnrollment.id, 'active'); setSelectedEnrollment(null); }}
                 >
                   Approve Enrollment
-                  <ArrowRight className="h-4 w-4 ml-3" />
+                  <ArrowRight className="h-4 w-4 ml-2" />
                 </Button>
               </>
             )}
 
             {selectedEnrollment?.status === 'active' && (
-              <div className="flex items-center gap-3 px-6 h-14 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100/50">
-                 <ShieldCheck className="h-5 w-5" />
-                 <span className="text-[10px] font-black uppercase tracking-widest">Enrolled & Active</span>
+              <div className="flex items-center gap-2 px-4 h-12 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100/50">
+                 <ShieldCheck className="h-4 w-4" />
+                 <span className="text-[10px] font-black uppercase tracking-widest">Active Access</span>
               </div>
             )}
           </div>

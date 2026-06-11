@@ -1,4 +1,4 @@
-import logo from "@/assets/logo.png";
+import logo from "@/assets/aliet_banner.png";
 import {
   Linkedin,
   Instagram,

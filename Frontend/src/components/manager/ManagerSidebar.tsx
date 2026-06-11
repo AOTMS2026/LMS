@@ -43,7 +43,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/lanyard/aotms_logo.jpg";
 import { cn } from "@/lib/utils";
 
 const navGroups = [
@@ -75,10 +75,10 @@ const navGroups = [
       { id: "users",        title: "User Management",    url: "/manager/users",                 icon: Users },
       { id: "instructors",  title: "Instructors",        url: "/manager/instructors",           icon: UserPlus },
       { id: "instructor-access", title: "Instructor Access", url: "/manager/instructor-access", icon: ShieldCheck },
-      { id: "enrollments",  title: "Enrollments Hub",    url: "/manager/enrollments",           icon: Database },
       { id: "submissions-grading", title: "Submissions Grading", url: "/manager/submissions-grading", icon: ClipboardList },
       { id: "live-broadcast", title: "Live Broadcast",      url: "/manager/live-broadcast",        icon: Radio },
       { id: "grant-access", title: "Grant Access",       url: "/manager/grant-access",          icon: KeyRound },
+      { id: "student-access", title: "Student Access",   url: "/manager/student-access",        icon: UserCheck },
     ],
   },
   {
@@ -93,7 +93,6 @@ const navGroups = [
   {
     label: "Marketing & AI",
     items: [
-      { id: "coupons",      title: "Rewards & Coupons",  url: "/manager/coupons",               icon: Ticket },
       { id: "ai-hub",       title: "AI Communications",  url: "/manager/ai-hub",                icon: Zap },
     ],
   },

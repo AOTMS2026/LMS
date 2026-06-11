@@ -44,6 +44,7 @@ interface Course {
 interface GrantStudentAccessProps {
     profiles?: Profile[];
     enrollments?: CourseEnrollment[];
+    showPendingOnly?: boolean;
 }
 
 // Map course_type value → human label + visual style
@@ -52,7 +53,7 @@ const COURSE_TYPE_META: Record<string, { label: string; icon: React.ElementType;
   internship: { label: 'Internship',  icon: Briefcase,     badgeClass: 'bg-amber-50 text-amber-700 border-amber-200', filterLabel: 'Internship Students'  },
 };
 
-export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: propEnrollments = [], onSync: _onSync, loading: _loading }: GrantStudentAccessProps & { onSync?: () => void; loading?: boolean }) {
+export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: propEnrollments = [], onSync: _onSync, loading: _loading, showPendingOnly = false }: GrantStudentAccessProps & { onSync?: () => void; loading?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Profile | null>(null);
@@ -93,6 +94,16 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
     enabled: propEnrollments.length === 0,
   });
 
+  // Fetch pending enrollment requests for Student Access tab
+  const { data: pendingEnrollments = [], refetch: refetchPending } = useQuery({
+    queryKey: ['pending-enrollment-requests'],
+    queryFn: async () => {
+      const data = await fetchWithAuth('/data/course_enrollments?status=eq.pending') as (CourseEnrollment & { course?: { title?: string }; user?: { full_name?: string; email?: string } })[];
+      return data || [];
+    },
+    enabled: showPendingOnly,
+  });
+
   const profiles   = propProfiles.length > 0   ? propProfiles   : fetchedProfiles;
   const enrollments = propEnrollments.length > 0 ? propEnrollments : fetchedEnrollments;
 
@@ -121,9 +132,6 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
   // Courses available for the selected student — filtered to match their course_type
   const availableCourses = courses.filter(course => {
     if (selectedStudent) {
-      // Only show courses that match the student's chosen course type
-      const studentType = (selectedStudent as any).course_type || 'full_time';
-      if (course.course_type !== studentType) return false;
       // Exclude courses already actively enrolled
       if (enrollments.some(e => e.user_id === selectedStudent.id && e.course_id === course.id && e.status === 'active')) return false;
     }
@@ -187,10 +195,12 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
           <div className="space-y-1">
             <CardTitle className="text-xl flex items-center gap-2">
               <UserPlus className="h-5 w-5 text-primary" />
-              Grant Student Access
+              {showPendingOnly ? 'Student Course Requests' : 'Grant Student Access'}
             </CardTitle>
             <CardDescription className="max-w-md">
-              Assign an <strong>Internship</strong> or <strong>Full-Time</strong> course to students based on the programme they registered for.
+              {showPendingOnly
+                ? 'Students who have requested course access. Review and approve or reject their enrollment requests.'
+                : 'Assign an <strong>Internship</strong> or <strong>Full-Time</strong> course to students based on the programme they registered for.'}
             </CardDescription>
           </div>
 
@@ -304,8 +314,8 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
                           <Badge className={`border text-[9px] h-4 px-2 uppercase font-black tracking-tighter ${courseTypeMeta.badgeClass}`}>
                             {courseTypeMeta.label}
                           </Badge>
-                          {(selectedStudent as any).college_name && (
-                            <span className="text-[10px] text-slate-400 truncate">{(selectedStudent as any).college_name}</span>
+                          {(selectedStudent as any).department && (
+                            <span className="text-[10px] text-slate-400 truncate">{(selectedStudent as any).department}</span>
                           )}
                         </div>
                       </div>
@@ -400,7 +410,99 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
       </CardHeader>
 
       <CardContent>
-        {/* ── Search bar ──────────────────────────────────────────────────── */}
+        {/* ── Pending Enrollment Requests (Student Access tab) ──────────── */}
+        {showPendingOnly && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-black text-slate-900 text-sm uppercase tracking-widest flex items-center gap-2">
+                <Clock className="h-4 w-4 text-amber-500" />
+                Pending Requests ({pendingEnrollments.length})
+              </h3>
+              <Button variant="outline" size="sm" className="rounded-xl gap-1 text-xs" onClick={() => refetchPending()}>
+                <CheckCircle className="h-3.5 w-3.5" /> Refresh
+              </Button>
+            </div>
+            {pendingEnrollments.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                <CheckCircle className="h-10 w-10 text-emerald-300 mb-3" />
+                <p className="font-bold text-slate-500 text-sm">No pending requests</p>
+                <p className="text-slate-400 text-xs">All course enrollment requests have been processed.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(pendingEnrollments as any[]).map((enroll, idx) => {
+                  const userObj = enroll.user_id || enroll.user || {};
+                  const studentName = (typeof userObj === 'object' ? userObj.full_name : null) || enroll.full_name || 'Student';
+                  const studentEmail = (typeof userObj === 'object' ? userObj.email : null) || enroll.email || '';
+                  const courseObj = enroll.course_id || enroll.course || {};
+                  const courseName = (typeof courseObj === 'object' ? courseObj.title : null) || enroll.course_title || 'Unknown Course';
+                  return (
+                    <div key={enroll.id || idx} className="flex items-center justify-between p-4 bg-white rounded-2xl border border-amber-100 shadow-sm">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center font-black text-amber-600 text-sm">
+                          {studentName.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900 text-sm">{studentName}</p>
+                          {(enroll as any).roll_number && (
+                            <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{(enroll as any).roll_number}</p>
+                          )}
+                          <div className="flex items-center gap-2">
+                            {(enroll as any).department && (
+                              <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{(enroll as any).department}</span>
+                            )}
+                            {(enroll as any).year && (
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Yr {(enroll as any).year}</span>
+                            )}
+                          </div>
+                          <p className="text-[10px] text-slate-500">{studentEmail}</p>
+                          <Badge className="mt-1 bg-blue-50 text-blue-700 border-none text-[9px] font-black uppercase">{courseName}</Badge>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          className="rounded-xl h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1"
+                          onClick={async () => {
+                            try {
+                              await fetchWithAuth(`/courses/enrollment-status`, {
+                                method: 'PUT',
+                                body: JSON.stringify({ enrollmentId: enroll.id, status: 'active' }),
+                              });
+                              refetchPending();
+                              queryClient.invalidateQueries({ queryKey: ['grant-access-enrollments'] });
+                            } catch { /* silent */ }
+                          }}
+                        >
+                          <CheckCircle className="h-3.5 w-3.5" /> Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="rounded-xl h-8 text-red-600 border-red-200 hover:bg-red-50 text-xs gap-1"
+                          onClick={async () => {
+                            try {
+                              await fetchWithAuth(`/courses/enrollment-status`, {
+                                method: 'PUT',
+                                body: JSON.stringify({ enrollmentId: enroll.id, status: 'rejected' }),
+                              });
+                              refetchPending();
+                            } catch { /* silent */ }
+                          }}
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> Reject
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-6 pt-6 border-t border-slate-100">
+              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Manual Enrollment</p>
+            </div>
+          </div>
+        )}
         <div className="relative mb-4">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -439,8 +541,8 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
                         <SIcon className="h-2.5 w-2.5" />
                         {sMeta.label}
                       </Badge>
-                      {(student as any).college_name && (
-                        <span className="text-[9px] text-slate-400 truncate max-w-[120px]">{(student as any).college_name}</span>
+                      {(student as any).department && (
+                        <span className="text-[9px] text-slate-400 truncate max-w-[120px]">{(student as any).department}</span>
                       )}
                     </div>
                   </div>

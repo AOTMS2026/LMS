@@ -26,9 +26,10 @@ const ProfileSchema = new mongoose.Schema({
     email: { type: String },
     full_name: { type: String },
     avatar_url: { type: String },
-    mobile_number: { type: String },
-    college_name: { type: String }, // User requested
-    institute_name: { type: String }, // User requested
+    mobile_number: { type: String, sparse: true },
+    department: { type: String }, // e.g. CSE, ECE, EEE, DS, AI/ML, IT
+    roll_number: { type: String }, // Student roll number (e.g. 23hp1a0549)
+    year: { type: String }, // Academic year: 1, 2, 3, 4
     course_type: { type: String, default: 'full_time' }, // full_time, internship, bridge
     github_url: { type: String },
     linkedin_url: { type: String },
@@ -55,6 +56,8 @@ const ProfileSchema = new mongoose.Schema({
     updated_at: { type: Date }
 });
 ProfileSchema.set('toJSON', { virtuals: true, versionKey: false, transform: (doc, ret) => { ret.id = ret.user_id; delete ret._id; } });
+ProfileSchema.index({ mobile_number: 1 }, { unique: true, sparse: true });
+ProfileSchema.index({ roll_number: 1 }, { unique: true, sparse: true });
 
 const ResumeScanSchema = new mongoose.Schema({
     user_id: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },

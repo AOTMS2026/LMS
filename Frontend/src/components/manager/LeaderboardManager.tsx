@@ -27,6 +27,10 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
   const { data: studentBatches = [] } = useStudentBatches();
   const verifyEntry = useVerifyLeaderboardEntry();
   const [selectedBatchId, setSelectedBatchId] = useState<string>("all");
+  const [selectedYear, setSelectedYear] = useState<string>("all");
+  const [selectedDept, setSelectedDept] = useState<string>("all");
+
+  const DEPARTMENTS = ["CSE", "ECE", "EEE", "DS", "AI/ML", "IT"];
 
   const handleVerify = async (id: string) => {
     if (!user?.id) return;
@@ -41,9 +45,11 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
   };
 
   const filteredLeaderboard = leaderboard.filter(entry => {
-    if (selectedBatchId === "all") return true;
     const studentId = typeof entry.user_id === 'object' ? entry.user_id.id : entry.user_id;
-    return studentBatches.some(sb => sb.student_id === studentId && sb.batch_id === selectedBatchId);
+    if (selectedBatchId !== "all" && !studentBatches.some(sb => sb.student_id === studentId && sb.batch_id === selectedBatchId)) return false;
+    if (selectedYear !== "all" && (entry as any).year !== selectedYear) return false;
+    if (selectedDept !== "all" && ((entry as any).department || '').toUpperCase() !== selectedDept) return false;
+    return true;
   });
 
   const verifiedCount = filteredLeaderboard.filter(e => e.is_verified).length;
@@ -64,7 +70,7 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-400" />
             <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-              <SelectTrigger className="w-[180px] h-9 rounded-xl border-slate-200">
+              <SelectTrigger className="w-[150px] h-9 rounded-xl border-slate-200">
                 <SelectValue placeholder="All Batches" />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-slate-100 shadow-xl">
@@ -77,6 +83,29 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
               </SelectContent>
             </Select>
           </div>
+          <Select value={selectedYear} onValueChange={setSelectedYear}>
+            <SelectTrigger className="w-[120px] h-9 rounded-xl border-slate-200">
+              <SelectValue placeholder="All Years" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+              <SelectItem value="all">All Years</SelectItem>
+              <SelectItem value="1">Year 1</SelectItem>
+              <SelectItem value="2">Year 2</SelectItem>
+              <SelectItem value="3">Year 3</SelectItem>
+              <SelectItem value="4">Year 4</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={selectedDept} onValueChange={setSelectedDept}>
+            <SelectTrigger className="w-[120px] h-9 rounded-xl border-slate-200">
+              <SelectValue placeholder="All Depts" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+              <SelectItem value="all">All Depts</SelectItem>
+              {DEPARTMENTS.map(d => (
+                <SelectItem key={d} value={d}>{d}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
           <div className="flex items-center gap-2">
             <Badge variant="default" className="gap-1 rounded-lg">
@@ -183,6 +212,12 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
                           <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-500 shrink-0" />
                         )}
                       </div>
+                      {(entry as any).roll_number && (
+                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest leading-none mb-0.5">{(entry as any).roll_number}</p>
+                      )}
+                      {(entry as any).year && (
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-0.5">Year {(entry as any).year}</p>
+                      )}
                       <div className="flex flex-wrap items-center gap-1.5 sm:gap-3 text-[9px] sm:text-[10px] uppercase font-black text-slate-400 tracking-wider">
                         <span>{entry.exams_completed || 0} exams</span>
                         <span className="w-1 h-1 rounded-full bg-slate-300 shrink-0" />

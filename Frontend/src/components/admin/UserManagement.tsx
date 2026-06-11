@@ -533,6 +533,16 @@ export function UserManagement({
                         <Mail className="h-3 w-3 opacity-40" />
                         {user.email}
                       </p>
+                      {user.roll_number && (
+                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">
+                          {user.roll_number}
+                        </p>
+                      )}
+                      {(user as any).year && (
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          Year {(user as any).year}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 pt-1">
                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100/50">
                            {formatLastActive(user.last_active_at)}
@@ -664,6 +674,7 @@ export function UserManagement({
             { label: "Interns",     count: roleCounts.intern     || 0, icon: Briefcase,    desc: "Internship programme students",     accent: "bg-amber-50",  iconColor: "text-amber-600" },
             { label: "Instructors", count: roleCounts.instructor || 0, icon: Presentation, desc: "Course & content management",       accent: "bg-emerald-50",iconColor: "text-emerald-600" },
             { label: "Managers",    count: roleCounts.manager    || 0, icon: UserCog,      desc: "Operational management team",       accent: "bg-purple-50", iconColor: "text-purple-600" },
+            { label: "Admins",      count: roleCounts.admin      || 0, icon: ShieldCheck,  desc: "Platform administrators",           accent: "bg-red-50",    iconColor: "text-red-600" },
           ].map((role) => (
             <Card key={role.label} className="border-none shadow-xl shadow-slate-200/50 rounded-[2rem] overflow-hidden group transition-all duration-500 hover:-translate-y-2 bg-white">
               <CardContent className="p-8">
@@ -1035,6 +1046,16 @@ export function UserManagement({
                   <h3 className="text-xl font-bold text-foreground">
                     {selectedUser.full_name || 'Unknown'}
                   </h3>
+                  {selectedUser.roll_number && (
+                    <p className="text-xs font-black text-indigo-600 uppercase tracking-widest mt-0.5">
+                      {selectedUser.roll_number}
+                    </p>
+                  )}
+                  {(selectedUser as any).year && (
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                      Year {(selectedUser as any).year}
+                    </p>
+                  )}
                   <Badge variant="secondary" className="mt-1">
                     {selectedUser.role || 'student'}
                   </Badge>
@@ -1054,13 +1075,13 @@ export function UserManagement({
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-sm text-muted-foreground">College</span>
-                  <span className="text-sm font-medium truncate max-w-[200px]" title={selectedUser.college_name}>{selectedUser.college_name || 'N/A'}</span>
+                  <span className="text-sm text-muted-foreground">Department</span>
+                  <span className="text-sm font-medium truncate max-w-[200px]" title={selectedUser.department}>{selectedUser.department || 'N/A'}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <span className="text-sm text-muted-foreground">Institute</span>
-                  <span className="text-sm font-medium truncate max-w-[200px]" title={selectedUser.institute_name}>{selectedUser.institute_name || 'N/A'}</span>
+                  <span className="text-sm text-muted-foreground">Roll Number</span>
+                  <span className="text-sm font-medium truncate max-w-[200px]" title={selectedUser.roll_number}>{selectedUser.roll_number || 'N/A'}</span>
                 </div>
                 
                 <div className="flex items-center justify-between p-3 bg-muted rounded-lg">

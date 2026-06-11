@@ -44,8 +44,8 @@ export default function NotificationsPage() {
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      const data = await fetchWithAuth('/notifications');
-      setNotifications(data);
+      const data = await fetchWithAuth('/notifications') as Notification[];
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
       toast.error("Failed to load notifications");
@@ -56,7 +56,7 @@ export default function NotificationsPage() {
 
   const markAllRead = async () => {
     try {
-      await fetchWithAuth('/notifications/mark-read', { method: 'POST' });
+      await fetchWithAuth('/notifications/mark-all-read', { method: 'POST' });
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       toast.success("All caught up!");
     } catch (err) {

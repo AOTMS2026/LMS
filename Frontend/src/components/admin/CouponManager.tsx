@@ -50,8 +50,8 @@ interface Student {
   email: string;
   mobile_number?: string;
   avatar_url?: string;
-  college_name?: string;
-  institute_name?: string;
+  department?: string;
+  roll_number?: string;
   last_login_at?: string;
   registration_date?: string;
   registration_time?: string;
@@ -86,7 +86,7 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "college" | "institute">("all");
+  const [filterType, setFilterType] = useState<"all" | "dept" | "institute">("all");
   const [filterValue, setFilterValue] = useState<string>("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [selectedBulkUserIds, setSelectedBulkUserIds] = useState<string[]>([]);
@@ -97,36 +97,36 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
   
   // New State for Enhanced Filtering & College Management
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
-  const [registeredColleges, setRegisteredColleges] = useState<{id: string, name: string}[]>([]);
-  const [isAddingCollege, setIsAddingCollege] = useState(false);
-  const [newCollegeName, setNewCollegeName] = useState("");
-  const [isSavingCollege, setIsSavingCollege] = useState(false);
+  const [registeredDepts, setRegisteredDepts] = useState<{id: string, name: string}[]>([]);
+  const [isAddingDept, setIsAddingDept] = useState(false);
+  const [newDeptName, setNewDeptName] = useState("");
+  const [isSavingDept, setIsSavingDept] = useState(false);
 
-  const fetchColleges = useCallback(async () => {
+  const fetchDepts = useCallback(async () => {
     try {
-      const data = await fetchWithAuth<{id: string, name: string}[]>("/data/colleges");
-      setRegisteredColleges(data || []);
+      const data = await fetchWithAuth<{id: string, name: string}[]>("/data/departments");
+      setRegisteredDepts(data || []);
     } catch (err) {
-      console.error("Failed to fetch colleges:", err);
+      console.error("Failed to fetch departments:", err);
     }
   }, []);
 
-  const handleAddCollege = async () => {
-    if (!newCollegeName.trim()) return;
-    setIsSavingCollege(true);
+  const handleAddDept = async () => {
+    if (!newDeptName.trim()) return;
+    setIsSavingDept(true);
     try {
-      await fetchWithAuth("/data/colleges", {
+      await fetchWithAuth("/data/departments", {
         method: "POST",
-        body: JSON.stringify({ name: newCollegeName.trim() })
+        body: JSON.stringify({ name: newDeptName.trim() })
       });
-      toast.success("College added successfully");
-      setNewCollegeName("");
-      setIsAddingCollege(false);
-      fetchColleges();
+      toast.success("Department added successfully");
+      setNewDeptName("");
+      setIsAddingDept(false);
+      fetchDepts();
     } catch (err) {
-      toast.error("Failed to add college");
+      toast.error("Failed to add department");
     } finally {
-      setIsSavingCollege(false);
+      setIsSavingDept(false);
     }
   };
 
@@ -156,11 +156,11 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
     await Promise.all([
       fetchStudents(),
       fetchCoupons(),
-      fetchColleges()
+      fetchDepts()
     ]);
     setLoading(false);
     if (showToast) toast.success("Reward data synchronized");
-  }, [fetchStudents, fetchCoupons, fetchColleges]);
+  }, [fetchStudents, fetchCoupons, fetchDepts]);
 
   useEffect(() => {
     refreshAllData();
@@ -289,41 +289,35 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
 
     if (filterType === "all") return matchesSearch;
 
-    const getCollegeName = (val: string | { name?: string; title?: string } | null | undefined) => {
+    const getDeptName = (val: string | { name?: string; title?: string } | null | undefined) => {
       if (typeof val === 'object' && val !== null) return val.name || val.title;
       return val;
     };
 
-    if (filterType === "college") {
-      return matchesSearch && getCollegeName(s.college_name) === filterValue;
+    if (filterType === "dept") {
+      return matchesSearch && getDeptName(s.department) === filterValue;
     }
     if (filterType === "institute") {
-      return matchesSearch && getCollegeName(s.institute_name) === filterValue;
+      return matchesSearch && getDeptName(s.roll_number) === filterValue;
     }
     return matchesSearch;
   });
 
 
-  const uniqueColleges = Array.from(new Set([
+  const uniqueDepts = Array.from(new Set([
     ...students.map(s => {
       // Handle potential object structure for college if it exists
-      if (typeof s.college_name === 'object' && s.college_name !== null) {
-        const c = s.college_name as { name?: string; title?: string };
+      if (typeof s.department === 'object' && s.department !== null) {
+        const c = s.department as { name?: string; title?: string };
         return c.name || c.title;
       }
-      return s.college_name;
+      return s.department;
     }),
-    ...registeredColleges.map(c => c.name)
+    ...registeredDepts.map(c => c.name)
   ].filter(Boolean))).sort() as string[];
 
   const uniqueInstitutes = Array.from(new Set(
-    students.map(s => {
-      if (typeof s.institute_name === 'object' && s.institute_name !== null) {
-        const i = s.institute_name as { name?: string; title?: string };
-        return i.name || i.title;
-      }
-      return s.institute_name;
-    }).filter(Boolean)
+    students.map(s => s.roll_number).filter(Boolean)
   )).sort() as string[];
 
   return (
@@ -383,7 +377,7 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                 Target Matrix
                             </CardTitle>
                             <CardDescription className="text-xs font-bold text-slate-400 uppercase tracking-widest leading-none">
-                                Filter students by College or Institute for bulk rewards
+                                Filter students by Department for bulk rewards
                             </CardDescription>
                         </div>
                         
@@ -416,7 +410,7 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                 <select 
                                     value={filterType}
                                     onChange={(e) => {
-                                        setFilterType(e.target.value as "all" | "college" | "institute");
+                                        setFilterType(e.target.value as "all" | "dept" | "institute");
                                         setFilterValue("");
                                         setSelectedStudent(null);
                                         setSelectedBulkUserIds([]);
@@ -424,15 +418,15 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                     className="bg-transparent border-none text-[11px] font-black text-slate-700 focus:ring-0 outline-none uppercase tracking-wider cursor-pointer pr-1 whitespace-nowrap"
                                 >
                                     <option value="all">All Students</option>
-                                    <option value="college">College Wise</option>
+                                    <option value="dept">Department Wise</option>
                                     <option value="institute">Institute Wise</option>
                                 </select>
                             </div>
 
-                            {/* College / Institute Dropdown */}
+                            {/* Department Dropdown */}
                             {filterType !== "all" && (
                                 <div className="flex-1 flex items-center gap-2 bg-white pl-3 pr-2 py-2 rounded-2xl border border-primary/30 shadow-sm animate-in slide-in-from-right-4 min-w-[200px]">
-                                    {filterType === 'college' ? <School className="h-3.5 w-3.5 text-primary" /> : <Building2 className="h-3.5 w-3.5 text-primary" />}
+                                    {filterType === "dept" ? <School className="h-3.5 w-3.5 text-primary" /> : <Building2 className="h-3.5 w-3.5 text-primary" />}
                                     <div className="w-px h-4 bg-primary/20 flex-shrink-0" />
                                     <select 
                                         value={filterValue}
@@ -442,7 +436,7 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                             if (e.target.value) {
                                                 const getVal = (v: string | { name?: string; title?: string } | null | undefined) => (typeof v === 'object' && v !== null) ? (v.name || v.title) : v;
                                                 const newFiltered = students.filter(s => 
-                                                    filterType === 'college' ? getVal(s.college_name) === e.target.value : getVal(s.institute_name) === e.target.value
+                                                    filterType === "dept" ? getVal(s.department) === e.target.value : getVal(s.roll_number) === e.target.value
                                                 );
                                                 setSelectedBulkUserIds(newFiltered.map(s => s.id));
                                             } else {
@@ -451,8 +445,8 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                         }}
                                         className="flex-1 bg-transparent border-none text-[11px] font-black text-slate-900 focus:ring-0 outline-none tracking-tight cursor-pointer truncate"
                                     >
-                                        <option value="">{filterType === "college" ? "— Choose College —" : "— Choose Institute —"}</option>
-                                        {(filterType === "college" ? uniqueColleges : uniqueInstitutes).map(val => (
+                                        <option value="">{filterType === "dept" ? "— — Choose Department — —" : "— Choose Institute —"}</option>
+                                        {(filterType === "dept" ? uniqueDepts : uniqueInstitutes).map(val => (
                                             <option key={val} value={val}>{val}</option>
                                         ))}
                                     </select>
@@ -596,11 +590,11 @@ export function CouponManager({ onSync, loading: parentLoading = false }: Coupon
                                         <p className="text-[10px] text-slate-400 font-medium leading-tight break-all">
                                             {student.email}
                                         </p>
-                                        {/* College badge */}
-                                        {(student.college_name || student.institute_name) && (() => {
+                                        {/* Department badge */}
+                                        {(student.department || student.roll_number) && (() => {
                                             const getVal = (v: string | { name?: string; title?: string } | null | undefined): string =>
                                                 (typeof v === 'object' && v !== null) ? (v.name || v.title || '') : (typeof v === 'string' ? v : '');
-                                            const label = getVal(student.college_name) || getVal(student.institute_name);
+                                            const label = getVal(student.department) || student.roll_number || '';
                                             return label ? (
                                                 <Badge className="text-[7px] h-4 px-1.5 rounded-md uppercase font-black bg-blue-50 text-blue-600 border-none shadow-none w-fit max-w-[180px] truncate">
                                                     {label as string}

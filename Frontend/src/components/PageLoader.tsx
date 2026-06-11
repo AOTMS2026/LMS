@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import logo from "/favicon.png";
+import logo from "@/assets/aliet_logo.png";
 
 interface PageLoaderProps {
   isVisible: boolean;

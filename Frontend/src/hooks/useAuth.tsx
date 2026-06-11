@@ -28,7 +28,7 @@ interface AuthContextType {
   session: Session | null;
   userRole: UserRole | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string, phone?: string, courseType?: string, collegeName?: string, locationData?: { city?: string; district?: string; country?: string; fullAddress?: string; latitude?: number; longitude?: number }) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, phone?: string, courseType?: string, collegeName?: string, locationData?: { city?: string; district?: string; country?: string; fullAddress?: string; latitude?: number; longitude?: number }, rollNumber?: string, year?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; requiresAdminOtp?: boolean }>;
   verifyAdminOtp: (email: string, otp: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -73,7 +73,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (role && role !== 'undefined') ? (role as UserRole) : null;
   });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    // If no token in localStorage, no session to check — not loading
+    const token = localStorage.getItem('access_token');
+    const savedUser = localStorage.getItem('user');
+    // If we already have cached credentials, start non-loading so UI renders immediately
+    // checkSession will re-validate in background
+    if (token && savedUser && savedUser !== 'undefined') return false;
+    return true;
+  });
 
   const signOut = useCallback(async () => {
     try {
@@ -188,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return () => clearInterval(interval);
   }, [user?.id, checkSession]);
 
-  const signUp = useCallback(async (email: string, password: string, fullName: string, phone?: string, courseType?: string, collegeName?: string, locationData?: { city?: string; district?: string; country?: string; fullAddress?: string; latitude?: number; longitude?: number }) => {
+  const signUp = useCallback(async (email: string, password: string, fullName: string, phone?: string, courseType?: string, collegeName?: string, locationData?: { city?: string; district?: string; country?: string; fullAddress?: string; latitude?: number; longitude?: number }, rollNumber?: string, year?: string) => {
     try {
       const res = await fetch(`${API_URL}/auth/signup`, {
         method: 'POST',
@@ -200,6 +208,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           phone, 
           courseType,
           collegeName,
+          rollNumber,
+          year,
           city: locationData?.city,
           district: locationData?.district,
           country: locationData?.country,

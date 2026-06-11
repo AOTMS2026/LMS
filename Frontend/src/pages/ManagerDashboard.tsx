@@ -22,7 +22,6 @@ import SubmissionsGrading from "@/components/admin/SubmissionsGrading";
 import { CourseBuilder } from "@/components/instructor/courses/CourseBuilder";
 import { Course as CatalogCourse, CourseEnrollment } from "@/hooks/useCourses";
 import { Course as InstructorCourse } from "@/hooks/useInstructorData";
-import { EnrollmentsList } from "@/components/admin/EnrollmentsList";
 import { CourseAssignment } from "@/components/admin/CourseAssignment";
 import { CourseApproval } from "@/components/admin/CourseApproval";
 import { CouponManager } from "@/components/admin/CouponManager";
@@ -74,6 +73,7 @@ import {
   ClipboardList,
   BookOpen,
   Activity,
+  UserCheck,
 } from "lucide-react";
 
 
@@ -283,15 +283,14 @@ export default function ManagerDashboard() {
     { id: "users",               title: "User Management",     url: "/manager/users",                icon: Users },
     { id: "student-performance", title: "Academic Scores",     url: "/manager/student-performance",  icon: BarChart3 },
     { id: "instructors",         title: "Instructors",         url: "/manager/instructors",         icon: Users },
-    { id: "enrollments",         title: "Enrollments Hub",     url: "/manager/enrollments",         icon: DbIcon },
     { id: "submissions-grading", title: "Submissions Grading", url: "/manager/submissions-grading", icon: ClipboardList },
     { id: "live-broadcast",      title: "Live Broadcast",      url: "/manager/live-broadcast",      icon: Radio },
     { id: "exams",               title: "Exam Scheduling",     url: "/manager/exams",               icon: Calendar },
     { id: "questions",           title: "Question Bank",       url: "/manager/questions",           icon: FileQuestion },
     { id: "question-access",     title: "Question Access",     url: "/manager/question-access",     icon: ShieldCheck },
     { id: "leaderboard",         title: "Leaderboard",         url: "/manager/leaderboard",         icon: Trophy },
-    { id: "coupons",             title: "Rewards & Coupons",   url: "/manager/coupons",             icon: Trophy },
     { id: "grant-access",        title: "Grant Access",        url: "/manager/grant-access",        icon: KeyRound },
+    { id: "student-access",      title: "Student Access",      url: "/manager/student-access",      icon: UserCheck },
     { id: "resume-scans",        title: "Resume Scans",        url: "/manager/resume-scans",        icon: ClipboardList },
     { id: "instructor-access",   title: "Instructor Access",   url: "/manager/instructor-access",   icon: ShieldCheck },
     { id: "all-courses",         title: "All Courses",         url: "/manager/all-courses",         icon: BookOpen },
@@ -338,12 +337,10 @@ export default function ManagerDashboard() {
       </div>
 
       {/* Platform Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {[
           { label: "Total Users",     value: stats.totalUsers,          icon: Users,      color: "text-blue-600",   bg: "bg-blue-50",   action: () => navigate('/manager/users') },
           { label: "Active Courses",  value: stats.activeCourses,       icon: BookOpen,   color: "text-green-600",  bg: "bg-green-50",  action: () => navigate('/manager/all-courses') },
-          { label: "Enrollments",     value: enrollments.length,        icon: Activity,   color: "text-purple-600", bg: "bg-purple-50", action: () => navigate('/manager/enrollments') },
-          { label: "Pending Reviews", value: stats.pendingEnrollments,  icon: Clock,      color: "text-amber-600",  bg: "bg-amber-50",  action: () => navigate('/manager/enrollments') },
         ].map((card, i) => (
           <Card key={i} className="border-none shadow-sm bg-white cursor-pointer hover:shadow-md transition-all" onClick={card.action}>
             <CardContent className="p-4 flex items-center gap-3">
@@ -415,7 +412,13 @@ export default function ManagerDashboard() {
 
         return <ExamScheduler onNavigateToRepository={() => setActiveSection('questions')} onSync={() => refresh()} loading={dataLoading} />;
       case "questions":
-        return <QuestionBankManager onSync={() => refresh()} loading={dataLoading} />;
+        return (
+          <QuestionBankManager 
+            onSync={() => refresh()} 
+            loading={dataLoading} 
+            onSectionChange={(sec) => setActiveSection(sec)}
+          />
+        );
       case "leaderboard":
         return <LeaderboardManager onSync={() => refresh()} loading={dataLoading} />;
       case "monitoring":
@@ -444,10 +447,11 @@ export default function ManagerDashboard() {
         return <QuestionBankApproval onSync={() => refresh()} loading={dataLoading} />;
       case "instructors":
         return <InstructorManagement onSync={() => refresh()} loading={dataLoading} />;
-      case "coupons":
-        return <CouponManager onSync={() => refresh()} loading={dataLoading} />;
+
       case "grant-access":
         return <GrantStudentAccess profiles={profiles} enrollments={enrollments as unknown as CourseEnrollment[]} onSync={() => refresh()} loading={dataLoading} />;
+      case "student-access":
+        return <GrantStudentAccess profiles={profiles} enrollments={enrollments as unknown as CourseEnrollment[]} onSync={() => refresh()} loading={dataLoading} showPendingOnly={true} />;
       case "resume-scans":
         return <ResumeScanHistory />;
       case "instructor-access":
@@ -456,22 +460,6 @@ export default function ManagerDashboard() {
         return <SubmissionsGrading onSync={() => refresh()} loading={dataLoading} />;
       case "live-broadcast":
         return <LiveClassManager />;
-      case "enrollments":
-        return (
-          <EnrollmentsList 
-            enrollments={enrollments as unknown as CourseEnrollment[]} 
-            loading={dataLoading} 
-            onUpdateStatus={async (id, status) => { 
-                await updateEnrollmentStatus(id, status); 
-            }}
-            onUpdatePayment={async (id, term) => { await updateEnrollmentPayment(id, term); }}
-            onDelete={async (id) => { 
-                await deleteEnrollment(id); 
-            }}
-            onResetATS={async (userId) => { await resetStudentATS(userId); }}
-            onSync={() => refresh()}
-          />
-        );
       case "notifications":
         return <NotificationSection />;
       case "student-performance":

@@ -31,7 +31,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useEnrolledCourses } from "@/hooks/useStudentData";
 import { Button } from "@/components/ui/button";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/lanyard/aotms_logo.jpg";
 import { cn } from "@/lib/utils";
 
 const navigationGroups = [

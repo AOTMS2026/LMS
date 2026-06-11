@@ -17,13 +17,13 @@ import {
   ChevronDown,
   Zap,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import alietBanner from "@/assets/aliet_banner.png";
 
 export function InstructorHeader() {
   const { user, signOut } = useAuth();
@@ -43,17 +43,7 @@ export function InstructorHeader() {
       {/* Left Section */}
       <div className="flex items-center gap-3 lg:gap-5 min-w-0">
         <SidebarTrigger className="h-9 w-9 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all duration-200 shrink-0" />
-
-        {/* Breadcrumb / Page Title indicator */}
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="h-5 w-px bg-slate-200" />
-          <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-900">
-            <Sparkles className="h-3 w-3 text-white" />
-            <span className="text-[11px] font-bold text-white uppercase tracking-widest">
-              Instructor Hub
-            </span>
-          </div>
-        </div>
+        <img src={alietBanner} alt="Andhra Loyola Institute of Engineering & Technology" className="h-10 sm:h-12 md:h-14 w-auto object-contain" />
 
         {/* Search - Hidden on mobile */}
         <div className="relative hidden lg:block group">

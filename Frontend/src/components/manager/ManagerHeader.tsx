@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
+import alietBanner from "@/assets/aliet_banner.png";
 
 export function ManagerHeader() {
   const { user, signOut } = useAuth();
@@ -39,6 +40,7 @@ export function ManagerHeader() {
     <header className="sticky top-0 z-50 flex h-14 sm:h-16 md:h-20 items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-3 sm:px-4 md:px-6 lg:px-10 transition-all">
       <div className="flex items-center gap-2 sm:gap-4">
         <SidebarTrigger className="-ml-1" />
+        <img src={alietBanner} alt="Andhra Loyola Institute of Engineering & Technology" className="h-10 sm:h-12 md:h-14 w-auto object-contain" />
 
         {/* Search */}
         <div className="relative hidden md:block">

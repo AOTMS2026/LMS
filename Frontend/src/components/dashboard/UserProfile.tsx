@@ -31,8 +31,9 @@ interface ProfileData {
     impact?: string | null;
     core_expertise?: string | null;
     resume_url?: string | null;
-    college_name?: string | null;
-    institute_name?: string | null;
+    department?: string | null;
+    roll_number?: string | null;
+    year?: string | null;
     city?: string | null;
     district?: string | null;
     country?: string | null;
@@ -69,8 +70,9 @@ export function UserProfile() {
         impact: '',
         core_expertise: '',
         resume_url: '',
-        college_name: '',
-        institute_name: '',
+        department: '',
+        roll_number: '',
+        year: '',
         city: '',
         district: '',
         country: '',
@@ -99,11 +101,11 @@ export function UserProfile() {
             // Merge with user metadata for fallback
             setProfile({
                 id: user.id,
-                full_name: data?.full_name || userData?.user_metadata?.full_name || '',
-                email: userData?.email || '',
-                avatar_url: data?.avatar_url || userData?.user_metadata?.avatar_url || '',
+                full_name: data?.full_name || userData?.full_name || user?.full_name || '',
+                email: userData?.email || user?.email || '',
+                avatar_url: data?.avatar_url || userData?.avatar_url || '',
                 bio: data?.bio || '',
-                phone: data?.phone || '',
+                phone: data?.mobile_number || data?.phone || '',
                 location: data?.location || '',
                 skills: data?.skills || [],
                 github_url: data?.github_url || '',
@@ -115,8 +117,9 @@ export function UserProfile() {
                 impact: data?.impact || '',
                 core_expertise: data?.core_expertise || '',
                 resume_url: data?.resume_url || '',
-                college_name: data?.college_name || '',
-                institute_name: data?.institute_name || '',
+                department: data?.department || '',
+                roll_number: data?.roll_number || '',
+                year: data?.year || '',
                 city: data?.city || '',
                 district: data?.district || '',
                 country: data?.country || '',
@@ -172,8 +175,9 @@ export function UserProfile() {
                 core_expertise: profile.core_expertise,
                 resume_url: profile.resume_url,
                 bio: profile.bio,
-                college_name: profile.college_name,
-                institute_name: profile.institute_name,
+                department: profile.department,
+                roll_number: profile.roll_number,
+                year: profile.year,
                 // Add extra fields if schema supports them
                 // mobile_number: profile.phone,
             };
@@ -409,22 +413,37 @@ export function UserProfile() {
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="collegeName">College Name</Label>
+                                    <Label htmlFor="department">Department</Label>
                                     <Input
-                                        id="collegeName"
-                                        placeholder="e.g. DVR & DR.HS MIC COLLEGE OF TECHNOLOGY"
-                                        value={profile.college_name || ''}
-                                        onChange={(e) => setProfile({ ...profile, college_name: e.target.value })}
+                                        id="department"
+                                        placeholder="e.g. CSE, ECE, EEE, DS, AI/ML, IT"
+                                        value={profile.department || ''}
+                                        onChange={(e) => setProfile({ ...profile, department: e.target.value })}
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="instituteName">Company Name</Label>
+                                    <Label htmlFor="rollNumber">Roll Number</Label>
                                     <Input
-                                        id="instituteName"
-                                        placeholder="Enter institute name if applicable"
-                                        value={profile.institute_name || ''}
-                                        onChange={(e) => setProfile({ ...profile, institute_name: e.target.value })}
+                                        id="rollNumber"
+                                        placeholder="e.g. 23HP1A0549"
+                                        value={profile.roll_number || ''}
+                                        onChange={(e) => setProfile({ ...profile, roll_number: e.target.value })}
                                     />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="year">Year</Label>
+                                    <select
+                                        id="year"
+                                        value={profile.year || ''}
+                                        onChange={(e) => setProfile({ ...profile, year: e.target.value })}
+                                        className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                        <option value="">Select year...</option>
+                                        <option value="1">1st Year</option>
+                                        <option value="2">2nd Year</option>
+                                        <option value="3">3rd Year</option>
+                                        <option value="4">4th Year</option>
+                                    </select>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="linkedin">LinkedIn Profile URL</Label>

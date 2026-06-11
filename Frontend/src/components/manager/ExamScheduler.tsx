@@ -433,7 +433,14 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
   const { data: rawCourses } = useCourses();
   const courses = useMemo(() => Array.isArray(rawCourses) ? rawCourses : [], [rawCourses]);
   const { data: rawBatches } = useBatches();
-  const batches = useMemo(() => Array.isArray(rawBatches) ? rawBatches : [], [rawBatches]);
+  // Only show batches belonging to this instructor (for instructors), all batches for admin/manager
+  const batches = useMemo(() => {
+    const all = Array.isArray(rawBatches) ? rawBatches : [];
+    if (userRole === 'instructor' && user?.id) {
+      return all.filter(b => b.instructor_id === user.id || b.instructor_id?.toString() === user.id);
+    }
+    return all;
+  }, [rawBatches, user?.id, userRole]);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);

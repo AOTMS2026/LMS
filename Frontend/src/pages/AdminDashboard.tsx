@@ -12,7 +12,6 @@ import { SecurityMonitor } from "@/components/admin/SecurityMonitor";
 import { QualityAssurance } from "@/components/admin/QualityAssurance";
 import { QuestionBankApproval } from "@/components/admin/QuestionBankApproval";
 import { InstructorManagement } from "@/components/admin/InstructorManagement";
-import { EnrollmentsList } from "@/components/admin/EnrollmentsList";
 import { GrantStudentAccess } from "@/components/admin/GrantStudentAccess";
 import { AllCoursesList } from "@/components/admin/AllCoursesList";
 import { ResumeScanHistory } from "@/components/admin/ResumeScanHistory";
@@ -156,7 +155,7 @@ function NotificationSection({ onSync, loading }: { onSync: () => void, loading:
 
       <Card className="rounded-[2.5rem] border-slate-200 shadow-sm overflow-hidden bg-white/50 backdrop-blur-md">
         <CardContent className="p-0">
-          {loading ? (
+          {notifLoading ? (
             <div className="p-8 space-y-4">
               {[1, 2, 3].map((i) => (
                 <Skeleton key={i} className="h-20 w-full rounded-2xl" />
@@ -403,8 +402,8 @@ export default function AdminDashboard() {
       "/admin": "users",
       "/admin/users": "users",
       "/admin/grant-access": "grant-access",
+      "/admin/student-access": "student-access",
       "/admin/leaderboard": "leaderboard",
-      "/admin/enrollments": "enrollments",
       "/admin/all-courses": "all-courses",
       "/admin/instructor-access": "instructor-access",
       "/admin/questions": "questions",
@@ -419,7 +418,8 @@ export default function AdminDashboard() {
       "/admin/question-repository": "question-repository",
       "/admin/question-access": "question-access",
       "/admin/live-monitoring": "live-monitoring",
-      "/admin/coupons": "coupons",
+      "/admin/live-broadcast": "live-broadcast",
+
       "/admin/profile": "profile",
       "/admin/notifications": "notifications",
       "/admin/student-performance": "student-performance",
@@ -549,7 +549,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Metrics Dashboard */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {[
                 {
                   label: "Total Users",
@@ -566,15 +566,6 @@ export default function AdminDashboard() {
                   color: "orange",
                   trend: "Steady",
                   description: "Verified curriculum",
-                },
-                {
-                  label: "Pending Enrollments",
-                  value: stats.pendingEnrollments,
-                  icon: GraduationCap,
-                  color: "red",
-                  trend:
-                    stats.pendingEnrollments > 0 ? "Action needed" : "Clear",
-                  description: "Approval queue",
                 },
                 {
                   label: "Live Learners",
@@ -663,12 +654,6 @@ export default function AdminDashboard() {
                         key: "tab-grant-access",
                       },
                       {
-                        id: "enrollments",
-                        label: "Student Enrollments",
-                        icon: GraduationCap,
-                        key: "tab-enrollments",
-                      },
-                      {
                         id: "student-performance",
                         label: "Student Hub",
                         icon: BarChart3,
@@ -680,12 +665,7 @@ export default function AdminDashboard() {
                         icon: Trophy,
                         key: "tab-leaderboard",
                       },
-                      {
-                        id: "coupons",
-                        label: "Reward & Coupons",
-                        icon: Ticket,
-                        key: "tab-coupons",
-                      },
+
                       {
                         id: "resume-scans",
                         label: "Resume Scans",
@@ -864,43 +844,7 @@ export default function AdminDashboard() {
                   </motion.div>
                 </TabsContent>
 
-                <TabsContent
-                  key="tab-enrollments"
-                  value="enrollments"
-                  className="mt-0 outline-none"
-                >
-                  <motion.div
-                    key="motion-enrollments"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    <EnrollmentsList
-                      enrollments={enrollments}
-                      loading={dataLoading}
-                      onUpdateStatus={async (id, status) => { await _updateEnrollmentStatus(id, status); }}
-                      onUpdatePayment={async (id, term) => { await updateEnrollmentPayment(id, term); }}
-                      onDelete={async (id) => { await _deleteEnrollment(id); }}
-                      onResetATS={async (userId) => { await _resetStudentATS(userId); }}
-                    />
-                  </motion.div>
-                </TabsContent>
 
-                <TabsContent
-                  key="tab-coupons"
-                  value="coupons"
-                  className="mt-0 outline-none"
-                >
-                  <motion.div
-                    key="motion-coupons"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    <CouponManager 
-                      onSync={() => refresh(true)}
-                      loading={dataLoading}
-                    />
-                  </motion.div>
-                </TabsContent>
 
                 <TabsContent
                   key="tab-grant-access"
@@ -917,6 +861,26 @@ export default function AdminDashboard() {
                       enrollments={enrollments}
                       onSync={() => refresh(true)}
                       loading={dataLoading}
+                    />
+                  </motion.div>
+                </TabsContent>
+
+                <TabsContent
+                  key="tab-student-access"
+                  value="student-access"
+                  className="mt-0 outline-none"
+                >
+                  <motion.div
+                    key="motion-student-access"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    <GrantStudentAccess
+                      profiles={profiles}
+                      enrollments={enrollments}
+                      onSync={() => refresh(true)}
+                      loading={dataLoading}
+                      showPendingOnly={true}
                     />
                   </motion.div>
                 </TabsContent>
@@ -1202,6 +1166,7 @@ export default function AdminDashboard() {
                     <QuestionBankManager 
                       onSync={() => refresh(true)}
                       loading={dataLoading}
+                      onSectionChange={(sec) => setActiveTab(sec === 'exams' ? 'exam-scheduling' : sec)}
                     />
                   </motion.div>
                 </TabsContent>

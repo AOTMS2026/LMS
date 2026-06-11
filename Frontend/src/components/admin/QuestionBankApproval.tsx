@@ -51,7 +51,7 @@ interface StudentAccess {
     assigned_by: string;
     granted_at: string;
     scheduled_date?: string;
-    college_name?: string;
+    department?: string;
     reg_date?: string;
 }
 
@@ -60,12 +60,12 @@ interface BatchStudentResponse {
     id?: string;
     student_name?: string;
     student_email?: string;
-    college_name?: string;
+    department?: string;
     profile?: {
         full_name?: string;
         email?: string;
         avatar_url?: string;
-        college_name?: string;
+        department?: string;
     };
 }
 
@@ -73,13 +73,13 @@ interface Student {
     id: string;
     full_name: string;
     email: string;
-    college_name?: string;
+    department?: string;
     avatar_url?: string;
     profile?: {
         full_name?: string;
         email?: string;
         avatar_url?: string;
-        college_name?: string;
+        department?: string;
     };
     student_name?: string;
     student_email?: string;
@@ -167,7 +167,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
     const [selectedStudentId, setSelectedStudentId] = useState("");
     const [isGranting, setIsGranting] = useState(false);
 
-    const [grantType, setGrantType] = useState<'student' | 'batch' | 'college'>('student');
+    const [grantType, setGrantType] = useState<'student' | 'batch' | 'dept'>('student');
     const [batches, setBatches] = useState<Batch[]>([]);
     const [selectedBatchId, setSelectedBatchId] = useState("");
     const [loadingBatches, setLoadingBatches] = useState(false);
@@ -178,8 +178,8 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
     const [loadingBatchStudents, setLoadingBatchStudents] = useState(false);
     
     // College Wise Grant
-    const [selectedCollege, setSelectedCollege] = useState<string>("all");
-    const [selectedCollegeStudents, setSelectedCollegeStudents] = useState<string[]>([]);
+    const [selectedDept, setSelectedDept] = useState<string>("all");
+    const [selectedDeptStudents, setSelectedDeptStudents] = useState<string[]>([]);
 
     const fetchPendingBanks = async (showLoading = true, showToast = false) => {
         try {
@@ -386,8 +386,8 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
         setSelectedBatchId("");
         setSelectedInstructorId("all");
         setSelectedBatchTypeFilter("all");
-        setSelectedCollege("all");
-        setSelectedCollegeStudents([]);
+        setSelectedDept("all");
+        setSelectedDeptStudents([]);
         setShowGrantDialog(true);
         setLoadingBatches(true);
         try {
@@ -424,7 +424,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
         if (!grantingTopic) return;
         if (grantType === 'student' && !selectedStudentId) return;
         if (grantType === 'batch' && !selectedBatchId) return;
-        if (grantType === 'college' && selectedCollegeStudents.length === 0) return;
+        if (grantType === 'dept' && selectedDeptStudents.length === 0) return;
 
         setIsGranting(true);
         try {
@@ -433,7 +433,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                 body: JSON.stringify({
                     topic: grantingTopic,
                     userId: grantType === 'student' ? selectedStudentId : undefined,
-                    userIds: grantType === 'college' ? selectedCollegeStudents : undefined,
+                    userIds: grantType === 'dept' ? selectedDeptStudents : undefined,
                     batchId: grantType === 'batch' ? selectedBatchId : undefined,
                     type: grantType
                 })
@@ -441,12 +441,12 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
 
             toast({
                 title: grantType === 'batch' ? 'Batch Access Granted! 🚀' : 
-                       grantType === 'college' ? `College Access Granted for ${selectedCollegeStudents.length} Students! 🚀` :
+                       grantType === 'dept' ? `College Access Granted for ${selectedDeptStudents.length} Students! 🚀` :
                        'Access Granted! 🚀',
                 description: grantType === 'batch'
                     ? `All students in the selected batch now have access to ${grantingTopic}`
-                    : grantType === 'college'
-                    ? `Selected students from ${selectedCollege} now have access to ${grantingTopic}`
+                    : grantType === 'dept'
+                    ? `Selected students from ${selectedDept} now have access to ${grantingTopic}`
                     : `Student now has access to mock tests for ${grantingTopic}`
             });
 
@@ -454,8 +454,8 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
             setGrantingTopic(null);
             setSelectedStudentId("");
             setSelectedBatchId("");
-            setSelectedCollege("all");
-            setSelectedCollegeStudents([]);
+            setSelectedDept("all");
+            setSelectedDeptStudents([]);
             fetchPendingBanks(false);
         } catch (err) {
             toast({
@@ -673,7 +673,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
 
             {/* Student Access Dialog */}
             <Dialog open={showAccessDialog} onOpenChange={setShowAccessDialog}>
-                <DialogContent className="w-[95vw] sm:max-w-[600px] rounded-[2.5rem] sm:rounded-[2rem] p-0 overflow-hidden border-none shadow-2xl">
+                <DialogContent className="w-[95vw] sm:max-w-[600px] rounded-[2.5rem] sm:rounded-[2rem] p-0 overflow-y-auto max-h-[90vh] border-none shadow-2xl flex flex-col">
                     <div className="bg-primary p-8 text-white relative">
                         <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '24px 24px' }} />
 
@@ -686,7 +686,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                         </DialogDescription>
                     </div>
 
-                    <div className="p-6 bg-white max-h-[400px] overflow-y-auto">
+                    <div className="p-6 bg-white flex-1 overflow-y-auto">
                         {loadingAccess ? (
                             <div className="flex items-center justify-center py-12">
                                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -712,9 +712,9 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                         <div className="flex-1 min-w-0">
                                             <p className="font-bold text-slate-900 truncate uppercase text-[11px] tracking-tight">{student.student_name}</p>
                                             <p className="text-[10px] text-slate-500 truncate lowercase font-medium">{student.student_email}</p>
-                                            {student.college_name && (
+                                            {student.department && (
                                                 <p className="text-[9px] font-black text-primary uppercase mt-1 line-clamp-1 italic">
-                                                    {student.college_name}
+                                                    {student.department}
                                                 </p>
                                             )}
                                             {student.reg_date && (
@@ -878,7 +878,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
 
                     <ScrollArea className="flex-1 overflow-y-auto pr-1">
                         <div className="p-8 space-y-8 bg-white relative">
-                            <Tabs value={grantType} onValueChange={(v) => setGrantType(v as 'student' | 'batch' | 'college')} className="w-full">
+                            <Tabs value={grantType} onValueChange={(v) => setGrantType(v as 'student' | 'batch' | 'dept')} className="w-full">
                                 <TabsList className="grid grid-cols-3 mb-8 bg-slate-50 p-1.5 rounded-3xl border border-slate-100 h-12">
                                     <TabsTrigger
                                         value="student"
@@ -1075,17 +1075,17 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                         <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">
                                             Select College
                                         </Label>
-                                        <Select value={selectedCollege} onValueChange={(val) => {
-                                            setSelectedCollege(val);
+                                        <Select value={selectedDept} onValueChange={(val) => {
+                                            setSelectedDept(val);
                                             // Reset selected students when college changes
-                                            setSelectedCollegeStudents([]);
+                                            setSelectedDeptStudents([]);
                                         }}>
                                             <SelectTrigger className="h-14 rounded-3xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700 transition-all hover:bg-white hover:shadow-md">
                                                 <SelectValue placeholder="Select a college..." />
                                             </SelectTrigger>
                                             <SelectContent className="rounded-3xl border-slate-200 shadow-xl max-h-[250px] p-2">
                                                 <SelectItem value="all" className="font-bold py-3 rounded-xl mb-1">Show All Students</SelectItem>
-                                                {Array.from(new Set(students.map(s => s.college_name || s.profile?.college_name).filter(Boolean))).map((college) => (
+                                                {Array.from(new Set(students.map(s => s.department || s.profile?.department).filter(Boolean))).map((college) => (
                                                     <SelectItem key={college} value={college!} className="font-bold py-3 rounded-xl mb-1">
                                                         {college}
                                                     </SelectItem>
@@ -1094,26 +1094,26 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                         </Select>
                                     </div>
 
-                                    {selectedCollege && (
+                                    {selectedDept && (
                                         <div className="space-y-4 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-500 mt-6 relative">
                                             <div className="flex items-center justify-between px-1">
                                                 <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">
-                                                    Students ({students.filter(s => selectedCollege === 'all' || (s.college_name || s.profile?.college_name) === selectedCollege).length})
+                                                    Students ({students.filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept).length})
                                                 </Label>
                                                 <Button 
                                                     variant="ghost" 
                                                     size="sm"
                                                     className="h-6 text-[8px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
                                                     onClick={() => {
-                                                        const filtered = students.filter(s => selectedCollege === 'all' || (s.college_name || s.profile?.college_name) === selectedCollege);
-                                                        if (selectedCollegeStudents.length === filtered.length) {
-                                                            setSelectedCollegeStudents([]);
+                                                        const filtered = students.filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept);
+                                                        if (selectedDeptStudents.length === filtered.length) {
+                                                            setSelectedDeptStudents([]);
                                                         } else {
-                                                            setSelectedCollegeStudents(filtered.map(s => s.id));
+                                                            setSelectedDeptStudents(filtered.map(s => s.id));
                                                         }
                                                     }}
                                                 >
-                                                    {selectedCollegeStudents.length === students.filter(s => selectedCollege === 'all' || (s.college_name || s.profile?.college_name) === selectedCollege).length 
+                                                    {selectedDeptStudents.length === students.filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept).length 
                                                         ? 'Deselect All' : 'Select All'}
                                                 </Button>
                                             </div>
@@ -1121,12 +1121,12 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                             <ScrollArea className="h-[200px] rounded-[2rem] border border-slate-100 bg-slate-50/30 p-4">
                                                 <div className="grid grid-cols-1 gap-2">
                                                     {students
-                                                        .filter(s => selectedCollege === 'all' || (s.college_name || s.profile?.college_name) === selectedCollege)
+                                                        .filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept)
                                                         .map((s) => (
                                                             <div
                                                                 key={s.id}
                                                                 onClick={() => {
-                                                                    setSelectedCollegeStudents(prev => 
+                                                                    setSelectedDeptStudents(prev => 
                                                                         prev.includes(s.id) 
                                                                             ? prev.filter(id => id !== s.id) 
                                                                             : [...prev, s.id]
@@ -1134,18 +1134,18 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                                                 }}
                                                                 className={cn(
                                                                     "flex items-center gap-4 p-3 rounded-2xl border transition-all cursor-pointer group",
-                                                                    selectedCollegeStudents.includes(s.id)
+                                                                    selectedDeptStudents.includes(s.id)
                                                                         ? "bg-primary/5 border-primary/30 shadow-sm"
                                                                         : "bg-white border-slate-100 hover:border-primary/20"
                                                                 )}
                                                             >
                                                                 <div className={cn(
                                                                     "h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all",
-                                                                    selectedCollegeStudents.includes(s.id)
+                                                                    selectedDeptStudents.includes(s.id)
                                                                         ? "bg-primary border-primary"
                                                                         : "border-slate-200 group-hover:border-primary/30"
                                                                 )}>
-                                                                    {selectedCollegeStudents.includes(s.id) && <CheckCircle className="h-4 w-4 text-white" />}
+                                                                    {selectedDeptStudents.includes(s.id) && <CheckCircle className="h-4 w-4 text-white" />}
                                                                 </div>
                                                                 <Avatar className="h-8 w-8 border-white shadow-sm shrink-0">
                                                                     <AvatarImage src={s.avatar_url || s.profile?.avatar_url} />
@@ -1154,7 +1154,7 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                                                 <div className="flex flex-col min-w-0 flex-1">
                                                                     <span className="text-[11px] font-bold text-slate-800 truncate">{s.full_name}</span>
                                                                     <span className="text-[9px] text-slate-400 truncate opacity-70">
-                                                                        {s.email} {s.college_name || s.profile?.college_name ? `• ${s.college_name || s.profile?.college_name}` : ''}
+                                                                        {s.email} {s.department || s.profile?.department ? `• ${s.department || s.profile?.department}` : ''}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -1189,11 +1189,11 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                 </Button>
                                 <Button
                                     onClick={handleGrantAccess}
-                                    disabled={(grantType === 'student' && !selectedStudentId) || (grantType === 'batch' && !selectedBatchId) || (grantType === 'college' && selectedCollegeStudents.length === 0) || isGranting}
+                                    disabled={(grantType === 'student' && !selectedStudentId) || (grantType === 'batch' && !selectedBatchId) || (grantType === 'dept' && selectedDeptStudents.length === 0) || isGranting}
                                     className="flex-[2] h-14 rounded-3xl bg-slate-900 hover:bg-black text-white shadow-2xl shadow-slate-900/40 font-black text-[10px] uppercase tracking-[.2em] transition-all active:scale-[0.98]"
                                 >
                                     {isGranting ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3 text-primary" />}
-                                    {grantType === 'batch' ? 'Confirm Batch' : grantType === 'college' ? `Grant to ${selectedCollegeStudents.length}` : 'Confirm Access'}
+                                    {grantType === 'batch' ? 'Confirm Batch' : grantType === 'dept' ? `Grant to ${selectedDeptStudents.length}` : 'Confirm Access'}
                                 </Button>
                             </div>
                         </div>

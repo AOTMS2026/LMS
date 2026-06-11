@@ -28,10 +28,9 @@ import {
   ArrowLeft,
   ArrowRight,
   ShieldCheck,
-  GraduationCap,
 } from "lucide-react";
 
-import logo from "@/assets/logo.png";
+import logo from "@/assets/aliet_logo.png";
 import { motion, AnimatePresence } from "framer-motion";
 import { AnimatedCharactersLogin } from "@/components/ui/animated-characters-login-page";
 import {
@@ -56,58 +55,6 @@ import {
 } from "@/components/ui/input-otp";
 
 
-const COLLEGES = [
-  "Velagapudi Ramakrishna Siddhartha Engineering College",
-  "Prasad V Potluri Siddhartha Institute of Technology",
-  "Andhra Loyola Institute of Engineering and Technology",
-  "Dhanekula Institute of Engineering and Technology",
-  "SRK Institute of Technology",
-  "NRI Institute of Technology",
-  "RK College of Engineering",
-  "Lingayas Institute of Management and Technology",
-  "PSCMR College of Engineering",
-  "Nimra College of Engineering & Technology",
-  "Nova College of Engineering & Technology",
-  "VIT-AP University",
-  "KL University",
-  "RVR & JC College of Engineering",
-  "Vignan’s Foundation for Science, Technology & Research",
-  "Vignan Institute of Technology and Science",
-  "St. Mary’s Engineering College",
-  "Malineni Lakshmaiah Engineering College",
-  "Potti Sriramulu Chalavadi Mallikarjuna Rao College",
-  "Gudlavalleru Engineering College",
-  "Usha Rama College of Engineering & Technology",
-  "Amrita Sai Institute of Science and Technology",
-  "Chalapathi Institute of Engineering and Technology",
-  "Kallam Haranadhareddy Institute of Technology",
-  "Narasaraopeta Engineering College",
-  "VKR VNB & AGK College of Engineering",
-  "Sri Sunflower College of Engineering and Technology",
-  "DJR College of Engineering and Technology",
-  "Vikas College of Engineering & Technology",
-  "Sai Tirumala NVR Engineering College",
-  "Sri Mittapalli College of Engineering",
-  "Guntur Engineering College",
-  "Chebrolu Engineering College",
-  "Eswar College of Engineering",
-  "Bapatla Engineering College",
-  "Vignan’s Lara Institute of Technology and Science",
-  "Sri Venkateswara College of Engineering & Technology",
-  "Paladugu Parvathi Devi College of Engineering",
-  "St. Ann’s College of Engineering & Technology",
-  "Vasireddy Venkatadri Institute of Technology",
-  "Chaitanya Engineering College",
-  "Sri Chaitanya College of Engineering",
-  "KKR & KSR Institute of Technology and Sciences",
-  "Sri Subbaraya and Narayana College",
-  "Sri Prakash College of Engineering",
-  "Sri Vasavi Institute of Engineering & Technology",
-  "Vikas Group of Institutions",
-  "Sri Sarathi Institute of Engineering & Technology",
-  "Sri Siddhartha Institute of Technology & Sciences",
-  "Aditya Engineering College (nearby region)"
-];
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address" }),
@@ -147,9 +94,10 @@ const detailsSchema = z
       .regex(/[0-9]/, { message: "Password must contain at least one number" }),
     collegeName: z
       .string()
-      .min(2, { message: "Please enter your college name" })
-      .max(120, { message: "College name too long" }),
-    courseType: z.string().min(1, { message: "Please select a course type" }),
+      .min(1, { message: "Please select your department" }),
+    rollNumber: z.string().optional(),
+    year: z.string().optional(),
+    courseType: z.string().min(1, { message: "Please select a role" }),
     confirmPassword: z
       .string()
       .min(1, { message: "Please confirm your password" }),
@@ -275,6 +223,8 @@ export default function Auth() {
       password: "",
       confirmPassword: "",
       collegeName: "",
+      rollNumber: "",
+      year: "",
       courseType: "",
       agreeToTerms: false,
     },
@@ -609,7 +559,9 @@ export default function Auth() {
       fullPhone,
       data.courseType,
       data.collegeName,
-      locationData
+      locationData,
+      data.rollNumber,
+      data.year
     );
 
     if (error) {
@@ -1394,46 +1346,14 @@ export default function Auth() {
                         )}
                       />
 
-                      {/* College & Institute + Course Type */}
+                      {/* Department & Role */}
                       <FormField
                         control={detailsForm.control}
                         name="collegeName"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest ml-1 mb-1">
-                              College / Institute Name
-                            </FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10" />
-                                <Input
-                                  placeholder="e.g. KL University"
-                                  className="pl-10 h-11 bg-slate-50 border-slate-200 rounded-xl focus:ring-4 focus:ring-[#0075CF]/10 transition-all"
-                                  list="college-suggestions"
-                                  onFocus={() => setIsTyping(true)}
-                                  onBlur={() => setIsTyping(false)}
-                                  {...field}
-                                />
-                                <datalist id="college-suggestions">
-                                  {COLLEGES.map((c) => (
-                                    <option key={c} value={c} />
-                                  ))}
-                                </datalist>
-                              </div>
-                            </FormControl>
-                            <FormMessage className="text-[10px]" />
-                          </FormItem>
-                        )}
-                      />
-
-                      {/* Course Type */}
-                      <FormField
-                        control={detailsForm.control}
-                        name="courseType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest ml-1 mb-1">
-                              Course Type
+                              Department
                             </FormLabel>
                             <FormControl>
                               <select
@@ -1443,10 +1363,95 @@ export default function Auth() {
                                 onBlur={() => setIsTyping(false)}
                                 className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-4 focus:ring-[#0075CF]/10 focus:border-[#0075CF] transition-all appearance-none cursor-pointer"
                               >
-                                <option value="" disabled>Select your course type...</option>
-                                <option value="full_time">Full Time Course</option>
-                                <option value="internship">Internship</option>
-                                <option value="bridge">Bridge Course</option>
+                                <option value="" disabled>Select your department...</option>
+                                <option value="cse">CSE</option>
+                                <option value="ece">ECE</option>
+                                <option value="eee">EEE</option>
+                                <option value="ds">DS</option>
+                                <option value="ai/ml">AI/ML</option>
+                                <option value="it">IT</option>
+                              </select>
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Roll Number */}
+                      <FormField
+                        control={detailsForm.control}
+                        name="rollNumber"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest ml-1 mb-1">
+                              Roll Number
+                            </FormLabel>
+                            <FormControl>
+                              <Input
+                                placeholder="e.g. 23HP1A0549"
+                                {...field}
+                                onFocus={() => setIsTyping(true)}
+                                onBlur={() => setIsTyping(false)}
+                                className="h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-4 focus:ring-[#0075CF]/10 focus:border-[#0075CF] transition-all"
+                              />
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Year */}
+                      <FormField
+                        control={detailsForm.control}
+                        name="year"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest ml-1 mb-1">
+                              Year
+                            </FormLabel>
+                            <FormControl>
+                              <select
+                                value={field.value}
+                                onChange={field.onChange}
+                                onFocus={() => setIsTyping(true)}
+                                onBlur={() => setIsTyping(false)}
+                                className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-4 focus:ring-[#0075CF]/10 focus:border-[#0075CF] transition-all appearance-none cursor-pointer"
+                              >
+                                <option value="" disabled>Select your year...</option>
+                                <option value="1">1st Year</option>
+                                <option value="2">2nd Year</option>
+                                <option value="3">3rd Year</option>
+                                <option value="4">4th Year</option>
+                              </select>
+                            </FormControl>
+                            <FormMessage className="text-[10px]" />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Role */}
+                      <FormField
+                        control={detailsForm.control}
+                        name="courseType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest ml-1 mb-1">
+                              Role
+                            </FormLabel>
+                            <FormControl>
+                              <select
+                                value={field.value}
+                                onChange={field.onChange}
+                                onFocus={() => setIsTyping(true)}
+                                onBlur={() => setIsTyping(false)}
+                                className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-4 focus:ring-[#0075CF]/10 focus:border-[#0075CF] transition-all appearance-none cursor-pointer"
+                              >
+                                <option value="" disabled>Select your role...</option>
+                                <option value="admin">Admin</option>
+                                <option value="manager">Manager</option>
+                                <option value="instructor">Instructor</option>
+                                <option value="student">Student</option>
+                                <option value="intern">Intern</option>
                               </select>
                             </FormControl>
                             <FormMessage className="text-[10px]" />

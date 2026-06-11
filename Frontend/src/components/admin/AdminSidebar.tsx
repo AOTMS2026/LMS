@@ -44,7 +44,7 @@ import {
   Zap,
   MonitorCheck,
 } from "lucide-react";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/lanyard/aotms_logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ const navGroups = [
     items: [
       { title: "User Management", url: "/admin/users", icon: Users },
       { title: "Grant Access", url: "/admin/grant-access", icon: UserCheck },
-      { title: "Student Enrollments", url: "/admin/enrollments", icon: GraduationCap },
+      { title: "Student Access", url: "/admin/student-access", icon: ShieldCheck },
     ],
   },
   {
@@ -64,7 +64,6 @@ const navGroups = [
     items: [
       { title: "Academic Scores", url: "/admin/student-performance", icon: TrendingUp },
       { title: "Leaderboard", url: "/admin/leaderboard", icon: Trophy },
-      { title: "Rewards & Coupons", url: "/admin/coupons", icon: Ticket },
       { title: "Resume Scans", url: "/admin/resume-scans", icon: ClipboardList },
     ],
   },

@@ -58,8 +58,9 @@ interface StudentProfile {
   full_name: string | null;
   email: string | null;
   mobile_number?: string | null;
-  college_name?: string | null;
-  institute_name?: string | null;
+  department?: string | null;
+  institute_name?: string | null; // kept for legacy, replaced by roll_number
+  roll_number?: string | null;
   full_address?: string | null;
   city?: string | null;
   district?: string | null;
@@ -71,6 +72,7 @@ interface StudentProfile {
   created_at?: string;
   latitude?: number | null;
   longitude?: number | null;
+  enrolled_courses?: { _id?: string; title?: string; slug?: string }[];
 }
 
 interface CourseEntry {
@@ -164,8 +166,8 @@ function buildPDF(profile: StudentProfile, detail: StudentDetail): string {
   const name = sv(profile.full_name);
   const email = sv(profile.email);
   const mobile = sv(profile.mobile_number);
-  const college = sv(profile.college_name);
-  const institute = sv(profile.institute_name);
+  const college = sv(profile.department);
+  const institute = sv(profile.roll_number);
   const joined = sd(profile.created_at);
   const status = profile.is_approved ? "Approved" : "Pending";
   const lat = profile.latitude;
@@ -317,7 +319,7 @@ function buildPDF(profile: StudentProfile, detail: StudentDetail): string {
       <div class="info-item"><div class="lbl">Full Name</div><div class="val">${name}</div></div>
       <div class="info-item"><div class="lbl">Email</div><div class="val">${email}</div></div>
       <div class="info-item"><div class="lbl">Mobile</div><div class="val">${mobile}</div></div>
-      <div class="info-item"><div class="lbl">College</div><div class="val">${college}</div></div>
+      <div class="info-item"><div class="lbl">Department</div><div class="val">${college}</div></div>
       <div class="info-item"><div class="lbl">Institute</div><div class="val">${institute}</div></div>
       <div class="info-item"><div class="lbl">Status</div><div class="val"><span class="bj ${status === "Approved" ? "bg" : "ba"}">${status}</span></div></div>
       <div class="info-item"><div class="lbl">Joined</div><div class="val">${joined}</div></div>
@@ -446,6 +448,7 @@ export function StudentPerformance({
   const [search, setSearch] = useState("");
   const [fStatus, setFStatus] = useState("all");
   const [fCollege, setFCollege] = useState("all");
+  const [fYear, setFYear] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, StudentDetail>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -547,9 +550,15 @@ export function StudentPerformance({
   };
 
   // ── Filter ────────────────────────────────────────────────────────────────────
-  const uniqueColleges = Array.from(
-    new Set(students.map(s => sv(s.college_name)).filter(v => v !== "—"))
-  ).sort();
+  const DEPARTMENTS = ["CSE", "ECE", "EEE", "DS", "AI/ML", "IT"];
+
+  const uniqueDepartments = Array.from(
+    new Set(students.map(s => (s as any).department).filter(Boolean))
+  ).sort() as string[];
+
+  const uniqueYears = Array.from(
+    new Set(students.map(s => (s as any).year).filter(Boolean))
+  ).sort() as string[];
 
   const filtered = students.filter(s => {
     const q = search.toLowerCase();
@@ -558,11 +567,13 @@ export function StudentPerformance({
       (s.full_name || "").toLowerCase().includes(q) ||
       (s.email || "").toLowerCase().includes(q) ||
       s.id.toLowerCase().includes(q) ||
-      (s.mobile_number || "").includes(q);
+      (s.mobile_number || "").includes(q) ||
+      ((s as any).roll_number || "").toLowerCase().includes(q);
     const matchStatus =
       fStatus === "all" || (fStatus === "approved" ? s.is_approved : !s.is_approved);
-    const matchCollege = fCollege === "all" || sv(s.college_name) === fCollege;
-    return matchSearch && matchStatus && matchCollege;
+    const matchCollege = fCollege === "all" || ((s as any).department || "").toUpperCase() === fCollege.toUpperCase();
+    const matchYear = (fYear === "all" || !fYear) || ((s as any).year || "") === fYear;
+    return matchSearch && matchStatus && matchCollege && matchYear;
   });
 
   // ── Render ───────────────────────────────────────────────────────────────────
@@ -639,14 +650,26 @@ export function StudentPerformance({
             </SelectContent>
           </Select>
           <Select value={fCollege} onValueChange={setFCollege}>
-            <SelectTrigger className="h-12 min-w-52 rounded-2xl bg-slate-50 border-none font-black text-[11px] uppercase tracking-tighter shadow-sm">
-              <SelectValue placeholder="College" />
+            <SelectTrigger className="h-12 min-w-44 rounded-2xl bg-slate-50 border-none font-black text-[11px] uppercase tracking-tighter shadow-sm">
+              <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-slate-100 shadow-2xl max-h-80">
-              <SelectItem value="all" className="font-bold text-xs py-3">ALL COLLEGES</SelectItem>
-              {uniqueColleges.map(c => (
-                <SelectItem key={c} value={c} className="font-bold text-xs py-3">{c.toUpperCase()}</SelectItem>
+              <SelectItem value="all" className="font-bold text-xs py-3">ALL DEPARTMENTS</SelectItem>
+              {(uniqueDepartments.length > 0 ? uniqueDepartments : DEPARTMENTS).map(d => (
+                <SelectItem key={d} value={d} className="font-bold text-xs py-3">{d}</SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={fYear} onValueChange={setFYear}>
+            <SelectTrigger className="h-12 w-36 rounded-2xl bg-slate-50 border-none font-black text-[11px] uppercase tracking-tighter shadow-sm">
+              <SelectValue placeholder="Year" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl border-slate-100 shadow-2xl">
+              <SelectItem value="all" className="font-bold text-xs py-3">ALL YEARS</SelectItem>
+              <SelectItem value="1" className="font-bold text-xs py-3">YEAR 1</SelectItem>
+              <SelectItem value="2" className="font-bold text-xs py-3">YEAR 2</SelectItem>
+              <SelectItem value="3" className="font-bold text-xs py-3">YEAR 3</SelectItem>
+              <SelectItem value="4" className="font-bold text-xs py-3">YEAR 4</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -729,6 +752,16 @@ export function StudentPerformance({
                             <p className="font-black text-slate-900 text-xl sm:text-2xl leading-[0.9] tracking-tight group-hover:text-slate-700 transition-colors truncate">
                               {stu.full_name || "UNNAMED STUDENT"}
                             </p>
+                            {stu.roll_number && (
+                              <p className="text-[11px] font-bold text-indigo-600 uppercase tracking-widest mt-0.5">
+                                {stu.roll_number}
+                              </p>
+                            )}
+                            {(stu as any).year && (
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Year {(stu as any).year}
+                              </p>
+                            )}
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 mt-2">
                               <span className="text-[11px] text-slate-500 font-bold flex items-center gap-2 truncate uppercase tracking-widest">
                                 <Mail className="h-3 w-3 opacity-40 shrink-0" />{stu.email}
@@ -740,21 +773,14 @@ export function StudentPerformance({
                               )}
                             </div>
                             <div className="flex items-center gap-2 pt-1 flex-wrap">
-                              {stu.college_name && stu.college_name.trim() !== "" && stu.college_name !== "—" && (
-                                 <Badge className="bg-slate-100 hover:bg-slate-200 text-slate-600 border-none font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-widest transition-colors">
-                                    {stu.college_name.toUpperCase()}
-                                 </Badge>
-                              )}
-                              {stu.institute_name && stu.institute_name.trim() !== "" && stu.institute_name !== "—" && (
-                                 <Badge className="bg-slate-900 hover:bg-slate-800 text-white border-none font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-widest transition-colors">
-                                    {stu.institute_name.toUpperCase()}
-                                 </Badge>
-                              )}
-                              {(!stu.college_name || stu.college_name.trim() === "" || stu.college_name === "—") && 
-                               (!stu.institute_name || stu.institute_name.trim() === "" || stu.institute_name === "—") && (
-                                 <Badge className="bg-slate-100 hover:bg-slate-200 text-slate-400 border-none font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-widest transition-colors">
-                                    —
-                                 </Badge>
+                              {stu.department && stu.department.trim() !== "" && stu.department !== "—" ? (
+                                <Badge className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-none font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-widest transition-colors">
+                                  {stu.department.toUpperCase()}
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-slate-100 hover:bg-slate-200 text-slate-400 border-none font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-widest transition-colors">
+                                  —
+                                </Badge>
                               )}
                               {/* Role badge — always show INTERN or STUDENT */}
                               <Badge className={`border-none font-black text-[9px] px-3 py-1 rounded-full uppercase tracking-widest ${stu.role === 'intern' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -836,8 +862,8 @@ export function StudentPerformance({
                                           { l: "Full Name", v: stu.full_name, icon: Users },
                                           { l: "Email Address", v: stu.email, icon: Mail },
                                           { l: "Contact No", v: stu.mobile_number, icon: Phone },
-                                          { l: "College Det.", v: stu.college_name, icon: GraduationCap },
-                                          { l: "Institute", v: stu.institute_name, icon: Building2 },
+                                          { l: "Department", v: stu.department, icon: GraduationCap },
+                                          { l: "Roll Number", v: stu.roll_number, icon: Building2 },
                                           { l: "Joined On", v: sd(stu.created_at), icon: Clock },
                                           { l: "Platform UUID", v: stu.id, icon: Fingerprint, mono: true },
                                         ];

@@ -265,8 +265,14 @@ export function useAvailableCourses() {
         queryKey: ['available-courses'],
         queryFn: async () => {
             try {
-                // Unlimited view for all courses (published, pending, or active) for catalog discovery
-                const data: Course[] = await fetchWithAuth('/data/courses?limit=100&sort=created_at&order=desc');
+                // Use /public/courses which returns approved/published courses for all roles
+                const token = localStorage.getItem('access_token');
+                const res = await fetch(`${import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : 'https://aotms-lms-new.onrender.com/api')}/public/courses?limit=100`, {
+                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                });
+                if (!res.ok) throw new Error('Failed to fetch courses');
+                const data: Course[] = await res.json();
+
                 let enrolledCourseIds = new Set<string>();
 
                 if (user?.id) {

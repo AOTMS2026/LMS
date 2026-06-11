@@ -257,7 +257,7 @@ export default function CoursesPage() {
               <div className="relative z-10 space-y-8">
                 <div className="flex items-center justify-between">
                   <div className="h-10 w-10 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm border border-white/10">
-                    <BookOpen className="h-5 w-5 text-primary" />
+                    <BookOpen className="h-5 w-5 text-white" />
                   </div>
                   <Button 
                     variant="ghost" 
@@ -273,8 +273,8 @@ export default function CoursesPage() {
                   <DialogTitle className="text-3xl font-black tracking-tight leading-tight">
                     Review Your <span className="text-white italic">Enrollment</span>
                   </DialogTitle>
-                  <DialogDescription className="text-slate-400 text-sm leading-relaxed">
-                    You're one step away from mastering new skills. Complete the secure payment below to unlock full course access.
+                  <DialogDescription className="text-slate-200 text-sm leading-relaxed">
+                    You're one step away from mastering new skills. Complete your free enrollment below to unlock full course access.
                   </DialogDescription>
                 </DialogHeader>
 
@@ -285,20 +285,18 @@ export default function CoursesPage() {
                         <img src={paymentCourse.image} alt="" className="h-full w-full object-cover" />
                       </div>
                       <div className="space-y-1">
-                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Target Course</div>
+                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-[#FD5A1A]">Target Course</div>
                         <h3 className="font-bold text-sm leading-snug line-clamp-2">{paymentCourse.title}</h3>
-                        <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                        <div className="flex items-center gap-2 text-[10px] text-slate-300">
                           <Clock className="h-3 w-3" />
                           <span>Lifetime Access</span>
                         </div>
                       </div>
                     </div>
                     <div className="pt-4 border-t border-white/20 flex items-center justify-between">
-                      <span className="text-sm font-medium text-white/60">Total Investment</span>
+                      <span className="text-sm font-medium text-white/60">Investment Fee</span>
                       <span className="text-2xl font-black text-white">
-                        {paymentCourse.price?.toString().includes('$') 
-                          ? paymentCourse.price.replace('$', '₹') 
-                          : `₹${paymentCourse.price}`}
+                        Free of Cost
                       </span>
                     </div>
                   </div>
@@ -311,12 +309,12 @@ export default function CoursesPage() {
                     <CheckCircle2 className="h-6 w-6 text-[#FD5A1A]" />
                   </div>
                   <div>
-                    <div className="text-xs font-black uppercase tracking-widest text-white/40 mb-0.5">Payment Verified</div>
-                    <div className="text-sm font-bold text-white">Manual Admin Approval</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-white/40 mb-0.5">Enrollment Status</div>
+                    <div className="text-sm font-bold text-white">Direct Free Access</div>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-medium uppercase tracking-[0.1em]">
-                  Secure transactions protected by standard SSL protocols and human verification systems.
+                <p className="text-[10px] text-slate-300 leading-relaxed font-medium uppercase tracking-[0.1em]">
+                  Education is the key to opportunity. Get started with no financial barrier.
                 </p>
               </div>
             </div>
@@ -325,14 +323,14 @@ export default function CoursesPage() {
             <div className="flex-1 p-8 md:p-12 space-y-8 bg-white selection:bg-slate-100">
               <div className="flex justify-between items-start">
                 <div className="space-y-1 flex-1">
-                  <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Payment Details</h3>
-                  <p className="text-slate-500 text-sm font-medium">Scan the QR code below or use the payment credentials.</p>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Confirm Enrollment</h3>
+                  <p className="text-slate-500 text-sm font-medium">Select your preferred batch schedule to proceed.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button
                         size="sm"
                         className="rounded-full px-6 font-bold h-10 hidden md:flex shadow-lg shadow-primary/20"
-                        disabled={isUploading || !paymentProof}
+                        disabled={isUploading}
                         onClick={handleEnrollmentSubmit}
                     >
                          {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enroll Course'}
@@ -345,46 +343,6 @@ export default function CoursesPage() {
                       >
                         <X className="h-5 w-5" />
                       </Button>
-                </div>
-              </div>
-
-              {/* QR Section */}
-              <div className="relative group max-w-[280px] mx-auto">
-                <div className="absolute -inset-4 bg-primary/5 rounded-[2rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                <div className="relative bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] p-6 shadow-sm overflow-hidden flex flex-col items-center">
-                  <div className="mb-4 text-center">
-                    <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Secure UPI Gateway</div>
-                    <div className="flex items-center justify-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200">
-                      <QrCode className="h-3 w-3 text-primary" />
-                      <span className="text-[10px] font-bold text-slate-600">Scan to Pay</span>
-                    </div>
-                  </div>
-                  
-                  <div className="relative h-44 w-44 bg-white rounded-2xl p-2 shadow-inner border border-slate-200/50 flex items-center justify-center group-hover:scale-[1.02] transition-transform">
-                    {/* The QR Image */}
-                    <img 
-                      src="/scanner.jpeg" 
-                      alt="Payment QR Code" 
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "https://placehold.co/400x400?text=QR+CODE+HERE";
-                      }}
-                    />
-                  </div>
-
-                  <div className="mt-6 w-full space-y-3">
-                    <div className="p-3 bg-white rounded-xl border border-dashed border-slate-300 flex items-center justify-between group/code cursor-pointer hover:border-primary transition-colors">
-                      <span className="text-[10px] font-mono font-bold text-slate-500 truncate max-w-[140px]">vyapar.17432781471@hdfcbank</span>
-                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-[#0075CF]">
-                        <CheckCircle2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    <div className="flex items-center justify-center gap-6 saturate-0 opacity-50">
-                        <Phone className="h-4 w-4" />
-                        <span className="text-xs font-bold">+91 80199 42233</span>
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -440,38 +398,6 @@ export default function CoursesPage() {
                  ) : null}
               </div>
 
-              {/* Upload Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-400">Confirmation Proof</label>
-                    {paymentProof && (
-                        <span className="text-[10px] font-bold text-primary flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3" /> File Selected
-                        </span>
-                    )}
-                </div>
-                <div 
-                    className={`relative border-2 border-dashed rounded-2xl p-6 transition-all cursor-pointer group flex flex-col items-center justify-center space-y-3 ${paymentProof ? 'border-primary bg-primary/5' : 'border-slate-200 hover:border-primary hover:bg-slate-50'}`}
-                    onClick={() => document.getElementById('payment-proof')?.click()}
-                >
-                    <div className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100 group-hover:scale-110 transition-transform">
-                        <Upload className={`h-5 w-5 ${paymentProof ? 'text-[#FD5A1A]' : 'text-slate-400'}`} />
-                    </div>
-                    <div className="text-center">
-                        <p className="text-xs font-bold text-slate-900">{paymentProof ? paymentProof.name : 'Upload Payment Screenshot'}</p>
-                        <p className="text-[10px] text-slate-500 mt-1 font-medium">JPEG, PNG only (Max 5MB)</p>
-                    </div>
-                    <input 
-                        id="payment-proof" 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
-                    />
-                </div>
-              </div>
-
-
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-4 pt-4">
                 <Button
@@ -488,19 +414,19 @@ export default function CoursesPage() {
                 <Button
                     size="lg"
                     className="h-14 rounded-2xl bg-gradient-to-r from-[#0075CF] to-[#3391D9] font-black uppercase tracking-widest text-sm shadow-xl shadow-[#0075CF]/20 active:scale-95 transition-all"
-                    disabled={isUploading || !paymentProof}
+                    disabled={isUploading}
                     onClick={handleEnrollmentSubmit}
                 >
                     {isUploading ? (
                         <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
-                        'Enroll Course'
+                        'Enroll Now'
                     )}
                 </Button>
               </div>
 
               <p className="text-center text-[10px] text-slate-400 font-medium">
-                After payment, please upload the screenshot to confirm your order details via manual verification.
+                Once confirmed, the administration will review your free registration and grant you access shortly.
               </p>
             </div>
           </div>
@@ -633,10 +559,12 @@ function CourseCard({
 
         {/* Meta Info */}
         <div className="flex items-center gap-6 text-sm text-slate-500">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span className="font-medium">{course.duration}</span>
-          </div>
+          {course.duration !== "4 Months" && (
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              <span className="font-medium">{course.duration}</span>
+            </div>
+          )}
           {course.trainer && (
             <div className="flex items-center gap-2">
               <User className="h-4 w-4" />
@@ -649,23 +577,9 @@ function CourseCard({
         <div className="flex items-baseline justify-between pt-2">
           <div className="flex items-baseline gap-3">
             <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#0075CF] to-[#FD5A1A]">
-              {course.price?.toString().includes('$') 
-                ? course.price.replace('$', '₹') 
-                : `₹${course.price}`}
+              Free of Cost
             </span>
-            {course.original_price && (
-              <span className="text-base text-slate-400 line-through">
-                {course.original_price?.toString().includes('$') 
-                  ? course.original_price.replace('$', '₹') 
-                  : `₹${course.original_price}`}
-              </span>
-            )}
           </div>
-          {course.original_price && (
-            <Badge className="bg-orange-100 text-[#FD5A1A] border-orange-200 text-[10px] font-bold uppercase tracking-wider">
-              {Math.round((1 - parsePrice(course.price) / parsePrice(course.original_price)) * 100)}% OFF
-            </Badge>
-          )}
         </div>
 
         {/* Enroll Button */}
@@ -678,7 +592,7 @@ function CourseCard({
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
           ) : (
             <>
-              {userRole === 'instructor' ? 'Teach this Course' : 'Purchase Course'}
+              {userRole === 'instructor' ? 'Teach this Course' : 'Enroll Now'}
               <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
             </>
           )}

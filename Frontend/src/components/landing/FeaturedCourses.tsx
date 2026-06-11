@@ -116,14 +116,14 @@ export default function FeaturedCourses() {
 
                   <div className="space-y-6 pt-4 border-t border-slate-50">
                     <div className="flex items-center justify-between text-xs font-black text-slate-600 uppercase tracking-widest">
-                      <span className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-[#0075CF]" />{" "}
-                        {course.duration}
-                      </span>
+                      {course.duration !== "4 Months" && (
+                        <span className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-[#0075CF]" />{" "}
+                          {course.duration}
+                        </span>
+                      )}
                       <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#0075CF] to-[#FD5A1A] text-base md:text-lg font-black tracking-tight">
-                        {course.price?.toString().includes("$")
-                          ? course.price.replace("$", "₹")
-                          : `₹${course.price}`}
+                        Free of Cost
                       </span>
                     </div>
 

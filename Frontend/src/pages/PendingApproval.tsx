@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
-import logo from '@/assets/logo.png';
+import logo from '@/assets/aliet_logo.png';
 import { Clock, Mail, LogOut, ArrowLeft } from 'lucide-react';
 
 export default function PendingApproval() {

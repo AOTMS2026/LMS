@@ -14,9 +14,10 @@ extend({ MeshLineGeometry, MeshLineMaterial })
 
 export default function Lanyard({ position = [0, 8, 0], gravity = [0, -40, 0] }) {
   return (
-    <div className="absolute inset-0 pointer-events-none z-[50]">
+    <div className="absolute inset-0 pointer-events-none z-[50]" style={{ background: 'transparent' }}>
       <Canvas 
-        gl={{ alpha: true, antialias: true }}
+        gl={{ alpha: true, antialias: true, clearColor: 0x000000, clearAlpha: 0 }}
+        onCreated={({ gl }) => { gl.setClearColor(0x000000, 0); }}
         camera={{ position: [0, 0, 10], fov: 25 }}
         style={{ background: 'transparent' }}
       >

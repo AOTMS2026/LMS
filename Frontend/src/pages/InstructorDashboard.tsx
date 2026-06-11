@@ -684,7 +684,10 @@ export default function InstructorDashboard() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                 >
-                  <QuestionBankManager mode="instructor" />
+                  <QuestionBankManager 
+                    mode="instructor" 
+                    onSectionChange={(sec) => navigate(sec === 'exams' ? '/instructor/exams' : `/instructor/${sec}`)}
+                  />
                 </motion.div>
               )}
               {isExams && (

@@ -179,40 +179,21 @@ function CoursesTab() {
     
     setIsUploading(true);
     try {
-      let paymentProofUrl = null;
-      
-      // 1. Upload payment proof if provided
-      if (paymentProof) {
-        const formData = new FormData();
-        formData.append('file', paymentProof);
-        
-        const uploadRes = await fetchWithAuth('/upload', {
-          method: 'POST',
-          body: formData,
-          headers: {} // File transfers shouldn't have content-type set manually
-        }) as { url: string };
-        
-        paymentProofUrl = uploadRes?.url;
-      }
-
-      // 2. Submit Enrollment Request with the proof, UTR, and Coupon
+      // Submit Enrollment Request as free of cost
       await enrollMutation.mutateAsync({ 
           courseId: paymentCourse.id, 
-          payment_proof_url: paymentProofUrl,
-          utr_number: utrNumber,
-          coupon_code: appliedPrice ? couponCode : undefined,
-          payment_term: paymentTerm
+          payment_proof_url: null,
+          utr_number: '',
+          payment_term: 'full'
       });
 
       toast({
         title: "Enrollment Requested",
         description: `Enrollment for ${paymentCourse.title} submitted! Waiting for admin approval.`,
-        className: "bg-amber-50 border-amber-200"
+        className: "bg-emerald-50 border-emerald-200"
       });
       
       setShowPaymentModal(false);
-      setPaymentProof(null);
-      setUtrNumber('');
       setCourseTab('enrolled');
     } catch (err) {
       const error = err as Error;
@@ -230,12 +211,12 @@ function CoursesTab() {
     <div className="w-full space-y-8 h-full">
       {/* Payment Modal JSX */}
       <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
-        <DialogContent className="w-[95vw] sm:max-w-2xl p-0 overflow-hidden border-none shadow-2xl rounded-[2.5rem] bg-white h-auto max-h-[95vh] flex flex-col">
+        <DialogContent className="w-[95vw] sm:max-w-md p-0 overflow-hidden border-none shadow-2xl rounded-[2.5rem] bg-white h-auto flex flex-col">
           <DialogHeader className="sr-only">
-            <DialogTitle>Enrollment & Payment Protocol</DialogTitle>
-            <DialogDescription>Verify credentials and submit payment proof for course activation.</DialogDescription>
+            <DialogTitle>Confirm Enrollment</DialogTitle>
+            <DialogDescription>Confirm enrollment details.</DialogDescription>
           </DialogHeader>
-          {/* Top Course Strip (Compact) */}
+          
           {paymentCourse && (
             <div className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
                <div className="flex items-center gap-3">
@@ -248,12 +229,8 @@ function CoursesTab() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-900 leading-none">{paymentCourse.title}</h3>
-                    <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-widest font-black">
-                      {paymentTerm === 'term2' ? (
-                        <span className="text-amber-600">Balance: ₹{term2Amount.toLocaleString('en-IN')}</span>
-                      ) : (
-                        <span className="text-slate-700">Total: ₹{getEffectivePrice().toLocaleString('en-IN')}</span>
-                      )}
+                    <p className="text-[10px] text-emerald-600 mt-1 uppercase tracking-widest font-black">
+                      Free Course
                     </p>
                   </div>
                </div>
@@ -268,108 +245,32 @@ function CoursesTab() {
             </div>
           )}
 
-          <div className="p-8 sm:p-10 space-y-8 overflow-y-auto overflow-x-hidden custom-scrollbar">
-            {/* Term Selection (Drastically Reduced Height) */}
-            <div className="space-y-4">
-               <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Select Payment Plan</div>
-               <div className="grid grid-cols-2 gap-4">
-                 {[ 
-                   { id: 'full', label: 'Full', pct: 100, amount: getEffectivePrice() },
-                   { id: 'term1', label: 'Term 1', pct: 60, amount: term1Amount },
-                   { id: 'term2', label: 'Term 2', pct: 40, amount: term2Amount }
-                 ].filter(plan => {
-                   if (paymentCourse?.payment_term === 'term1') return plan.id === 'term2';
-                   return plan.id === 'full' || plan.id === 'term1';
-                 }).map((plan) => (
-                    <button 
-                      key={plan.id}
-                      onClick={() => setPaymentTerm(plan.id as 'full' | 'term1' | 'term2')}
-                      className={`p-4 rounded-2xl border-2 transition-all text-center flex flex-col items-center justify-center gap-1 ${paymentTerm === plan.id ? 'border-slate-900 bg-slate-900 text-white shadow-xl shadow-slate-200' : 'border-slate-100 bg-slate-50 hover:bg-slate-100 text-slate-900 font-bold'}`}
-                    >
-                      <div className={`text-[10px] font-black uppercase tracking-wider ${paymentTerm === plan.id ? 'text-slate-300' : 'text-slate-500'}`}>{plan.label} ({plan.pct}%)</div>
-                      <div className="font-black text-lg">₹{plan.amount.toLocaleString('en-IN')}</div>
-                    </button>
-                 ))}
-               </div>
-            </div>
+          <div className="p-8 space-y-6">
+            <p className="text-sm text-slate-600 font-medium text-center">
+              You are about to register for <strong>{paymentCourse?.title}</strong>. No fees or payments are required.
+            </p>
 
-            {/* Payment Section (Horizontal Mix) */}
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 sm:gap-6 items-start">
-               {/* QR Section */}
-               <div className="col-span-1 sm:col-span-2 flex flex-col items-center gap-4">
-                  <div className="relative w-full aspect-square max-w-[240px] mx-auto bg-white rounded-3xl p-4 border-2 border-slate-100 shadow-xl overflow-hidden group/qr">
-                    <img src="/scanner.jpeg" alt="QR Code" className="w-full h-full object-contain rounded-xl group-hover:scale-110 transition-transform duration-500" />
-                    <div className="absolute inset-0 bg-slate-900/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                  <div className="text-center">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Secure Scan Portal</span>
-                  </div>
-               </div>
-
-               {/* Inputs Column (Compressed) */}
-               <div className="col-span-1 sm:col-span-3 space-y-4">
-                  {/* Coupon (Enhanced UX) */}
-                  <div className="space-y-4">
-                    <div className="flex gap-3 group">
-                      <Input 
-                        placeholder="COUPON CODE"
-                        value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                        disabled={appliedPrice !== null}
-                        className="flex-1 h-12 rounded-xl border-none bg-slate-100 px-5 text-sm font-black tracking-widest placeholder:text-slate-300 focus-visible:ring-black transition-all"
-                      />
-                      <Button 
-                        size="sm"
-                        onClick={handleApplyCoupon}
-                        disabled={!couponCode || isValidating || appliedPrice !== null}
-                        className="h-12 px-8 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-slate-100 transition-all hover:scale-[1.02] active:scale-95 bg-slate-900 hover:bg-black text-white shrink-0"
-                      >
-                        {isValidating ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* UTR (Enhanced UX) */}
-                  <div className="space-y-1.5">
-                    <div className="relative group/utr">
-                      <Input 
-                        placeholder="12-DIGIT UTR NUMBER"
-                        value={utrNumber}
-                        onChange={(e) => setUtrNumber(e.target.value.replace(/\D/g, '').slice(0, 12))}
-                        className="w-full h-12 rounded-xl border-none bg-slate-100 px-5 pr-10 text-sm font-black tracking-widest placeholder:text-slate-300 focus-visible:ring-black transition-all"
-                      />
-                      <Hash className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-300 group-focus-within/utr:text-black transition-colors" />
-                    </div>
-                  </div>
-
-                  {/* Upload (Enhanced UX) */}
-                  <div 
-                    className={`h-12 flex items-center justify-center gap-3 border-2 border-dashed rounded-xl cursor-pointer transition-all ${paymentProof ? 'border-slate-900 bg-slate-900 text-white shadow-xl' : 'border-slate-200 hover:bg-slate-100'}`}
-                    onClick={() => document.getElementById('payment-proof')?.click()}
-                  >
-                    <Upload className={`h-4 w-4 ${paymentProof ? 'text-white' : 'text-slate-400'}`} />
-                    <span className={`text-[10px] font-black uppercase tracking-widest truncate max-w-[150px] ${paymentProof ? 'text-white' : 'text-slate-500'}`}>
-                      {paymentProof ? paymentProof.name : 'Upload Payment Image'}
-                    </span>
-                    <input id="payment-proof" type="file" className="hidden" accept="image/*" onChange={(e) => setPaymentProof(e.target.files?.[0] || null)} />
-                  </div>
-               </div>
-            </div>
-
-            {/* Action Bar (Low Height) */}
-            <div className="pt-6 sm:pt-8 border-t border-slate-100 flex items-center justify-between gap-6 pb-2">
-              <div className="flex-1">
-                 <p className="text-[10px] text-slate-400 font-bold leading-relaxed max-w-[280px]">By clicking enroll, you agree to our terms. Manual approval usually takes <span className="text-slate-900">2-4 hours</span>.</p>
-              </div>
+            <div className="flex gap-4 pt-2">
+              <Button
+                  variant="ghost"
+                  className="flex-1 h-14 rounded-2xl font-black uppercase tracking-widest text-xs border border-slate-200 hover:bg-slate-50 transition-all"
+                  onClick={() => setShowPaymentModal(false)}
+              >
+                  Cancel
+              </Button>
               <Button
                   size="lg"
-                  className="h-14 px-12 rounded-[1.25rem] font-black uppercase tracking-[0.1em] text-[12px] shadow-2xl shadow-slate-200 bg-slate-900 hover:bg-black text-white transition-all hover:scale-[1.02] active:scale-95 shrink-0"
-                  disabled={isUploading || !paymentProof || utrNumber.length !== 12}
+                  className="flex-1 h-14 rounded-2xl font-black uppercase tracking-widest text-xs bg-slate-900 hover:bg-black text-white shadow-xl transition-all"
+                  disabled={isUploading}
                   onClick={handleEnrollmentSubmit}
               >
-                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm Enrollment'}
+                  {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enroll Now'}
               </Button>
             </div>
+
+            <p className="text-center text-[10px] text-slate-400 font-medium">
+              Once confirmed, the administration will review your free registration and grant you access shortly.
+            </p>
           </div>
         </DialogContent>
       </Dialog>
@@ -405,20 +306,7 @@ function CoursesTab() {
                 return;
               }
 
-              // Check for Term 2 Payment if active but has balance
-              if (c.enrollmentStatus === 'active' && c.remaining_balance > 0) {
-                 toast({
-                   title: "Balance Dues Found",
-                   description: "Opening payment gateway for your remaining balance.",
-                   className: "bg-amber-50 border-amber-200"
-                 });
-                 setPaymentCourse(c);
-                 setPaymentTerm('term2');
-                 setCouponCode("");
-                 setAppliedPrice(null);
-                 setShowPaymentModal(true);
-                 return;
-              }
+
               
               setViewingCourse(c);
             }}

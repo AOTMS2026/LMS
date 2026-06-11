@@ -240,8 +240,8 @@ export interface Profile {
   email?: string;
   avatar_url?: string;
   mobile_number?: string;
-  college_name?: string;
-  institute_name?: string;
+  department?: string;
+  roll_number?: string;
   ats_credits?: number;
   approval_status?: string;
   city?: string;
@@ -1430,10 +1430,8 @@ export function useCreateTopic() {
               (ba) => ba.student_id === userId && ba.course_id === courseId,
             );
 
-            // SECURITY CHECK: If instructor, only show students in YOUR assigned batches
-            if (userRole === 'instructor' && !batchAssignment) {
-              return;
-            }
+            // NOTE: Show all enrolled students in instructor's approved courses.
+            // Batch assignment is optional — unassigned students still appear in roster.
 
             existing.courseEnrollments.push({
               courseId: courseId,
@@ -1457,10 +1455,8 @@ export function useCreateTopic() {
               (ba) => ba.student_id === userId && ba.course_id === courseId,
             );
 
-            // SECURITY CHECK: If instructor, only show students in YOUR assigned batches
-            if (userRole === 'instructor' && !batchAssignment) {
-              return;
-            }
+            // NOTE: Show all enrolled students in instructor's approved courses.
+            // Batch assignment is optional — unassigned students still appear in roster.
 
             studentMap.set(userId, {
               id: enrollment.id || enrollment._id || userId,

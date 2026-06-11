@@ -88,6 +88,7 @@ interface RosterStudent {
   full_name: string;
   email: string;
   avatar_url?: string;
+  enrollment_status?: 'active' | 'pending' | 'completed' | 'dropped';
   batch?: {
     id: string;
     name: string;
@@ -163,6 +164,11 @@ function DraggableStudentCard({ student, onRemove }: { student: RosterStudent, o
           <p className="text-sm font-black text-slate-900 truncate">{student.full_name}</p>
           <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
             <p className="text-[10px] font-bold text-slate-500 truncate max-w-[120px]">{student.email}</p>
+            {student.enrollment_status === 'pending' && (
+              <Badge className="text-[8px] font-black uppercase bg-amber-50 text-amber-600 border border-amber-100 rounded-md px-1.5 py-0.5 scale-90 shrink-0 whitespace-nowrap">
+                Pending
+              </Badge>
+            )}
             {student.batch && (
               <Badge className="text-[8px] font-black uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md px-1.5 py-0.5 scale-90 shrink-0 whitespace-nowrap">
                 {student.batch.name}
@@ -210,7 +216,7 @@ function DroppableRosterColumn({ title, students, colorClass, type, onRemove }: 
              type === 'afternoon' ? 'bg-blue-400' :
              type === 'evening' ? 'bg-violet-400' :
              'bg-slate-400'
-           } ${isOver ? 'animate-ping' : ''}`} />
+           } ${isOver ? 'animate-ping scale-125' : 'animate-none'}`} />
            <h3 className="font-black text-[11px] uppercase tracking-[0.2em] text-slate-600">{title}</h3>
         </div>
         <Badge className={`${colorClass} border-none font-black shadow-sm`}>{students.length}</Badge>

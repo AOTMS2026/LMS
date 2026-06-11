@@ -385,7 +385,8 @@ const requireInstructor = requireRole(['admin', 'manager', 'instructor']);
 // --- AI HUB LIVE INTEGRATION (BROADCAST & BOOST) ---
 app.post('/api/admin/broadcast', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
-        const { type, selectedUsers, category, subject, message } = req.body;
+        const { type, selectedUsers, category, eventType, eventName, eventDetails, subject, message } = req.body;
+        const notifTitle = eventName || subject || category || 'Broadcast';
         console.log('[AI Hub Broadcast] Hit for', selectedUsers?.length, 'users', selectedUsers);
 
         if (!selectedUsers || selectedUsers.length === 0) {
@@ -433,10 +434,36 @@ app.post('/api/admin/broadcast', authenticateToken, requireAdminOrManager, async
             return res.status(400).json({ error: 'No valid emails found for selected users. Please sync platform data and try again.' });
         }
 
-        const n8nWebhookUrl = process.env.N8N_EMAIL1_WEBHOOK_URL;
+        const n8nWebhookUrl = process.env.N8N_EMAIL_WEBHOOK_URL;
+
+        // Always create in-app notifications regardless of n8n config
+        try {
+            await Promise.all(
+                Object.keys(userMap).map(uid =>
+                    Notification.create({
+                        user_id: new mongoose.Types.ObjectId(uid),
+                        type: eventType || category || 'broadcast',
+                        title: notifTitle,
+                        message: message,
+                        data: { eventType, eventName, eventDetails, subject, category },
+                        is_read: false
+                    })
+                )
+            );
+            console.log(`[AI Hub Broadcast] ✅ In-app notifications created for ${Object.keys(userMap).length} users`);
+        } catch (notifErr) {
+            console.warn('[AI Hub Broadcast] In-app notification creation partially failed:', notifErr.message);
+        }
+
         if (!n8nWebhookUrl) {
-            console.error('[AI Hub Broadcast] No n8n webhook URL configured. Set N8N_EMAIL1_WEBHOOK_URL in .env');
-            return res.status(500).json({ error: 'Mail webhook not configured. Contact administrator.' });
+            console.warn('[AI Hub Broadcast] N8N_EMAIL_WEBHOOK_URL not configured — in-app only.');
+            return res.json({
+                success: true,
+                message: `In-app notification sent to ${Object.keys(userMap).length} recipient(s). Email skipped (configure N8N_EMAIL_WEBHOOK_URL in .env to enable email).`,
+                succeeded: Object.keys(userMap).length,
+                failed: 0,
+                emailSkipped: true
+            });
         }
 
         console.log('[AI Hub Broadcast] Sending to n8n webhook:', n8nWebhookUrl);
@@ -458,6 +485,9 @@ app.post('/api/admin/broadcast', authenticateToken, requireAdminOrManager, async
                     content: message,             // n8n field alias
                     body: message,               // n8n field alias
                     category,
+                    eventType: eventType || category,
+                    eventName,
+                    eventDetails,
                     broadcast_type: type,
                     sent_at: new Date().toISOString(),
                     triggered_by: req.user?.id || 'admin'
@@ -1117,10 +1147,20 @@ app.post('/api/public/enroll', async (req, res) => {
 });
 
 app.post('/api/auth/signup', async (req, res) => {
-    const { email, password, fullName, phone, courseType, collegeName, instituteName, city, district, country, fullAddress, latitude, longitude } = req.body;
+    const { email, password, fullName, phone, courseType, collegeName, rollNumber, year, city, district, country, fullAddress, latitude, longitude } = req.body;
     try {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'User already exists' });
+
+        // Uniqueness checks for mobile and roll number
+        if (phone) {
+            const existingPhone = await Profile.findOne({ mobile_number: phone });
+            if (existingPhone) return res.status(400).json({ error: 'This mobile number is already registered with another account' });
+        }
+        if (rollNumber) {
+            const existingRoll = await Profile.findOne({ roll_number: rollNumber });
+            if (existingRoll) return res.status(400).json({ error: 'This roll number is already registered with another account' });
+        }
 
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
@@ -1131,9 +1171,12 @@ app.post('/api/auth/signup', async (req, res) => {
         const registrationDate = now.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
         const registrationTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-        // Determine role based on courseType
-        // internship → 'intern', everything else → 'student'
-        const assignedRole = courseType === 'internship' ? 'intern' : 'student';
+        // Determine role based on courseType/role parameter
+        const assignedRole = ['admin', 'manager', 'instructor', 'student', 'intern'].includes(courseType)
+            ? courseType
+            : (courseType === 'internship' ? 'intern' : 'student');
+
+        const profileCourseType = assignedRole === 'intern' ? 'internship' : 'full_time';
 
         // Create User
         const user = await User.create({
@@ -1153,9 +1196,10 @@ app.post('/api/auth/signup', async (req, res) => {
             full_name: fullName,
             avatar_url: avatarUrl,
             mobile_number: phone,
-            college_name: collegeName,
-            institute_name: instituteName,
-            course_type: courseType || 'full_time',
+            department: collegeName,
+            roll_number: rollNumber,
+            year: year || '',
+            course_type: profileCourseType,
             registration_date: registrationDate,
             registration_time: registrationTime,
             city,
@@ -1167,7 +1211,7 @@ app.post('/api/auth/signup', async (req, res) => {
             approval_status: 'pending'
         });
 
-        // Create Role based on courseType
+        // Create Role
         await UserRole.create({
             user_id: user._id,
             role: assignedRole
@@ -2302,8 +2346,9 @@ app.get('/api/admin/users', authenticateToken, requireAdminOrManager, async (req
                 full_address: profile.full_address || null,
                 latitude: profile.latitude || null,
                 longitude: profile.longitude || null,
-                college_name: profile.college_name || null,
-                institute_name: profile.institute_name || null,
+                department: profile.department || null,
+                roll_number: profile.roll_number || null,
+                year: profile.year || null,
                 course_type: profile.course_type || 'full_time',
             };
         });
@@ -2677,7 +2722,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
             await profile.save();
         }
 
-        console.log("==> GET PROFILE DATA SERVING:", profile ? profile.github_url : 'NO PROFILE DOC');
+        console.log("==> GET PROFILE DATA SERVING:", profile ? 'OK - ' + profile.full_name : 'NO PROFILE DOC');
 
         res.json({
             profile,
@@ -3427,6 +3472,10 @@ app.post('/api/instructor/choose-course', authenticateToken, requireInstructor, 
 app.get('/api/instructor/courses', authenticateToken, requireInstructor, async (req, res) => {
     try {
         const { all } = req.query;
+        const role = await getUserRole(req.user.id);
+        const isAdmin = role === 'admin' || role === 'manager';
+        const isCatalogue = all === 'true';
+
         let query = {
             $or: [
                 { instructor_id: req.user.id },
@@ -3434,26 +3483,37 @@ app.get('/api/instructor/courses', authenticateToken, requireInstructor, async (
             ]
         };
 
-        if (all === 'true' || req.user.role === 'admin' || req.user.role === 'manager') {
-            query = {};
+        // Catalogue mode: admins/managers see all, instructors see all published/approved
+        if (isCatalogue || isAdmin) {
+            query = isCatalogue && !isAdmin
+                ? { status: { $in: ['approved', 'published'] }, is_active: { $ne: false } }
+                : {};
         }
 
-        const courses = await Course.find(query).sort({ updated_at: -1 }).lean();
-        const courseIds = courses.map(c => c._id);
+        const allCourses = await Course.find(query).sort({ updated_at: -1 }).lean();
+        const allCourseIds = allCourses.map(c => c._id);
 
-        // Fetch ALL batches to see locks
+        // Fetch ALL batches for lock display
         const allBatches = await Batch.find({
-            course_id: { $in: courseIds },
+            course_id: { $in: allCourseIds },
             status: { $in: ['pending', 'approved'] }
         }).select('course_id batch_type').lean();
 
-        // Fetch SPECIFIC batches for this instructor to see THEIR assignment
+        // Fetch SPECIFIC batches for this instructor
         const myBatches = await Batch.find({
-            course_id: { $in: courseIds },
+            course_id: { $in: allCourseIds },
             instructor_id: req.user.id
         }).lean();
 
-        // Map data
+        // My Courses mode (default): only show courses where THIS instructor's batch is approved
+        // Catalogue & admin modes: show all courses (no batch filter)
+        const courses = (!isCatalogue && role === 'instructor')
+            ? allCourses.filter(course => {
+                const myMatch = myBatches.find(b => b.course_id.toString() === course._id.toString());
+                return myMatch && myMatch.status === 'approved';
+            })
+            : allCourses;
+
         const data = courses.map(course => {
             const courseIdStr = course._id.toString();
             const locks = allBatches.filter(b => b.course_id.toString() === courseIdStr);
@@ -3465,7 +3525,7 @@ app.get('/api/instructor/courses', authenticateToken, requireInstructor, async (
                 ...course,
                 id: course._id,
                 occupied_sessions: occupiedSessions,
-                assigned_session: myMatch?.batch_type, // 'morning', 'afternoon', etc.
+                assigned_session: myMatch?.batch_type,
                 is_approved: myMatch?.status === 'approved'
             };
         });
@@ -5122,14 +5182,15 @@ app.get('/api/admin/question-bank/:topic/access-list', authenticateToken, requir
 
         // 4. Enrich with Profile data
         const studentIds = Array.from(studentMap.keys());
-        const profiles = await Profile.find({ user_id: { $in: studentIds } }).select('user_id college_name institute_name registration_date registration_time').lean();
+        const profiles = await Profile.find({ user_id: { $in: studentIds } }).select('user_id department roll_number year registration_date registration_time').lean();
 
         profiles.forEach(p => {
             const sid = p.user_id.toString();
             if (studentMap.has(sid)) {
                 const student = studentMap.get(sid);
-                student.college_name = p.college_name;
-                student.institute_name = p.institute_name;
+                student.department = p.department;
+                student.roll_number = p.roll_number;
+                student.year = p.year;
                 student.reg_date = p.registration_date;
                 student.reg_time = p.registration_time;
             }
@@ -5996,21 +6057,21 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
     }
 });
 
-app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
-    try {
-        await Notification.findOneAndUpdate({ _id: req.params.id, user_id: req.user.id }, { is_read: true });
-        res.json({ success: true });
-    } catch (err) {
-        handleError(res, err, 'mark-individual-notification-read');
-    }
-});
-
 app.post('/api/notifications/mark-all-read', authenticateToken, async (req, res) => {
     try {
         await Notification.updateMany({ user_id: req.user.id, is_read: false }, { is_read: true });
         res.json({ success: true });
     } catch (err) {
         handleError(res, err, 'mark-all-read');
+    }
+});
+
+app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+    try {
+        await Notification.findOneAndUpdate({ _id: req.params.id, user_id: req.user.id }, { is_read: true });
+        res.json({ success: true });
+    } catch (err) {
+        handleError(res, err, 'mark-individual-notification-read');
     }
 });
 
@@ -6055,8 +6116,8 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
                     created_at: 1,
                     // Do NOT hardcode role — look it up dynamically below
                     mobile_number: '$profile.mobile_number',
-                    college_name: '$profile.college_name',
-                    institute_name: '$profile.institute_name',
+                    department: '$profile.department',
+                    roll_number: '$profile.roll_number',
                     course_type: { $ifNull: ['$profile.course_type', 'full_time'] },
                     full_address: '$profile.full_address',
                     city: '$profile.city',
@@ -6073,10 +6134,23 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
             { $sort: { created_at: -1 } }
         ]);
 
-        // Attach correct role from roleMap
+        // Attach correct role from roleMap + enrolled course departments
+        const allEnrollments = await Enrollment.find({
+            user_id: { $in: studentIds },
+            status: { $in: ['active', 'pending', 'completed'] }
+        }).populate('course_id', 'title slug').lean();
+
+        const enrollmentMap = {};
+        for (const e of allEnrollments) {
+            const uid = e.user_id.toString();
+            if (!enrollmentMap[uid]) enrollmentMap[uid] = [];
+            if (e.course_id) enrollmentMap[uid].push(e.course_id);
+        }
+
         const result = students.map(s => ({
             ...s,
             role: roleMap[s.user_id.toString()] || (s.course_type === 'internship' ? 'intern' : 'student'),
+            enrolled_courses: enrollmentMap[s.user_id.toString()] || [],
         }));
 
         res.json(result);
@@ -6154,8 +6228,8 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
             }
         }
 
-        // Student-specific scoping logic - only apply to students
-        if (role?.toLowerCase() === 'student') {
+        // Student-specific scoping logic - apply to students and interns
+        if (role?.toLowerCase() === 'student' || role?.toLowerCase() === 'intern') {
             const studentScopedTables = {
                 'exam_results': 'student_id',
                 'resumescans': 'user_id',
@@ -6373,13 +6447,17 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
             }
 
             if (table === 'course_enrollments') {
-                // Find all student IDs in this instructor's batches
-                const myBatches = await Batch.find({ instructor_id: req.user.id }).select('_id').lean();
-                const myBatchIds = myBatches.map(b => b._id);
-                const myStudentAssignments = await StudentBatch.find({ batch_id: { $in: myBatchIds } }).select('student_id').lean();
-                const myStudentIds = myStudentAssignments.map(a => a.student_id);
+                // Scope enrollments to courses this instructor is approved for
+                const myApprovedBatches = await Batch.find({
+                    instructor_id: req.user.id,
+                    status: 'approved'
+                }).select('course_id').lean();
+                const myCourseIds = myApprovedBatches.map(b => b.course_id);
 
-                const enrollmentFilter = { user_id: { $in: myStudentIds } };
+                const enrollmentFilter = {
+                    course_id: { $in: myCourseIds },
+                    status: { $in: ['active', 'pending', 'completed'] }
+                };
                 if (Object.keys(query).length > 0) {
                     query = { $and: [query, enrollmentFilter] };
                 } else {
@@ -6421,7 +6499,40 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
 
         let data;
         if (table === 'leaderboard_stats' || table === 'leaderboard') {
-            data = await dataQuery.populate('user_id', 'full_name avatar_url email');
+            const entries = await dataQuery.populate('user_id', 'full_name avatar_url email').lean();
+
+            // Enrich with actual exam stats from ExamResult
+            const userIds = entries.map(e => e.user_id?._id || e.user_id).filter(Boolean);
+            const examResults = await ExamResult.find({ student_id: { $in: userIds } })
+                .select('student_id score percentage').lean();
+
+            const examStatsMap = {};
+            for (const r of examResults) {
+                const uid = r.student_id.toString();
+                if (!examStatsMap[uid]) examStatsMap[uid] = { count: 0, totalPct: 0 };
+                examStatsMap[uid].count++;
+                examStatsMap[uid].totalPct += (r.percentage || 0);
+            }
+
+            // Enrich with profile data (roll_number, year, department)
+            const profiles = await Profile.find({ user_id: { $in: userIds } })
+                .select('user_id roll_number year department').lean();
+            const profileMap = {};
+            profiles.forEach(p => { profileMap[p.user_id.toString()] = p; });
+
+            data = entries.map(e => {
+                const uid = (e.user_id?._id || e.user_id)?.toString();
+                const stats = examStatsMap[uid] || { count: 0, totalPct: 0 };
+                const prof = profileMap[uid] || {};
+                return {
+                    ...e,
+                    exams_completed: stats.count,
+                    average_percentage: stats.count > 0 ? Math.round(stats.totalPct / stats.count) : 0,
+                    roll_number: prof.roll_number || null,
+                    year: prof.year || null,
+                    department: prof.department || null,
+                };
+            });
         } else if (table === 'exam_results') {
             data = await dataQuery
                 .populate('exam_id', 'title')
@@ -6430,9 +6541,21 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
             data = await dataQuery
                 .populate('instructor_ids', 'full_name avatar_url');
         } else if (table === 'course_enrollments') {
-            data = await dataQuery
+            const rawData = await dataQuery
                 .populate('user_id', 'full_name email avatar_url phone')
-                .populate('course_id', 'title category thumbnail_url');
+                .populate('course_id', 'title category thumbnail_url')
+                .lean();
+            // Enrich with profile (roll_number, year, department)
+            const uids = rawData.map(e => e.user_id?._id || e.user_id).filter(Boolean);
+            const profList = await Profile.find({ user_id: { $in: uids } })
+                .select('user_id roll_number year department').lean();
+            const profMap = {};
+            profList.forEach(p => { profMap[p.user_id.toString()] = p; });
+            data = rawData.map(e => {
+                const uid = (e.user_id?._id || e.user_id)?.toString();
+                const prof = profMap[uid] || {};
+                return { ...e, roll_number: prof.roll_number || null, year: prof.year || null, department: prof.department || null };
+            });
         } else if (table === 'course_ratings') {
             data = await dataQuery
                 .populate('user_id', 'full_name avatar_url');
@@ -6474,14 +6597,15 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
                 }
                 if (table === 'exams') req.body.status = 'scheduled';
             } else if (table === 'courses') {
-                if (role !== 'instructor') return res.status(403).json({ error: 'Only instructors can create courses' });
+                if (!['instructor', 'admin', 'manager'].includes(role)) return res.status(403).json({ error: 'Only instructors can create courses' });
                 req.body.instructor_id = req.user.id;
+                if (!req.body.instructor_ids) req.body.instructor_ids = [req.user.id];
                 req.body.status = 'draft'; // Forces draft state
             } else if ([
                 'course_topics', 'course_modules', 'course_videos',
                 'course_resources', 'course_timeline', 'course_announcements', 'live_classes'
             ].includes(table)) {
-                if (role !== 'instructor') return res.status(403).json({ error: 'Unauthorized to create course content' });
+                if (!['instructor', 'admin', 'manager'].includes(role)) return res.status(403).json({ error: 'Unauthorized to create course content' });
 
                 // Set ownership
                 req.body.instructor_id = req.user.id;
@@ -7192,9 +7316,10 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
         // Convert courseId to ObjectId for proper MongoDB query
         const courseId = new mongoose.Types.ObjectId(req.params.courseId);
 
-        // Get all course enrollments (students) regardless of status
+        // Get all course enrollments (active + pending + completed) — exclude only dropped/rejected
         const enrollments = await Enrollment.find({
-            course_id: courseId
+            course_id: courseId,
+            status: { $in: ['active', 'pending', 'completed'] }
         }).lean();
 
         const studentIds = enrollments.map(e => e.user_id).filter(id => id);
@@ -7244,6 +7369,11 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
             return acc;
         }, {});
 
+        const enrollmentStatusMap = enrollments.reduce((acc, e) => {
+            if (e.user_id) acc[e.user_id.toString()] = e.status;
+            return acc;
+        }, {});
+
         const rosterData = enrollments.map(e => {
             const uid = e.user_id ? e.user_id.toString() : null;
             if (!uid) return null;
@@ -7262,6 +7392,7 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
                 email: profile?.email || user?.email || 'No email',
                 avatar_url: profile?.avatar_url || user?.avatar_url || null,
                 role: role,
+                enrollment_status: enrollmentStatusMap[uid] || 'pending',
                 batch: (assigned && assigned.batch) ? {
                     id: assigned.batch._id.toString(),
                     name: assigned.batch.batch_name || 'Legacy Batch',

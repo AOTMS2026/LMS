@@ -191,7 +191,7 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                         }}
                                         disabled={enrollMutation.isPending || isPending}
                                     >
-                                        {enrollMutation.isPending ? "Setting up..." : isPending ? "Waiting for Approval" : "Purchase Course"}
+                                        {enrollMutation.isPending ? "Setting up..." : isPending ? "Waiting for Approval" : "Enroll Now"}
                                     </Button>
 
                                     {/* Payment Modal inside Viewer */}
@@ -220,7 +220,7 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                                 Review Your <span className="text-primary italic">Enrollment</span>
                                                             </h2>
                                                             <p className="text-slate-400 text-sm leading-relaxed">
-                                                                You're one step away from mastering new skills. Complete the secure payment below to unlock full course access.
+                                                                You're one step away from mastering new skills. Complete your free enrollment below to unlock full course access.
                                                             </p>
                                                         </div>
 
@@ -243,18 +243,12 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                                     </div>
                                                                 </div>
                                                             </div>
-                                                                <div className="pt-4 border-t border-white/10 flex items-center justify-between">
-                                                                    <span className="text-sm font-medium text-slate-400">Course Value</span>
-                                                                    <span className="text-sm line-through text-slate-500">
-                                                                        {course.original_price ? `₹${course.original_price.toLocaleString('en-IN')}` : "₹00,000"}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-sm font-medium text-slate-400">Total Investment</span>
-                                                                    <span className="text-2xl font-black text-white">
-                                                                        {course.price === 0 ? "Free Access" : (course.price ? `₹${course.price.toLocaleString('en-IN')}` : "Contact Us")}
-                                                                    </span>
-                                                                </div>
+                                                            <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                                                                <span className="text-sm font-medium text-slate-400">Investment Fee</span>
+                                                                <span className="text-2xl font-black text-white">
+                                                                    Free of Cost
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
 
@@ -264,12 +258,12 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                                 <CheckCircle2 className="h-6 w-6 text-primary" />
                                                             </div>
                                                             <div>
-                                                                <div className="text-xs font-black uppercase tracking-widest text-white/40 mb-0.5">Payment Verified</div>
-                                                                <div className="text-sm font-bold text-white">Manual Admin Approval</div>
+                                                                <div className="text-xs font-black uppercase tracking-widest text-white/40 mb-0.5">Enrollment Status</div>
+                                                                <div className="text-sm font-bold text-white">Direct Free Access</div>
                                                             </div>
                                                         </div>
                                                         <p className="text-[10px] text-slate-500 leading-relaxed font-medium uppercase tracking-[0.1em]">
-                                                            Secure transactions protected by standard SSL protocols and human verification systems.
+                                                            Education is the key to opportunity. Get started with no financial barrier.
                                                         </p>
                                                     </div>
                                                 </div>
@@ -278,8 +272,8 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                 <div className="flex-1 p-8 md:p-12 space-y-8 bg-white selection:bg-slate-100">
                                                     <div className="flex justify-between items-start">
                                                         <div className="space-y-1 flex-1">
-                                                            <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Payment Details</h3>
-                                                            <p className="text-slate-500 text-sm font-medium">Scan the QR code below or use the payment credentials.</p>
+                                                            <h3 className="text-2xl font-black text-slate-900 tracking-tight uppercase">Confirm Enrollment</h3>
+                                                            <p className="text-slate-500 text-sm font-medium">Verify your free registration to proceed.</p>
                                                         </div>
                                                         <div className="flex items-center gap-2">
                                                             <Button 
@@ -293,103 +287,12 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                         </div>
                                                     </div>
 
-                                                    {/* QR Section */}
-                                                    <div className="relative group max-w-[280px] mx-auto">
-                                                        <div className="absolute -inset-4 bg-primary/5 rounded-[2rem] blur-2xl opacity-0 group-hover:opacity-100 transition duration-500"></div>
-                                                        <div className="relative bg-slate-50 border-2 border-slate-100 rounded-[2.5rem] p-6 shadow-sm overflow-hidden flex flex-col items-center">
-                                                            <div className="mb-4 text-center">
-                                                                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Secure UPI Gateway</div>
-                                                                <div className="flex items-center justify-center gap-2 px-3 py-1 bg-white rounded-full border border-slate-200">
-                                                                    <QrCode className="h-3 w-3 text-primary" />
-                                                                    <span className="text-[10px] font-bold text-slate-600">Scan to Pay</span>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div className="relative h-44 w-44 bg-white rounded-2xl p-2 shadow-inner border border-slate-200/50 flex items-center justify-center group-hover:scale-[1.02] transition-transform">
-                                                                {/* The QR Image */}
-                                                                <img 
-                                                                    src="/scanner.jpeg" 
-                                                                    alt="Payment QR Code" 
-                                                                    className="w-full h-full object-contain"
-                                                                    onError={(e) => {
-                                                                        const target = e.target as HTMLImageElement;
-                                                                        target.src = "https://placehold.co/400x400?text=QR+CODE+HERE";
-                                                                    }}
-                                                                />
-                                                            </div>
-
-                                                            <div className="mt-6 w-full space-y-3">
-                                                                <div className="p-3 bg-white rounded-xl border border-dashed border-slate-300 flex items-center justify-between group/code cursor-pointer hover:border-primary transition-colors">
-                                                                    <span className="text-[10px] font-mono font-bold text-slate-500 truncate max-w-[140px]">vyapar.17432781471@hdfcbank</span>
-                                                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-primary">
-                                                                        <CheckCircle2 className="h-3 w-3" />
-                                                                    </Button>
-                                                                </div>
-                                                                <div className="flex items-center justify-center gap-6 saturate-0 opacity-50">
-                                                                    <Phone className="h-4 w-4" />
-                                                                    <span className="text-xs font-bold">+91 80199 42233</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Upload Section */}
-                                                    <div className="space-y-4">
-                                                        <div className="flex items-center justify-between">
-                                                            <label className="text-xs font-black uppercase tracking-widest text-slate-400">Confirmation Proof <span className="text-primary">*</span></label>
-                                                            {paymentProof && (
-                                                                <span className="text-[10px] font-bold text-primary flex items-center gap-1">
-                                                                    <CheckCircle2 className="h-3 w-3" /> File Selected
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div 
-                                                            className={`relative border-2 border-dashed rounded-2xl p-6 transition-all cursor-pointer group flex flex-col items-center justify-center space-y-3 ${paymentProof ? 'border-primary bg-primary/5' : 'border-slate-200 hover:border-primary hover:bg-slate-50'}`}
-                                                            onClick={() => document.getElementById('viewer-payment-proof')?.click()}
-                                                        >
-                                                            <div className="h-10 w-10 rounded-full bg-white shadow-sm flex items-center justify-center border border-slate-100 group-hover:scale-110 transition-transform">
-                                                                <Upload className={`h-5 w-5 ${paymentProof ? 'text-primary' : 'text-slate-400'}`} />
-                                                            </div>
-                                                            <div className="text-center">
-                                                                <p className="text-xs font-bold text-slate-900">{paymentProof ? paymentProof.name : 'Upload Payment Screenshot'}</p>
-                                                                <p className="text-[10px] text-slate-500 mt-1 font-medium">JPEG, PNG only (Max 5MB)</p>
-                                                            </div>
-                                                            <input 
-                                                                id="viewer-payment-proof" 
-                                                                type="file" 
-                                                                className="hidden" 
-                                                                accept="image/*"
-                                                                onChange={(e) => setPaymentProof(e.target.files?.[0] || null)}
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {/* UTR Number Section */}
-                                                    <div className="space-y-4">
-                                                        <div className="flex items-center justify-between">
-                                                            <label className="text-xs font-black uppercase tracking-widest text-slate-400">Transaction ID (UTR) <span className="text-primary">*</span></label>
-                                                        </div>
-                                                        <div className="relative group">
-                                                            <input 
-                                                                placeholder="Enter 12-digit UTR Number"
-                                                                value={utrNumber}
-                                                                onChange={(e) => {
-                                                                    const val = e.target.value.replace(/\D/g, '').slice(0, 12);
-                                                                    setUtrNumber(val);
-                                                                }}
-                                                                className="w-full h-14 rounded-2xl border-2 border-slate-100 bg-slate-50 px-6 font-bold text-slate-900 focus:border-primary focus:outline-none focus:bg-white transition-all shadow-sm"
-                                                            />
-                                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg bg-white/50 border border-slate-200 flex items-center justify-center pointer-events-none">
-                                                                <Hash className="h-4 w-4 text-slate-400" />
-                                                            </div>
-                                                        </div>
-                                                        <p className="text-[10px] text-slate-400 font-medium px-1">
-                                                            Please double-check your UTR number from your payment receipt.
-                                                        </p>
-                                                    </div>
+                                                    <p className="text-sm text-slate-600 font-medium">
+                                                        You are about to register for "<strong>{course.title}</strong>". No fees or payments are required.
+                                                    </p>
 
                                                     {/* Action Buttons */}
-                                                    <div className="grid grid-cols-2 gap-4 pt-4">
+                                                    <div className="grid grid-cols-2 gap-4 pt-12">
                                                         <Button
                                                             variant="ghost"
                                                             size="lg"
@@ -404,25 +307,17 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                         <Button
                                                             size="lg"
                                                             className="h-14 rounded-2xl font-black uppercase tracking-widest text-sm shadow-[0_10px_20px_rgba(var(--primary-rgb),0.2)] active:scale-95 transition-all"
-                                                            disabled={isUploading || !paymentProof || utrNumber.length !== 12}
+                                                            disabled={isUploading}
                                                             onClick={async () => {
                                                                 setIsUploading(true);
                                                                 try {
-                                                                    let paymentProofUrl = null;
-                                                                    if (paymentProof) {
-                                                                        const formData = new FormData();
-                                                                        formData.append('file', paymentProof);
-                                                                        const uploadRes = await fetchWithAuth<{ url: string }>('/upload', { method: 'POST', body: formData });
-                                                                        paymentProofUrl = uploadRes?.url;
-                                                                    }
                                                                     await enrollMutation.mutateAsync({ 
                                                                         courseId: course.id, 
-                                                                        payment_proof_url: paymentProofUrl,
-                                                                        utr_number: utrNumber
+                                                                        payment_proof_url: null,
+                                                                        utr_number: ''
                                                                     });
                                                                     toast({ title: "Enrollment Requested", description: "Waiting for admin approval." });
                                                                     setShowPaymentModal(false);
-                                                                    setUtrNumber('');
                                                                     setHasRequestedEnrollment(true);
                                                                 } catch (err) {
                                                                     toast({ title: "Error", description: "Failed to enroll.", variant: "destructive" });
@@ -434,13 +329,13 @@ export function StudentCourseViewer({ course, isEnrolled = true, onBack }: Stude
                                                             {isUploading ? (
                                                                 <Loader2 className="h-5 w-5 animate-spin" />
                                                             ) : (
-                                                                'Enroll Course'
+                                                                'Enroll Now'
                                                             )}
                                                         </Button>
                                                     </div>
 
                                                     <p className="text-center text-[10px] text-slate-400 font-medium">
-                                                        After payment, please upload the screenshot to confirm your order details via manual verification.
+                                                        Once confirmed, the administration will review your free registration and grant you access shortly.
                                                     </p>
                                                 </div>
                                             </div>

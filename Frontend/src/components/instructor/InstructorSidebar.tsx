@@ -37,7 +37,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 
-import logo from "@/assets/logo.png";
+import logo from "@/assets/lanyard/aotms_logo.jpg";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { useInstructorStats } from "@/hooks/useInstructorData";

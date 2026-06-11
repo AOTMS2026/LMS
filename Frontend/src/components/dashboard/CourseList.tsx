@@ -204,48 +204,8 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                                         ) : (
                                             <>
                                                 <div className="flex-1">
-                                                    {((course.remaining_balance || 0) > 0 && course.category === 'approve') || (course.payment_term === 'term2' && course.category === 'remove') || course.enrollmentStatus === 'deactivate' ? (
-                                                        <div className="space-y-4 mb-4">
-                                                            <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-tight">
-                                                                 <span className="text-slate-400">Payment Strategy</span>
-                                                                 <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-full text-[9px]">Term-Based (60/40)</span>
-                                                             </div>
-                                                             <div className="grid grid-cols-2 gap-2">
-                                                                 <div className="p-2.5 rounded-2xl bg-emerald-50/50 border border-emerald-100/50 flex flex-col items-center justify-center text-center transition-all hover:bg-emerald-50">
-                                                                     <span className="text-[7px] font-extrabold uppercase tracking-widest text-emerald-600/70 mb-1">Term 01</span>
-                                                                     <div className="text-[15px] font-black text-emerald-800 leading-none">₹{Math.round((course.price || 0) * 0.6).toLocaleString('en-IN')}</div>
-                                                                     <div className="text-[7px] font-bold text-emerald-600 uppercase mt-2 bg-emerald-100/50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                                                         <CheckCircle className="h-2 w-2" /> Cleared
-                                                                     </div>
-                                                                 </div>
-                                                                 <div 
-                                                                     onClick={(e) => {
-                                                                        if (course.enrollmentStatus === 'active' || course.enrollmentStatus === 'deactivate') {
-                                                                            e.stopPropagation();
-                                                                            window.dispatchEvent(new CustomEvent('open-payment-modal', { detail: { course } }));
-                                                                        }
-                                                                     }}
-                                                                     className={cn(
-                                                                        "p-2.5 rounded-2xl bg-amber-50/50 border border-amber-100/50 flex flex-col items-center justify-center text-center transition-all group/awaited",
-                                                                        (course.enrollmentStatus === 'active' || course.enrollmentStatus === 'deactivate') ? "cursor-pointer hover:bg-amber-100 hover:scale-[1.02] active:scale-95 shadow-sm" : ""
-                                                                     )}
-                                                                 >
-                                                                     <span className="text-[7px] font-extrabold uppercase tracking-widest text-amber-600/70 mb-1">Term 02</span>
-                                                                     <div className="text-[15px] font-black text-amber-800 leading-none">₹{Math.round((course.price || 0) * 0.4).toLocaleString('en-IN')}</div>
-                                                                     <div className="text-[7px] font-bold text-amber-600 uppercase mt-2 bg-amber-100/50 px-2 py-0.5 rounded-full animate-pulse group-hover/awaited:animate-none flex items-center justify-center">
-                                                                         {(course.enrollmentStatus === 'active' || course.enrollmentStatus === 'deactivate') ? "Pay Now" : "Awaited"}
-                                                                     </div>
-                                                                 </div>
-                                                            </div>
-
-                                                        </div>
-
-                                                    ) : (
-                                                        <CourseBatchBadge courseId={course.id} />
-                                                    )}
+                                                    <CourseBatchBadge courseId={course.id} />
                                                 </div>
-
-
                                             </>
                                         )}
                                     </div>
@@ -270,38 +230,25 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                                             <>
                                                 <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100/50">
                                                     <div className="flex flex-col">
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Value</span>
-                                                        <span className="text-sm line-through text-slate-500">₹{course.original_price || "00,000"}</span>
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Fee</span>
+                                                        <span className="text-sm font-bold text-slate-900">Free of Cost</span>
                                                     </div>
                                                     <div className="text-right">
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Full Investment</span>
-                                                        <p className="text-[16px] font-black text-slate-900 leading-none mt-0.5">
-                                                            {course.price === 0 ? "Free Access" : (course.price ? `₹${course.price.toLocaleString('en-IN')}` : "Contact Us")}
+                                                        <span className="text-[10px] font-black uppercase tracking-widest text-primary">Access</span>
+                                                        <p className="text-[16px] font-black text-emerald-600 leading-none mt-0.5">
+                                                            Lifetime Free
                                                         </p>
                                                     </div>
                                                 </div>
                                                 
-                                                {/* Term Breakdown (60/40) */}
-                                                <div className="grid grid-cols-2 gap-2 mt-2">
-                                                     <div className="p-2.5 rounded-2xl bg-blue-50/50 border border-blue-100/50 flex flex-col items-center justify-center text-center transition-all hover:bg-blue-50">
-                                                         <span className="text-[7px] font-extrabold uppercase tracking-widest text-blue-500/70 mb-1">1st Term</span>
-                                                         <div className="text-xs font-black text-blue-700 leading-none">60%</div>
-                                                         <div className="text-sm lg:text-[15px] font-black text-blue-800 mt-1">₹{Math.round((course.price || 0) * 0.6).toLocaleString('en-IN')}</div>
-                                                     </div>
-                                                     <div className="p-2.5 rounded-2xl bg-purple-50/50 border border-purple-100/50 flex flex-col items-center justify-center text-center transition-all hover:bg-purple-50">
-                                                         <span className="text-[7px] font-extrabold uppercase tracking-widest text-purple-500/70 mb-1">2nd Term</span>
-                                                         <div className="text-xs font-black text-purple-700 leading-none">40%</div>
-                                                         <div className="text-sm lg:text-[15px] font-black text-purple-800 mt-1">₹{Math.round((course.price || 0) * 0.4).toLocaleString('en-IN')}</div>
-                                                     </div>
-                                                 </div>
                                                 <Button
-                                                    className="w-full group/btn pro-button-primary"
+                                                    className="w-full group/btn pro-button-primary mt-2"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onSelectCourse?.(course);
                                                     }}
                                                 >
-                                                    Purchase Course
+                                                    Enroll Now
                                                     <ChevronRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
                                                 </Button>
                                             </>

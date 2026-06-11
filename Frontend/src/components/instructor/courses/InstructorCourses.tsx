@@ -64,10 +64,9 @@ interface CourseWithSession extends Course {
 
 export function InstructorCourses({ limit, hideHeader, showAll: initialShowAll, title }: InstructorCoursesProps = {}) {
     const [viewTab, setViewTab] = useState<'my' | 'catalog'>(initialShowAll ? 'catalog' : 'my');
-    
-    // If we're in 'my' tab, we want NOT all courses (only assigned).
-    // If we're in 'catalog' tab, we want ALL courses.
+    const { user } = useAuth();
     const { data: allCourses, isLoading, refetch } = useInstructorS3Courses(viewTab === 'catalog');
+    const { toast } = useToast();
     
     const courses = (limit && Array.isArray(allCourses)) 
         ? (allCourses as Course[]).slice(0, limit) 
@@ -85,7 +84,50 @@ export function InstructorCourses({ limit, hideHeader, showAll: initialShowAll, 
         startTime: '07:00',
         endTime: '09:00'
     });
-    const { toast } = useToast();
+
+    // New Course creation state
+    const [showCreateModal, setShowCreateModal] = useState(false);
+    const [creatingCourse, setCreatingCourse] = useState(false);
+    const [newCourseData, setNewCourseData] = useState({
+        title: '',
+        description: '',
+        category: 'Engineering',
+        level: 'beginner',
+        duration: '4 Months',
+    });
+
+    const handleCreateCourse = async () => {
+        if (!newCourseData.title.trim()) {
+            toast({ title: 'Error', description: 'Course title is required', variant: 'destructive' });
+            return;
+        }
+        setCreatingCourse(true);
+        try {
+            const result = await fetchWithAuth('/data/courses', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ...newCourseData,
+                    instructor_id: user?.id,
+                    instructor_ids: [user?.id],
+                    status: 'draft',
+                    price: 0,
+                    original_price: 19999,
+                    is_active: true,
+                }),
+            }) as Course;
+            toast({ title: 'Course Created', description: `"${newCourseData.title}" created as draft. Awaiting approval.` });
+            setShowCreateModal(false);
+            setNewCourseData({ title: '', description: '', category: 'Engineering', level: 'beginner', duration: '4 Months' });
+            refetch();
+            if (result?.id || (result as unknown as { _id: string })?._id) {
+                setViewingCourse(result);
+            }
+        } catch (err: unknown) {
+            toast({ title: 'Error', description: (err as Error).message || 'Failed to create course', variant: 'destructive' });
+        } finally {
+            setCreatingCourse(false);
+        }
+    };
 
     const handleSubmitForReview = async (courseId: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -122,7 +164,6 @@ export function InstructorCourses({ limit, hideHeader, showAll: initialShowAll, 
     };
 
 
-    const { user } = useAuth();
     const [assigning, setAssigning] = useState<string | null>(null);
 
     const handleAssignToMe = async (courseId: string, e: React.MouseEvent) => {
@@ -172,12 +213,97 @@ export function InstructorCourses({ limit, hideHeader, showAll: initialShowAll, 
                             {viewTab === 'catalog' ? 'Explore and choose curricula to teach.' : 'View your assigned courses.'}
                         </p>
                     </div>
-                    <Button onClick={() => refetch()} variant="outline" size="sm" className="hidden sm:flex gap-2 shrink-0 rounded-xl">
-                        <RefreshCw className="h-4 w-4" />
-                        Sync
-                    </Button>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button onClick={() => setShowCreateModal(true)} size="sm" className="hidden sm:flex gap-2 rounded-xl bg-primary text-white hover:bg-primary/90">
+                            <Plus className="h-4 w-4" />
+                            New Course
+                        </Button>
+                        <Button onClick={() => refetch()} variant="outline" size="sm" className="hidden sm:flex gap-2 shrink-0 rounded-xl">
+                            <RefreshCw className="h-4 w-4" />
+                            Sync
+                        </Button>
+                    </div>
                 </div>
             )}
+
+            {/* Create New Course Modal */}
+            <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
+                <DialogContent className="rounded-[2.5rem] border-none shadow-2xl p-8 max-w-lg bg-white">
+                    <DialogHeader>
+                        <DialogTitle className="text-2xl font-black text-slate-900 tracking-tight">Create New Course</DialogTitle>
+                        <DialogDescription className="text-slate-500 font-medium">Fill in the details to create a new course draft. It will be sent for admin approval.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-5 py-4">
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black text-slate-700 uppercase tracking-widest ml-1">Course Title *</Label>
+                            <Input
+                                placeholder="e.g. Advanced Data Structures"
+                                value={newCourseData.title}
+                                onChange={e => setNewCourseData(p => ({ ...p, title: e.target.value }))}
+                                className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:ring-primary/20"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black text-slate-700 uppercase tracking-widest ml-1">Description</Label>
+                            <textarea
+                                placeholder="Brief description of course content..."
+                                value={newCourseData.description}
+                                onChange={e => setNewCourseData(p => ({ ...p, description: e.target.value }))}
+                                className="w-full h-24 rounded-2xl border border-slate-200 bg-slate-50/50 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black text-slate-700 uppercase tracking-widest ml-1">Category</Label>
+                                <Select value={newCourseData.category} onValueChange={v => setNewCourseData(p => ({ ...p, category: v }))}>
+                                    <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 font-bold text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-2xl">
+                                        <SelectItem value="Engineering" className="font-bold">Engineering</SelectItem>
+                                        <SelectItem value="Coding" className="font-bold">Coding</SelectItem>
+                                        <SelectItem value="Aptitude" className="font-bold">Aptitude</SelectItem>
+                                        <SelectItem value="Reasoning" className="font-bold">Reasoning</SelectItem>
+                                        <SelectItem value="Data Science" className="font-bold">Data Science</SelectItem>
+                                        <SelectItem value="AI & ML" className="font-bold">AI & ML</SelectItem>
+                                        <SelectItem value="Web Development" className="font-bold">Web Development</SelectItem>
+                                        <SelectItem value="Soft Skills" className="font-bold">Soft Skills</SelectItem>
+                                        <SelectItem value="General" className="font-bold">General</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-xs font-black text-slate-700 uppercase tracking-widest ml-1">Level</Label>
+                                <Select value={newCourseData.level} onValueChange={v => setNewCourseData(p => ({ ...p, level: v }))}>
+                                    <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 font-bold text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-2xl">
+                                        <SelectItem value="beginner" className="font-bold">Beginner</SelectItem>
+                                        <SelectItem value="intermediate" className="font-bold">Intermediate</SelectItem>
+                                        <SelectItem value="advanced" className="font-bold">Advanced</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-xs font-black text-slate-700 uppercase tracking-widest ml-1">Duration</Label>
+                            <Input
+                                placeholder="e.g. 4 Months"
+                                value={newCourseData.duration}
+                                onChange={e => setNewCourseData(p => ({ ...p, duration: e.target.value }))}
+                                className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 focus:ring-primary/20"
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowCreateModal(false)} className="rounded-xl h-12">Cancel</Button>
+                        <Button onClick={handleCreateCourse} disabled={creatingCourse} className="rounded-xl h-12 bg-primary text-white gap-2">
+                            {creatingCourse ? <><RefreshCw className="h-4 w-4 animate-spin" /> Creating...</> : <><Plus className="h-4 w-4" /> Create Course</>}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Create Training Batch Modal - Styled exactly like the image */}
             <Dialog open={showEnrollModal} onOpenChange={setShowEnrollModal}>
@@ -294,7 +420,14 @@ export function InstructorCourses({ limit, hideHeader, showAll: initialShowAll, 
             ) : (() => {
                 const filtered = courses?.filter(c => {
                     const isOwner = (c.instructor_ids || []).includes(user?.id || "");
-                    return viewTab === 'my' ? isOwner : !isOwner;
+                    if (viewTab === 'my') {
+                        const isApproved = c.status?.toLowerCase() === 'approved' || 
+                                           c.status?.toLowerCase() === 'published' || 
+                                           c.status?.toLowerCase() === 'active';
+                        return isOwner && isApproved;
+                    } else {
+                        return true;
+                    }
                 });
 
                 if (!filtered || filtered.length === 0) {

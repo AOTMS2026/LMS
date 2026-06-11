@@ -211,45 +211,17 @@ export function AllCoursesList({
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Clock className="h-3.5 w-3.5" />
-                      <span className="text-xs font-semibold">
-                        {course.duration || "3 Months"} • ONLINE / LIVE
-                      </span>
-                    </div>
+                    {course.duration !== "4 Months" && (
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="text-xs font-semibold">
+                          {course.duration || "3 Months"} • ONLINE / LIVE
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* High Visibility Pricing */}
-                  <div className="mt-auto pt-4 border-t border-slate-50">
-                    <div className="flex flex-col gap-1.5 mb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                          Special Rate
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-3xl font-black text-slate-900 tracking-tighter">
-                          ₹
-                          {course.price
-                            ? Number(course.price).toLocaleString("en-IN")
-                            : "0"}
-                        </span>
-                        {course.price && Number(course.price) > 0 && (
-                          <div className="flex flex-col leading-none">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5">
-                              Regular
-                            </span>
-                            <span className="text-sm text-slate-400 line-through font-bold">
-                              ₹
-                              {Math.round(
-                                Number(course.price) * 1.4,
-                              ).toLocaleString("en-IN")}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+
 
                   {/* Active/Deactive Toggle */}
                   <div className="flex items-center gap-4 mt-auto mb-4 p-3 bg-slate-50/50 rounded-2xl border border-slate-100 group-hover:bg-white transition-colors">
@@ -294,85 +266,14 @@ export function AllCoursesList({
                   </div>
                 </div>
 
-                {/* Hover Management Float - Edit Price Only */}
-                <div className="absolute top-6 right-6 flex flex-col gap-2 opacity-0 group-hover:opacity-100 translate-x-4 group-hover:translate-x-0 transition-all duration-300">
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 rounded-full bg-white shadow-lg text-slate-400 hover:text-primary border-none"
-                    onClick={() =>
-                      setEditingPrice({
-                        id: course.id,
-                        title: course.title,
-                        price: String(course.price || "0"),
-                      })
-                    }
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+
               </motion.div>
             );
           })}
         </div>
       )}
 
-      {/* Price Edit Modal */}
-      <Dialog
-        open={!!editingPrice}
-        onOpenChange={(open) => !open && setEditingPrice(null)}
-      >
-        <DialogContent className="sm:max-w-md pro-modal">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-emerald-500" />
-              Edit Course Price
-            </DialogTitle>
-            <DialogDescription>
-              Update the pricing for "{editingPrice?.title}"
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6">
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">
-                  New Price (₹)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">
-                    ₹
-                  </span>
-                  <Input
-                    type="number"
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
-                    className="pl-8 h-12 text-lg font-bold rounded-xl"
-                    placeholder="Enter amount"
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-                  Set to 0 for free courses
-                </p>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setEditingPrice(null)}
-              className="rounded-xl"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handlePriceUpdate}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl px-8 shadow-lg shadow-emerald-200"
-            >
-              Update Price
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
     </div>
   );
 }

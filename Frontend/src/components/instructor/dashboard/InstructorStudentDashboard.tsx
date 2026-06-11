@@ -365,9 +365,10 @@ function StudentCourseDetails({
     batchType?: string;
     batchName?: string;
 }) {
-  const { data: videoProgress } = useStudentVideoProgress(studentId, courseId);
-  const { data: videos } = useVideos(courseId);
+  const { data: videoProgress, isLoading: progressLoading } = useStudentVideoProgress(studentId, courseId);
+  const { data: videos, isLoading: videosLoading } = useVideos(courseId);
   const [expanded, setExpanded] = useState(false);
+  const isLoading = progressLoading || videosLoading;
 
   // Merge video data with progress
   const videoList = useMemo(() => {
@@ -419,7 +420,12 @@ function StudentCourseDetails({
       
       {expanded && (
         <div className="mt-4 space-y-2 pl-2 border-l-2 border-slate-100 ml-2">
-            {videoList.length > 0 ? (
+            {isLoading ? (
+                <div className="flex items-center gap-2 py-2 px-2">
+                    <div className="h-3 w-3 rounded-full bg-primary/30 animate-pulse" />
+                    <p className="text-xs text-slate-400 italic">Loading progress...</p>
+                </div>
+            ) : videoList.length > 0 ? (
                 videoList.map((video) => (
                     <div key={video.id} className="flex items-center gap-3 text-xs py-1">
                         <div className={cn(
@@ -833,7 +839,7 @@ export function InstructorStudentDashboard() {
                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2 mb-4">
                       <BookOpen className="h-3 w-3 text-primary" /> Learning Pathways
                     </h4>
-                    <ScrollArea className="h-[280px] -mx-2 px-2">
+                    <ScrollArea className="max-h-[240px] -mx-2 px-2">
                        <div className="space-y-4 pb-4">
                         {selectedStudent.courseEnrollments.map((course) => (
                           <div key={course.courseId} className="group transition-all">

@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "@/hooks/useNotifications";
+import alietBanner from "@/assets/aliet_banner.png";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,14 +49,15 @@ export function DashboardHeader() {
 
   return (
     <header className="sticky top-0 z-40 flex h-14 sm:h-16 md:h-20 items-center justify-between gap-2 sm:gap-4 glass-panel px-3 sm:px-4 md:px-6 lg:px-10 border-b border-black/5 transition-all duration-300 bg-white/90 backdrop-blur-xl shadow-sm">
-      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
-        <SidebarTrigger className="-ml-2 h-10 w-10 text-primary hover:bg-primary/5 rounded-xl transition-all" />
+      <div className="flex items-center gap-2 sm:gap-4 lg:gap-6 min-w-0 flex-1">
+        <SidebarTrigger className="-ml-2 h-10 w-10 text-primary hover:bg-primary/5 rounded-xl transition-all shrink-0" />
+        <img src={alietBanner} alt="Andhra Loyola Institute of Engineering & Technology" className="h-8 sm:h-10 md:h-14 w-auto object-contain max-w-[120px] sm:max-w-[180px] md:max-w-none shrink-0" />
 
-        <div className="relative hidden md:flex items-center group">
+        <div className="relative hidden md:flex items-center group flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-primary transition-colors duration-300" />
           <Input
             placeholder="Search courses, mentors..."
-            className="pl-12 w-[300px] lg:w-[450px] h-11 bg-slate-50 border-slate-200 focus-visible:ring-primary/20 focus-visible:bg-white focus-visible:border-primary/50 text-sm transition-all rounded-2xl placeholder:text-slate-500 font-medium"
+            className="pl-12 w-full max-w-[300px] lg:max-w-[450px] h-11 bg-slate-50 border-slate-200 focus-visible:ring-primary/20 focus-visible:bg-white focus-visible:border-primary/50 text-sm transition-all rounded-2xl placeholder:text-slate-500 font-medium"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[9px] font-black text-slate-500 uppercase tracking-widest hidden lg:block shadow-sm">
             CTRL K
@@ -63,8 +65,7 @@ export function DashboardHeader() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-4 lg:gap-8">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1 sm:gap-2 lg:gap-4 shrink-0">
           <Button
             variant="outline"
             size="icon"
@@ -166,7 +167,6 @@ export function DashboardHeader() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
       </div>
     </header>
   );

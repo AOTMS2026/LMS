@@ -19,7 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import logo from "@/assets/logo.png";
+import alietBanner from "@/assets/aliet_banner.png";
 
 // Pages with light backgrounds that need dark navbar text
 const lightBgPages = [
@@ -131,18 +131,8 @@ const Header = () => {
     >
       <div className="container-width px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
-            <img
-              src={logo}
-              alt="AOTMS Logo"
-              className={`h-12 sm:h-14 md:h-16 lg:h-20 w-auto transition-all duration-300 ${
-                !isScrolled && !hasLightBg
-                  ? "brightness-0 invert opacity-90"
-                  : ""
-              }`}
-            />
-          </Link>
+          {/* Logo area intentionally empty - branding shown in hero */}
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0 w-8" aria-label="Home" />
  
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center gap-1 xl:gap-2">
@@ -290,7 +280,7 @@ const Header = () => {
                   <SheetHeader className="px-4 py-4 border-b border-border">
                     <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
                     <div className="flex items-center justify-between">
-                      <img src={logo} alt="AOTMS Logo" className="h-12 w-auto" />
+                      <span className="text-xs text-slate-400 font-medium">Navigation</span>
                     </div>
                   </SheetHeader>
 
