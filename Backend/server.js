@@ -17,6 +17,7 @@ const FormData = require('form-data');
 const dns = require('node:dns');
 dns.setServers(['8.8.8.8', '8.8.4.4']);
 
+
 // Cloudinary Config
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dbhuezxh0',
@@ -1006,16 +1007,59 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
         console.log(`[AUTH-OTP] OTP for ${email}: ${otp}`);
 
-        // Trigger n8n webhook (Legacy support)
-        if (process.env.N8N_EMAIL_WEBHOOK_URL) {
-            axios.post(process.env.N8N_EMAIL_WEBHOOK_URL, {
-                event: 'otp_request', email, otp, full_name, timestamp: new Date()
-            }).catch(e => console.error('n8n OTP trigger failed:', e.message));
+        // Send OTP email via n8n Email1 webhook (same pattern as forgot-password)
+        try {
+            const signupOtpUrl = process.env.N8N_EMAIL_WEBHOOK_URL1;
+            if (!signupOtpUrl) throw new Error('N8N_EMAIL_WEBHOOK_URL1 not set in .env');
+            const displayName = full_name || 'User';
+            await fetch(signupOtpUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email.toLowerCase().trim(),
+                    otp,
+                    name: displayName,
+                    type: 'signup_otp',
+                    subject: 'Your AOTMS LMS Verification Code',
+                    message: `Hi ${displayName},\n\nYour AOTMS LMS verification code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.\n\nRegards,\nAOTMS LMS Team`
+                })
+            });
+            console.log(`[AUTH-OTP] n8n Email1 called for ${email}`);
+        } catch (n8nErr) {
+            console.error(`[AUTH-OTP] n8n Email1 failed for ${email}:`, n8nErr.message);
         }
 
         res.json({ message: 'OTP sent successfully' });
     } catch (err) {
         handleError(res, err, 'send-otp');
+    }
+});
+
+// TEST ENDPOINT: hit /api/auth/test-otp-webhook to verify n8n Email1 fires correctly
+app.get('/api/auth/test-otp-webhook', async (req, res) => {
+    const testEmail = req.query.email || 'test@gmail.com';
+    const testOtp = '999999';
+    const testName = 'Test User';
+    const signupOtpUrl = process.env.N8N_EMAIL_WEBHOOK_URL1;
+    if (!signupOtpUrl) return res.status(500).json({ error: 'N8N_EMAIL_WEBHOOK_URL1 not set' });
+    try {
+        const resp = await fetch(signupOtpUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                email: testEmail,
+                otp: testOtp,
+                name: testName,
+                subject: 'TEST: AOTMS OTP Verification',
+                message: `Hi ${testName}, your test OTP is: ${testOtp}`
+            })
+        });
+        const body = await resp.text();
+        console.log(`[TEST-OTP] n8n responded HTTP ${resp.status}:`, body);
+        res.json({ status: resp.status, n8nResponse: body, url: signupOtpUrl, sentTo: testEmail });
+    } catch (err) {
+        console.error('[TEST-OTP] Error:', err.message);
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -1035,10 +1079,26 @@ app.post('/api/auth/resend-otp', async (req, res) => {
         );
         console.log(`[AUTH-OTP] Resent OTP for ${email}: ${otp}`);
 
-        if (process.env.N8N_EMAIL_WEBHOOK_URL) {
-            axios.post(process.env.N8N_EMAIL_WEBHOOK_URL, {
-                event: 'otp_request', email, otp, full_name, timestamp: new Date()
-            }).catch(e => console.error('n8n OTP trigger failed:', e.message));
+        // Resend OTP email via n8n Email1 webhook (same pattern as forgot-password)
+        try {
+            const signupOtpUrl = process.env.N8N_EMAIL_WEBHOOK_URL1;
+            if (!signupOtpUrl) throw new Error('N8N_EMAIL_WEBHOOK_URL1 not set in .env');
+            const displayNameResend = full_name || 'User';
+            await fetch(signupOtpUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    email: email.toLowerCase().trim(),
+                    otp,
+                    name: displayNameResend,
+                    type: 'signup_otp',
+                    subject: 'Your AOTMS LMS Verification Code',
+                    message: `Hi ${displayNameResend},\n\nYour AOTMS LMS verification code is: ${otp}\n\nThis code expires in 10 minutes. Do not share it with anyone.\n\nRegards,\nAOTMS LMS Team`
+                })
+            });
+            console.log(`[AUTH-OTP] n8n Email1 resend called for ${email}`);
+        } catch (n8nErr) {
+            console.error(`[AUTH-OTP] n8n Email1 resend failed for ${email}:`, n8nErr.message);
         }
 
         res.json({ message: 'OTP resent successfully' });
@@ -6975,12 +7035,20 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                 const uid = (e.user_id?._id || e.user_id)?.toString();
                 const stats = examStatsMap[uid] || { count: 0, totalPct: 0 };
                 const prof = profileMap[uid] || {};
+                // lean() bypasses toJSON virtuals so _id is not mapped to id automatically
+                const docId = e._id?.toString();
+                const userObj = typeof e.user_id === 'object' && e.user_id !== null
+                    ? { ...e.user_id, id: e.user_id._id?.toString() }
+                    : e.user_id;
                 return {
                     ...e,
+                    id: docId,                    // ensure id is always present
+                    _id: docId,
+                    user_id: userObj,
                     exams_completed: stats.count,
                     average_percentage: stats.count > 0 ? Math.round(stats.totalPct / stats.count) : 0,
                     roll_number: prof.roll_number || null,
-                    year: prof.year || null,
+                    year: prof.year ? prof.year.toString() : null,
                     department: prof.department || null,
                 };
             });

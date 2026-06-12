@@ -202,7 +202,7 @@ export function GrantStudentAccess({ profiles: propProfiles = [], enrollments: p
             <CardDescription className="max-w-md">
               {showPendingOnly
                 ? 'Students who have requested course access. Review and approve or reject their enrollment requests.'
-                : 'Assign an <strong>Internship</strong> or <strong>Full-Time</strong> course to students based on the programme they registered for.'}
+                : <>Assign an <strong>Internship</strong> or <strong>Full-Time</strong> course to students based on the programme they registered for.</>}
             </CardDescription>
           </div>
 

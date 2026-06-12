@@ -20,11 +20,15 @@ const SecurityEventSchema = new Schema({
 SecurityEventSchema.set('toJSON', { virtuals: true, versionKey: false, transform: (doc, ret) => { ret.id = ret._id; delete ret._id; } });
 
 const LeaderboardStatSchema = new Schema({
-    user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
-    total_score: { type: Number, default: 0, index: true },
-    rank: { type: Number },
-    badges: [String],
-    updated_at: { type: Date, default: Date.now, index: true }
+    user_id:      { type: Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+    total_score:  { type: Number, default: 0, index: true },
+    rank:         { type: Number },
+    badges:       [String],
+    exams_taken:  { type: Number, default: 0 },
+    is_verified:  { type: Boolean, default: false },
+    verified_by:  { type: Schema.Types.ObjectId, ref: 'User', default: null },
+    verified_at:  { type: Date, default: null },
+    updated_at:   { type: Date, default: Date.now, index: true }
 });
 LeaderboardStatSchema.set('toJSON', { virtuals: true, versionKey: false, transform: (doc, ret) => { ret.id = ret._id; delete ret._id; } });
 
