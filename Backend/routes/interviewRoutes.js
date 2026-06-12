@@ -350,6 +350,7 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                 mobile_number,
                 username: username.trim(),
                 password_hash,
+                initial_password: password, // stored for instructor reference
                 created_by: req.user.id,
                 assigned_exam_id: assigned_exam_id || null,
                 exam_schedule: finalSchedule,
@@ -402,6 +403,7 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                 .select('-password_hash')
                 .sort({ created_at: -1 })
                 .lean();
+            // initial_password is stored in plain text for instructor reference
 
             // Enrich with exam title
             const examIds = [...new Set(candidates.map(c => c.assigned_exam_id).filter(Boolean))];
@@ -521,7 +523,7 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
     });
 
     // DELETE /api/interview/exams/:id
-    router.delete('/exams/:id', authenticateToken, requireAdminOrManager, async (req, res) => {
+    router.delete('/exams/:id', authenticateToken, requireInstructor, async (req, res) => {
         try {
             await InterviewExamSchedule.findByIdAndDelete(req.params.id);
             await InterviewQuestion.deleteMany({ exam_id: req.params.id });

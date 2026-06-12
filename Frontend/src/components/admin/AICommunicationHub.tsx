@@ -49,11 +49,30 @@ interface EventTemplate {
   description: string;
   fromDate: string;
   toDate: string;
-  time: string;
+  startTime: string;
+  endTime: string;
+  payment: string;
 }
 
 const DEPARTMENTS = ["CSE", "ECE", "EEE", "DS", "AI/ML", "IT"];
 const YEARS = ["1", "2", "3", "4"];
+
+// Helper: format date as DD/MM/YYYY (Indian format)
+function formatIndianDate(dateStr: string): string {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-");
+  return `${d}/${m}/${y}`;
+}
+
+// Helper: convert 24h time to 12h AM/PM
+function formatTime12h(timeStr: string): string {
+  if (!timeStr) return "";
+  const [h, min] = timeStr.split(":");
+  const hour = parseInt(h, 10);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 || 12;
+  return `${h12}:${min} ${ampm}`;
+}
 
 export function AICommunicationHub({ profiles = [], loading: profilesLoading, onSync }: AICommunicationHubProps) {
   const [activeTab, setActiveTab] = useState<"student" | "instructor">("student");
@@ -72,7 +91,9 @@ export function AICommunicationHub({ profiles = [], loading: profilesLoading, on
     description: "",
     fromDate: "",
     toDate: "",
-    time: "",
+    startTime: "",
+    endTime: "",
+    payment: "",
   });
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -141,9 +162,11 @@ export function AICommunicationHub({ profiles = [], loading: profilesLoading, on
     setMessage(
       `📅 Event: ${template.eventName}\n` +
       `🗂️ Type: ${template.eventType}\n` +
-      (template.fromDate ? `📆 From: ${template.fromDate}` : "") +
-      (template.toDate ? ` → To: ${template.toDate}` : "") +
-      (template.time ? `\n⏰ Time: ${template.time}` : "") +
+      (template.fromDate ? `📆 Start Date: ${formatIndianDate(template.fromDate)}` : "") +
+      (template.toDate ? ` → End Date: ${formatIndianDate(template.toDate)}` : "") +
+      (template.startTime ? `\n⏰ Start Time: ${formatTime12h(template.startTime)}` : "") +
+      (template.endTime ? ` → End Time: ${formatTime12h(template.endTime)}` : "") +
+      (template.payment ? `\n💰 Payment: ${template.payment}` : "") +
       (template.description ? `\n\n${template.description}` : "")
     );
     setShowTemplate(false);
@@ -160,7 +183,7 @@ export function AICommunicationHub({ profiles = [], loading: profilesLoading, on
     }
     // Auto-build subject/message if not filled from template
     const finalSubject = subject || `${template.eventType || eventTypeInput}: ${template.eventName || 'Notification'}`;
-    const finalMessage = message || `Event: ${template.eventName || eventTypeInput}\nType: ${template.eventType || eventTypeInput}${template.fromDate ? `\nFrom: ${template.fromDate}${template.toDate ? ' → ' + template.toDate : ''}` : ''}${template.time ? `\nTime: ${template.time}` : ''}${template.description ? `\n\n${template.description}` : ''}`;
+    const finalMessage = message || `Event: ${template.eventName || eventTypeInput}\nType: ${template.eventType || eventTypeInput}${template.fromDate ? `\nStart Date: ${formatIndianDate(template.fromDate)}${template.toDate ? ' → End Date: ' + formatIndianDate(template.toDate) : ''}` : ''}${template.startTime ? `\nStart Time: ${formatTime12h(template.startTime)}${template.endTime ? ' → End Time: ' + formatTime12h(template.endTime) : ''}` : ''}${template.payment ? `\nPayment: ${template.payment}` : ''}${template.description ? `\n\n${template.description}` : ''}`;
 
     setIsSending(true);
     const tId = toast.loading(`Sending broadcast to ${selectedUsers.length} recipient${selectedUsers.length !== 1 ? "s" : ""}...`);
@@ -178,7 +201,9 @@ export function AICommunicationHub({ profiles = [], loading: profilesLoading, on
             description: template.description,
             fromDate: template.fromDate,
             toDate: template.toDate,
-            time: template.time,
+            startTime: template.startTime,
+            endTime: template.endTime,
+            payment: template.payment,
           },
           subject: finalSubject,
           message: finalMessage,
@@ -196,14 +221,14 @@ export function AICommunicationHub({ profiles = [], loading: profilesLoading, on
         setSubject("");
         setMessage("");
         setEventTypeInput("");
-        setTemplate({ eventType: "", eventName: "", description: "", fromDate: "", toDate: "", time: "" });
+        setTemplate({ eventType: "", eventName: "", description: "", fromDate: "", toDate: "", startTime: "", endTime: "", payment: "" });
       } else {
         toast.success(result?.message || `Broadcast sent to ${result?.succeeded ?? selectedUsers.length} recipients!`, { id: tId });
         setSelectedUsers([]);
         setSubject("");
         setMessage("");
         setEventTypeInput("");
-        setTemplate({ eventType: "", eventName: "", description: "", fromDate: "", toDate: "", time: "" });
+        setTemplate({ eventType: "", eventName: "", description: "", fromDate: "", toDate: "", startTime: "", endTime: "", payment: "" });
       }
     } catch (err) {
       const error = err as Error;
@@ -487,34 +512,70 @@ export function AICommunicationHub({ profiles = [], loading: profilesLoading, on
                     />
                   </div>
 
+                  {/* Dates — Indian format (DD/MM/YYYY input shown via native picker) */}
                   <div className="grid grid-cols-2 gap-2">
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">From Date</Label>
+                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Start Date</Label>
                       <Input
                         type="date"
                         className="h-10 rounded-xl bg-white border-slate-200 text-sm"
                         value={template.fromDate}
                         onChange={(e) => setTemplate(prev => ({ ...prev, fromDate: e.target.value }))}
                       />
+                      {template.fromDate && (
+                        <p className="text-[9px] text-slate-400 font-medium pl-1">{formatIndianDate(template.fromDate)}</p>
+                      )}
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">To Date</Label>
+                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">End Date</Label>
                       <Input
                         type="date"
                         className="h-10 rounded-xl bg-white border-slate-200 text-sm"
                         value={template.toDate}
                         onChange={(e) => setTemplate(prev => ({ ...prev, toDate: e.target.value }))}
                       />
+                      {template.toDate && (
+                        <p className="text-[9px] text-slate-400 font-medium pl-1">{formatIndianDate(template.toDate)}</p>
+                      )}
                     </div>
                   </div>
 
+                  {/* Times */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Start Time</Label>
+                      <Input
+                        type="time"
+                        className="h-10 rounded-xl bg-white border-slate-200 text-sm"
+                        value={template.startTime}
+                        onChange={(e) => setTemplate(prev => ({ ...prev, startTime: e.target.value }))}
+                      />
+                      {template.startTime && (
+                        <p className="text-[9px] text-slate-400 font-medium pl-1">{formatTime12h(template.startTime)}</p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">End Time</Label>
+                      <Input
+                        type="time"
+                        className="h-10 rounded-xl bg-white border-slate-200 text-sm"
+                        value={template.endTime}
+                        onChange={(e) => setTemplate(prev => ({ ...prev, endTime: e.target.value }))}
+                      />
+                      {template.endTime && (
+                        <p className="text-[9px] text-slate-400 font-medium pl-1">{formatTime12h(template.endTime)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Payment */}
                   <div className="space-y-1">
-                    <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Time</Label>
+                    <Label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Payment (Optional)</Label>
                     <Input
-                      type="time"
+                      placeholder="e.g. ₹500, Free, ₹1000 per participant"
                       className="h-10 rounded-xl bg-white border-slate-200 text-sm"
-                      value={template.time}
-                      onChange={(e) => setTemplate(prev => ({ ...prev, time: e.target.value }))}
+                      value={template.payment}
+                      onChange={(e) => setTemplate(prev => ({ ...prev, payment: e.target.value }))}
                     />
                   </div>
 

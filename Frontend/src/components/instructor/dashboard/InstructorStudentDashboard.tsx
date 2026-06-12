@@ -32,6 +32,7 @@ import {
   useInstructorAllStudents, 
   useInstructorStudentStats, 
   useInstructorCourses,
+  useCourseBatches,
   useStudentVideoProgress,
   useVideos,
   useSendReminder,
@@ -465,6 +466,8 @@ export function InstructorStudentDashboard() {
   const navigate = useNavigate();
   const { data: students, isLoading: studentsLoading, refetch } = useInstructorAllStudents();
   const { data: courses, isLoading: coursesLoading } = useInstructorCourses();
+  // Fetch all instructor batches for the batch filter dropdown
+  const { data: allBatches = [] } = useCourseBatches(null);
   const { stats, isLoading: statsLoading } = useInstructorStudentStats();
   const sendReminder = useSendReminder();
   
@@ -472,6 +475,8 @@ export function InstructorStudentDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [courseFilter, setCourseFilter] = useState<string>('all');
   const [batchFilter, setBatchFilter] = useState<string>('all');
+  const [yearFilter, setYearFilter] = useState<string>('all');
+  const [deptFilter, setDeptFilter] = useState<string>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [activities] = useState<RecentActivity[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<InstructorStudent | null>(null);
@@ -502,74 +507,44 @@ export function InstructorStudentDashboard() {
       const matchesStatus = statusFilter === 'all' || student.status === statusFilter;
       const matchesCourse = courseFilter === 'all' || 
         student.courseEnrollments.some(e => e.courseId === courseFilter);
-      return matchesSearch && matchesStatus && matchesCourse;
+      const matchesBatchName = batchFilter === 'all' || 
+        student.courseEnrollments.some(e => (e as any).batchName === batchFilter);
+      const matchesYear = yearFilter === 'all' || String(student.year || '') === yearFilter;
+      const matchesDept = deptFilter === 'all' || (student.department || '').toUpperCase() === deptFilter.toUpperCase();
+      return matchesSearch && matchesStatus && matchesCourse && matchesBatchName && matchesYear && matchesDept;
     });
 
-    const groups: Record<string, InstructorStudent[]> = {
-      'morning': [],
-      'afternoon': [],
-      'evening': [],
-      'unassigned': []
-    };
+    // Group students by batch name (DB batch name like cse-1, ece-2)
+    const groups: Record<string, InstructorStudent[]> = {};
+
     filtered.forEach(student => {
-      // If a specific course filter is set, only consider batch types for THAT course.
-      // Otherwise, consider all batch types for all courses the student is enrolled in.
       const relevantEnrollments = courseFilter === 'all'
         ? student.courseEnrollments
         : student.courseEnrollments.filter(e => e.courseId === courseFilter);
 
-      // Find the most relevant batch types for this student (lowercased for comparison)
-      // Use a Set to avoid duplicates if a student is in multiple courses of the same session
-      const batchTypes = Array.from(new Set(
+      // Get unique batch names for this student
+      const batchNames = Array.from(new Set(
         relevantEnrollments
-          .map(e => {
-            if (!e.batchType) return null;
-            const bt = e.batchType.toLowerCase();
-            // Normalize typos in data
-            if (bt.includes('eving') || bt.includes('eveg')) return 'evening';
-            if (bt.includes('morning')) return 'morning';
-            if (bt.includes('afternoon')) return 'afternoon';
-            return bt;
-          })
+          .map(e => (e as any).batchName as string | undefined)
           .filter(Boolean) as string[]
       ));
 
-      if (batchFilter !== 'all') {
-        const normalizedFilter = batchFilter.toLowerCase();
-        // If a specific filter is set, only include students that belong to THAT batch
-        if (batchTypes.includes(normalizedFilter)) {
-          groups[normalizedFilter].push(student);
-        }
+      if (batchNames.length === 0) {
+        // Student has no batch assigned
+        if (!groups['unassigned']) groups['unassigned'] = [];
+        groups['unassigned'].push(student);
       } else {
-        // "All Batches" - show student in EVERY group they belong to
-        if (batchTypes.length === 0) {
-          groups['unassigned'].push(student);
-        } else {
-          let added = false;
-          batchTypes.forEach(bt => {
-            if (groups[bt]) {
-              groups[bt].push(student);
-              added = true;
-            }
-          });
-          // Fallback to unassigned if the batch type doesn't match our main categories
-          if (!added) {
-             groups['unassigned'].push(student);
-          }
-        }
+        batchNames.forEach(bn => {
+          if (!groups[bn]) groups[bn] = [];
+          groups[bn].push(student);
+        });
       }
     });
 
-    // Only return groups that have students or the specific group if a filter is set
-    if (batchFilter !== 'all') {
-      const normalizedFilter = batchFilter.toLowerCase();
-      return { [normalizedFilter]: groups[normalizedFilter] || [] };
-    }
-
-    // Filter out empty groups for a cleaner "All Batches" view
+    // Filter out empty groups
     return Object.fromEntries(Object.entries(groups).filter(([_, s]) => s.length > 0));
 
-  }, [students, searchQuery, statusFilter, courseFilter, batchFilter]);
+  }, [students, searchQuery, statusFilter, courseFilter, batchFilter, yearFilter, deptFilter]);
 
   const totalFilteredCount = useMemo(() => 
     Object.values(groupedStudents).reduce((acc, current) => acc + current.length, 0)
@@ -693,16 +668,46 @@ export function InstructorStudentDashboard() {
                       </SelectContent>
                     </Select>
 
+                    <Select value={yearFilter} onValueChange={setYearFilter}>
+                      <SelectTrigger className="w-[120px] h-12 rounded-2xl bg-white border-none shadow-sm ring-1 ring-slate-100 text-[10px] font-black uppercase tracking-widest">
+                        <SelectValue placeholder="Year" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                        <SelectItem value="all" className="rounded-xl font-bold">All Years</SelectItem>
+                        <SelectItem value="1" className="rounded-xl font-bold">Year 1</SelectItem>
+                        <SelectItem value="2" className="rounded-xl font-bold">Year 2</SelectItem>
+                        <SelectItem value="3" className="rounded-xl font-bold">Year 3</SelectItem>
+                        <SelectItem value="4" className="rounded-xl font-bold">Year 4</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    <Select value={deptFilter} onValueChange={setDeptFilter}>
+                      <SelectTrigger className="w-[120px] h-12 rounded-2xl bg-white border-none shadow-sm ring-1 ring-slate-100 text-[10px] font-black uppercase tracking-widest">
+                        <SelectValue placeholder="Dept" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
+                        <SelectItem value="all" className="rounded-xl font-bold">All Depts</SelectItem>
+                        <SelectItem value="CSE" className="rounded-xl font-bold">CSE</SelectItem>
+                        <SelectItem value="ECE" className="rounded-xl font-bold">ECE</SelectItem>
+                        <SelectItem value="EEE" className="rounded-xl font-bold">EEE</SelectItem>
+                        <SelectItem value="DS" className="rounded-xl font-bold">DS</SelectItem>
+                        <SelectItem value="AI/ML" className="rounded-xl font-bold">AI/ML</SelectItem>
+                        <SelectItem value="IT" className="rounded-xl font-bold">IT</SelectItem>
+                      </SelectContent>
+                    </Select>
+
                     <Select value={batchFilter} onValueChange={setBatchFilter}>
-                      <SelectTrigger className="w-[140px] h-12 rounded-2xl bg-white border-none shadow-sm ring-1 ring-slate-100 text-[10px] font-black uppercase tracking-widest">
+                      <SelectTrigger className="w-[160px] h-12 rounded-2xl bg-white border-none shadow-sm ring-1 ring-slate-100 text-[10px] font-black uppercase tracking-widest">
                         <Clock className="w-3.5 h-3.5 mr-2 opacity-40 text-primary" />
                         <SelectValue placeholder="Batch" />
                       </SelectTrigger>
                       <SelectContent className="rounded-2xl border-none shadow-2xl p-2">
                         <SelectItem value="all" className="rounded-xl font-bold">All Batches</SelectItem>
-                        <SelectItem value="morning" className="rounded-xl font-bold">Morning</SelectItem>
-                        <SelectItem value="afternoon" className="rounded-xl font-bold">Afternoon</SelectItem>
-                        <SelectItem value="evening" className="rounded-xl font-bold">Evening</SelectItem>
+                        {allBatches.map(b => (
+                          <SelectItem key={b.id || b._id} value={b.batch_name} className="rounded-xl font-bold">
+                            {b.batch_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -728,22 +733,17 @@ export function InstructorStudentDashboard() {
                       {Object.entries(groupedStudents).map(([group, sList]) => (
                         <div key={group} className="space-y-6">
                            <div className="flex items-center gap-4 px-2">
-                              <div className={cn(
-                                "h-10 w-10 rounded-xl flex items-center justify-center shadow-lg",
-                                group === 'morning' ? "bg-amber-400 text-white shadow-amber-200" :
-                                group === 'afternoon' ? "bg-blue-500 text-white shadow-blue-200" :
-                                group === 'evening' ? "bg-indigo-600 text-white shadow-indigo-200" : "bg-slate-400 text-white shadow-slate-200"
-                              )}>
-                                 {group === 'morning' && <Sun className="h-5 w-5" />}
-                                 {group === 'afternoon' && <CloudSun className="h-5 w-5" />}
-                                 {group === 'evening' && <Moon className="h-5 w-5" />}
-                                 {group === 'unassigned' && <Users className="h-5 w-5" />}
+                              <div className="h-10 w-10 rounded-xl flex items-center justify-center shadow-lg bg-primary text-white shadow-primary/20">
+                                {group === 'unassigned'
+                                  ? <Users className="h-5 w-5" />
+                                  : <span className="text-sm font-black">{group.slice(0,2).toUpperCase()}</span>
+                                }
                               </div>
                               <div className="flex flex-col">
                                 <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">
-                                  {group} BATCH <span className="text-slate-300 ml-2">[{sList.length}]</span>
+                                  {group === 'unassigned' ? 'Unassigned' : group} <span className="text-slate-300 ml-2">[{sList.length}]</span>
                                 </h4>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ongoing Learning Session</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Batch</p>
                               </div>
                               <div className="h-px flex-1 bg-gradient-to-r from-slate-100 to-transparent ml-4" />
                            </div>

@@ -447,10 +447,11 @@ export function useCourseBatches(courseId: string | null) {
   return useQuery<Batch[]>({
     queryKey: ["course-batches", courseId],
     queryFn: async () => {
-      if (!courseId) return [];
-      return fetchWithAuth<Batch[]>(`/batches?course_id=${courseId}`);
+      // If null, fetch all batches for this instructor (no course filter)
+      const url = courseId ? `/batches?course_id=${courseId}` : `/batches`;
+      return fetchWithAuth<Batch[]>(url);
     },
-    enabled: !!courseId,
+    enabled: true, // always enabled; null = fetch all instructor batches
   });
 }
 
@@ -1271,6 +1272,9 @@ export function useCreateTopic() {
     email: string;
     avatarUrl?: string;
     mobileNumber?: string;
+    year?: string;
+    department?: string;
+    rollNumber?: string;
     enrolledCourses: number;
 
     completedCourses: number;
@@ -1374,6 +1378,25 @@ export function useCreateTopic() {
             ),
           ]);
 
+        // Fetch profiles for year/department/roll_number
+        const userIds = [...new Set(allEnrollments.map(e => {
+          const u = e.user_id;
+          return typeof u === 'string' ? u : (u?.id || u?._id?.toString());
+        }).filter(Boolean))];
+
+        let profileMap: Record<string, any> = {};
+        try {
+          if (userIds.length > 0) {
+            const profiles = await fetchWithAuth<any[]>(
+              `/data/profiles?user_id=in.(${userIds.join(',')})&select=user_id,year,department,roll_number`
+            ).catch(() => [] as any[]);
+            profiles.forEach(p => {
+              const uid = p.user_id?.toString?.() || p.user_id;
+              if (uid) profileMap[uid] = p;
+            });
+          }
+        } catch (e) { /* non-blocking */ }
+
         const studentMap = new Map<string, InstructorStudent>();
 
         allEnrollments.forEach((enrollment) => {
@@ -1458,6 +1481,7 @@ export function useCreateTopic() {
             // NOTE: Show all enrolled students in instructor's approved courses.
             // Batch assignment is optional — unassigned students still appear in roster.
 
+            const profile = profileMap[userId] || {};
             studentMap.set(userId, {
               id: enrollment.id || enrollment._id || userId,
               userId: userId,
@@ -1475,6 +1499,9 @@ export function useCreateTopic() {
                   : enrollment.user_avatar,
               mobileNumber:
                 typeof u === "object" && u?.phone ? u.phone : undefined,
+              year: profile.year ? String(profile.year) : undefined,
+              department: profile.department || undefined,
+              rollNumber: profile.roll_number || undefined,
               enrolledCourses: 1,
               completedCourses: progress === 100 ? 1 : 0,
               inProgressCourses: progress > 0 && progress < 100 ? 1 : 0,

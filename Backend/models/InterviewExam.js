@@ -6,6 +6,7 @@ const InterviewCandidateSchema = new mongoose.Schema({
     // Login credentials
     username: { type: String, required: true, unique: true, trim: true },
     password_hash: { type: String, required: true },
+    initial_password: { type: String, default: '' }, // Stored for instructor reference only
     email: { type: String, required: true, unique: true, trim: true, lowercase: true },
     mobile_number: { type: String, required: true },
     full_name: { type: String, required: true },

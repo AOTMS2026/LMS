@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useLeaderboard, useVerifyLeaderboardEntry, useBatches, useStudentBatches } from '@/hooks/useManagerData';
 import { useAuth } from '@/hooks/useAuth';
-import { Trophy, Medal, CheckCircle, Shield, User, Filter } from 'lucide-react';
+import { Trophy, Medal, CheckCircle, Shield, User } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SyncDataButton } from '@/components/admin/data/SyncDataButton';
 import {
@@ -67,22 +67,7 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
           <p className="text-sm text-muted-foreground">Verify and manage student rankings</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-              <SelectTrigger className="w-[150px] h-9 rounded-xl border-slate-200">
-                <SelectValue placeholder="All Batches" />
-              </SelectTrigger>
-              <SelectContent className="rounded-xl border-slate-100 shadow-xl">
-                <SelectItem value="all">All Batches</SelectItem>
-                {batches.map(batch => (
-                  <SelectItem key={batch.id} value={batch.id}>
-                    {batch.batch_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Year first */}
           <Select value={selectedYear} onValueChange={setSelectedYear}>
             <SelectTrigger className="w-[120px] h-9 rounded-xl border-slate-200">
               <SelectValue placeholder="All Years" />
@@ -95,6 +80,7 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
               <SelectItem value="4">Year 4</SelectItem>
             </SelectContent>
           </Select>
+          {/* Dept second */}
           <Select value={selectedDept} onValueChange={setSelectedDept}>
             <SelectTrigger className="w-[120px] h-9 rounded-xl border-slate-200">
               <SelectValue placeholder="All Depts" />
@@ -106,20 +92,25 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
               ))}
             </SelectContent>
           </Select>
-          <div className="w-px h-6 bg-slate-200 mx-1 hidden sm:block" />
-          <div className="flex items-center gap-2">
-            <Badge variant="default" className="gap-1 rounded-lg">
-              <CheckCircle className="h-3 w-3" />
-            </Badge>
-            <Badge variant="outline" className="gap-1 rounded-lg">
-              {unverifiedCount} Pending
-            </Badge>
-          </div>
+          {/* Batch third */}
+          <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+            <SelectTrigger className="w-[150px] h-9 rounded-xl border-slate-200">
+              <SelectValue placeholder="All Batches" />
+            </SelectTrigger>
+            <SelectContent className="rounded-xl border-slate-100 shadow-xl">
+              <SelectItem value="all">All Batches</SelectItem>
+              {batches.map(batch => (
+                <SelectItem key={batch.id} value={batch.id}>
+                  {batch.batch_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="h-6 w-[1px] bg-slate-200 mx-1 hidden sm:block" />
-          <SyncDataButton 
-             onSync={onSync || (() => refetch())} 
-             isLoading={parentLoading || leaderboardLoading} 
-             className="h-10 px-4"
+          <SyncDataButton
+            onSync={onSync || (() => refetch())}
+            isLoading={parentLoading || leaderboardLoading}
+            className="h-10 px-4"
           />
         </div>
       </div>

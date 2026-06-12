@@ -22,7 +22,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import {
   Plus, Trash2, Users, FileText,
-  Sparkles, RefreshCw, UserPlus, Send
+  Sparkles, RefreshCw, UserPlus, Send, Eye, EyeOff, Key
 } from "lucide-react";
 
 // Strip trailing /api if VITE_API_URL already includes it, since this file appends /api paths manually
@@ -367,6 +367,7 @@ function ExamsTab({ toast }: any) {
 function CandidatesTab({ toast }: any) {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [exams, setExams] = useState<any[]>([]);
+  const [showPasswords, setShowPasswords] = useState<Record<string, boolean>>({});
   const [assigning, setAssigning] = useState<any>(null);
   const [selectedExamForAssign, setSelectedExamForAssign] = useState("");
 
@@ -450,6 +451,21 @@ function CandidatesTab({ toast }: any) {
                 <p className="text-slate-400 text-xs mt-1 font-medium">
                   @{c.username} · {c.email} · {c.mobile_number}
                 </p>
+                {c.initial_password && (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <Key className="w-3 h-3 text-slate-400" />
+                    <span className="text-[11px] text-slate-500 font-medium">Password:</span>
+                    <span className="text-[11px] font-bold text-slate-800 font-mono">
+                      {showPasswords[c._id || c.id] ? c.initial_password : "********"}
+                    </span>
+                    <button
+                      onClick={() => setShowPasswords(prev => ({ ...prev, [c._id || c.id]: !prev[c._id || c.id] }))}
+                      className="text-slate-400 hover:text-primary transition-colors"
+                    >
+                      {showPasswords[c._id || c.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    </button>
+                  </div>
+                )}
                 {c.exam_title ? (
                   <p className="text-primary text-xs mt-1.5 font-medium">📋 {c.exam_title} · {c.exam_date} {c.exam_time}</p>
                 ) : (
