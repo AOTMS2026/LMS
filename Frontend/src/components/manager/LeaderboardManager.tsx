@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { useLeaderboard, useVerifyLeaderboardEntry, useBatches, useStudentBatches } from '@/hooks/useManagerData';
 import { useAuth } from '@/hooks/useAuth';
 import { Trophy, Medal, CheckCircle, Shield, User } from 'lucide-react';
-
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SyncDataButton } from '@/components/admin/data/SyncDataButton';
 import {
   Select,
@@ -31,6 +31,17 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
   const [selectedDept, setSelectedDept] = useState<string>("all");
 
   const DEPARTMENTS = ["CSE", "ECE", "EEE", "DS", "AI/ML", "IT"];
+
+  // Only restrict dept for managers (not admins)
+  const userRole = (user as any)?.role || '';
+  const managerDept = userRole === 'manager' ? ((user as any)?.department?.toUpperCase() || null) : null;
+
+  // Auto-set dept filter on mount for managers
+  const [deptInitialized, setDeptInitialized] = useState(false);
+  if (managerDept && !deptInitialized && selectedDept === "all") {
+    setSelectedDept(managerDept);
+    setDeptInitialized(true);
+  }
 
   const handleVerify = async (id: string) => {
     if (!user?.id) return;
@@ -81,25 +92,34 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
             </SelectContent>
           </Select>
           {/* Dept second */}
-          <Select value={selectedDept} onValueChange={setSelectedDept}>
+          <Select value={selectedDept} onValueChange={(v) => { setSelectedDept(v); setSelectedBatchId("all"); }} disabled={!!managerDept}>
             <SelectTrigger className="w-[120px] h-9 rounded-xl border-slate-200">
               <SelectValue placeholder="All Depts" />
             </SelectTrigger>
             <SelectContent className="rounded-xl border-slate-100 shadow-xl">
-              <SelectItem value="all">All Depts</SelectItem>
-              {DEPARTMENTS.map(d => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
-              ))}
+              {managerDept ? (
+                <SelectItem value={managerDept}>{managerDept}</SelectItem>
+              ) : (
+                <>
+                  <SelectItem value="all">All Depts</SelectItem>
+                  {DEPARTMENTS.map(d => (
+                    <SelectItem key={d} value={d}>{d}</SelectItem>
+                  ))}
+                </>
+              )}
             </SelectContent>
           </Select>
-          {/* Batch third */}
-          <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+          {/* Batch third — filtered by selected dept */}
+          <Select value={selectedBatchId} onValueChange={(v) => { setSelectedBatchId(v); }}>
             <SelectTrigger className="w-[150px] h-9 rounded-xl border-slate-200">
               <SelectValue placeholder="All Batches" />
             </SelectTrigger>
             <SelectContent className="rounded-xl border-slate-100 shadow-xl">
               <SelectItem value="all">All Batches</SelectItem>
-              {batches.map(batch => (
+              {(selectedDept === "all"
+                ? batches
+                : batches.filter(b => b.batch_name.toLowerCase().startsWith(selectedDept.toLowerCase().replace('/', '').replace('-', '').substring(0,3)))
+              ).map(batch => (
                 <SelectItem key={batch.id} value={batch.id}>
                   {batch.batch_name}
                 </SelectItem>
@@ -173,6 +193,9 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
               {filteredLeaderboard.map((entry, idx) => {
                 const userData = typeof entry.user_id === 'object' ? entry.user_id : null;
                 const displayName = userData?.full_name || 'Student';
+                const avatarUrl = userData?.avatar_url 
+                  ? (userData.avatar_url.startsWith('http') ? userData.avatar_url : `${import.meta.env.VITE_API_URL || 'https://loyola-lms.onrender.com/api'}/s3/public/${userData.avatar_url}`)
+                  : `https://api.dicebear.com/9.x/avataaars/svg?seed=${userData?.id || entry.id}`;
 
                 return (
                 <div
@@ -186,9 +209,12 @@ export function LeaderboardManager({ onSync, loading: parentLoading = false }: L
                       {getRankIcon(idx + 1)}
                     </div>
                     
-                    <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-primary/10 border border-white shadow-sm flex items-center justify-center flex-shrink-0 font-black text-primary text-xs">
-                      {displayName.slice(0, 2).toUpperCase()}
-                    </div>
+                    <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border border-white shadow-sm flex-shrink-0">
+                      <AvatarImage src={avatarUrl} />
+                      <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-xs font-bold font-mono">
+                        {displayName.slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
 
                     <div className="flex-1 min-w-0 pr-2">
                       <div className="flex items-center gap-1.5">

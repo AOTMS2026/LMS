@@ -6,6 +6,7 @@ interface User {
   id: string;
   email?: string;
   role?: string;
+  department?: string | null;
   full_name?: string;
   avatar_url?: string;
   user_metadata?: {

@@ -1256,6 +1256,22 @@ app.post('/api/public/enroll', async (req, res) => {
     }
 });
 
+// One-time migration: uppercase all department fields in profiles
+app.post('/api/admin/fix-departments', authenticateToken, async (req, res) => {
+    try {
+        const profiles = await Profile.find({ department: { $exists: true, $ne: null, $ne: '' } }).lean();
+        let fixed = 0;
+        for (const p of profiles) {
+            const upper = (p.department || '').toUpperCase();
+            if (p.department !== upper) {
+                await Profile.updateOne({ _id: p._id }, { $set: { department: upper } });
+                fixed++;
+            }
+        }
+        res.json({ message: `Fixed ${fixed} profiles. All departments now uppercase.` });
+    } catch (err) { handleError(res, err, 'fix-departments'); }
+});
+
 app.post('/api/auth/signup', async (req, res) => {
     const { email, password, fullName, phone, courseType, collegeName, rollNumber, year, city, district, country, fullAddress, latitude, longitude } = req.body;
     try {
@@ -1306,7 +1322,7 @@ app.post('/api/auth/signup', async (req, res) => {
             full_name: fullName,
             avatar_url: avatarUrl,
             mobile_number: phone,
-            department: collegeName,
+            department: collegeName ? collegeName.toUpperCase() : undefined,
             roll_number: rollNumber,
             year: year || '',
             course_type: profileCourseType,
@@ -3077,6 +3093,7 @@ app.get('/api/user/profile', authenticateToken, async (req, res) => {
                 role: role || 'student',
                 full_name: profile?.full_name || null,
                 avatar_url: profile?.avatar_url || null,
+                department: profile?.department || null,
                 approval_status: profile?.approval_status || 'pending',
                 suspended_until: profile?.suspended_until || null
             }
@@ -6514,8 +6531,15 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
         // If manager, filter to dept students only
         let filteredStudentIds = studentIds;
         if (managerDept) {
+            // Match by profile.department OR by enrollment in dept courses
+            const deptCourses = await Course.find({ department: managerDept }).select('_id').lean();
+            const deptCourseIds = deptCourses.map(c => c._id);
+            const enrolledInDept = await Enrollment.find({ course_id: { $in: deptCourseIds }, user_id: { $in: studentIds } }).select('user_id').lean();
+            const enrolledIds = new Set(enrolledInDept.map(e => e.user_id.toString()));
             const deptProfiles = await Profile.find({ user_id: { $in: studentIds }, department: managerDept }).select('user_id').lean();
-            filteredStudentIds = deptProfiles.map(p => p.user_id);
+            const profileIds = new Set(deptProfiles.map(p => p.user_id.toString()));
+            const combinedIds = [...new Set([...profileIds, ...enrolledIds])];
+            filteredStudentIds = studentIds.filter(id => combinedIds.includes(id.toString()));
         }
 
         const students = await User.aggregate([
@@ -6691,13 +6715,22 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                 const deptFieldTables = ['exams', 'question_bank', 'courses', 'batches', 'live_classes', 'course_modules', 'course_videos', 'course_resources'];
 
                 if (table === 'profiles') {
-                    const deptFilter = { department: managerDept };
+                    // Also find users enrolled in dept courses (catches students with missing department field)
+                    const deptCourses = await Course.find({ department: managerDept }).select('_id').lean();
+                    const deptCourseIds = deptCourses.map(c => c._id);
+                    const enrolledInDept = await Enrollment.find({ course_id: { $in: deptCourseIds } }).select('user_id').lean();
+                    const enrolledUserIds = enrolledInDept.map(e => e.user_id);
+                    const deptFilter = { $or: [ { department: managerDept }, { user_id: { $in: enrolledUserIds } } ] };
                     query = Object.keys(query).length > 0 ? { $and: [query, deptFilter] } : deptFilter;
-                    console.log(`[ACL] Manager scoped profiles to dept: ${managerDept}`);
+                    console.log(`[ACL] Manager scoped profiles to dept: ${managerDept} (direct: ${enrolledUserIds.length} via enrollment)`);
 
                 } else if (studentUserScopedTables.includes(table)) {
-                    const deptProfiles = await Profile.find({ department: managerDept }).select('user_id').lean();
-                    const deptUserIds = deptProfiles.map(p => p.user_id);
+                    // Also include students enrolled in dept courses
+                    const deptCourses2 = await Course.find({ department: managerDept }).select('_id').lean();
+                    const enrolled2 = await Enrollment.find({ course_id: { $in: deptCourses2.map(c => c._id) } }).select('user_id').lean();
+                    const enrolledIds2 = enrolled2.map(e => e.user_id);
+                    const deptProfiles = await Profile.find({ $or: [ { department: managerDept }, { user_id: { $in: enrolledIds2 } } ] }).select('user_id').lean();
+                    const deptUserIds = [...new Set([...deptProfiles.map(p => p.user_id), ...enrolledIds2])];
                     const idField = ['exam_results', 'student_exam_access'].includes(table) ? 'student_id' : 'user_id';
                     const deptFilter = { [idField]: { $in: deptUserIds } };
                     query = Object.keys(query).length > 0 ? { $and: [query, deptFilter] } : deptFilter;
@@ -7695,6 +7728,10 @@ app.get('/api/batches', authenticateToken, async (req, res) => {
             } else {
                 filter.instructor_id = req.user.id;
             }
+        } else if (userRole === 'manager') {
+            // Manager sees only batches in their department
+            const managerDept = await getManagerDepartment(req.user.id);
+            if (managerDept) filter.department = managerDept;
         }
         if (req.query.is_active !== undefined) filter.is_active = req.query.is_active === 'true';
 

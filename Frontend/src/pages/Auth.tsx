@@ -1364,12 +1364,12 @@ export default function Auth() {
                                 className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-4 focus:ring-[#0075CF]/10 focus:border-[#0075CF] transition-all appearance-none cursor-pointer"
                               >
                                 <option value="" disabled>Select your department...</option>
-                                <option value="cse">CSE</option>
-                                <option value="ece">ECE</option>
-                                <option value="eee">EEE</option>
-                                <option value="ds">DS</option>
-                                <option value="ai/ml">AI/ML</option>
-                                <option value="it">IT</option>
+                                <option value="CSE">CSE</option>
+                                <option value="ECE">ECE</option>
+                                <option value="EEE">EEE</option>
+                                <option value="DS">DS</option>
+                                <option value="AI/ML">AI/ML</option>
+                                <option value="IT">IT</option>
                               </select>
                             </FormControl>
                             <FormMessage className="text-[10px]" />

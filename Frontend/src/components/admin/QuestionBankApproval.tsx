@@ -25,7 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { useCourses } from '@/hooks/useManagerData';
-
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { SyncDataButton } from "./data/SyncDataButton";
 
@@ -74,16 +74,12 @@ interface Student {
     full_name: string;
     email: string;
     department?: string;
-    year?: string;
-    batch_name?: string;
-    roll_number?: string;
     avatar_url?: string;
     profile?: {
         full_name?: string;
         email?: string;
         avatar_url?: string;
         department?: string;
-        year?: string;
     };
     student_name?: string;
     student_email?: string;
@@ -184,11 +180,6 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
     // College Wise Grant
     const [selectedDept, setSelectedDept] = useState<string>("all");
     const [selectedDeptStudents, setSelectedDeptStudents] = useState<string[]>([]);
-
-    // Student tab cascading filters
-    const [studentFilterYear, setStudentFilterYear] = useState<string>("all");
-    const [studentFilterDept, setStudentFilterDept] = useState<string>("all");
-    const [studentFilterBatch, setStudentFilterBatch] = useState<string>("all");
 
     const fetchPendingBanks = async (showLoading = true, showToast = false) => {
         try {
@@ -431,9 +422,14 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
 
     const handleGrantAccess = async () => {
         if (!grantingTopic) return;
-        if (grantType === 'student' && !selectedStudentId) return;
-        if (grantType === 'batch' && !selectedBatchId) return;
-        if (grantType === 'dept' && selectedDeptStudents.length === 0) return;
+        // Determine grant type from what user actually selected
+        if (selectedStudentId) setGrantType('student');
+        else if (selectedBatchId && selectedBatchId !== 'all') setGrantType('batch');
+        else if (selectedDeptStudents.length === 0) return;
+        const resolvedType = selectedStudentId ? 'student' : (selectedBatchId && selectedBatchId !== 'all') ? 'batch' : 'dept';
+        if (resolvedType === 'student' && !selectedStudentId) return;
+        if (resolvedType === 'batch' && !selectedBatchId) return;
+        if (resolvedType === 'dept' && selectedDeptStudents.length === 0) return;
 
         setIsGranting(true);
         try {
@@ -441,10 +437,10 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                 method: 'POST',
                 body: JSON.stringify({
                     topic: grantingTopic,
-                    userId: grantType === 'student' ? selectedStudentId : undefined,
-                    userIds: grantType === 'dept' ? selectedDeptStudents : undefined,
-                    batchId: grantType === 'batch' ? selectedBatchId : undefined,
-                    type: grantType
+                    userId: selectedStudentId || undefined,
+                    userIds: (!selectedStudentId && (!selectedBatchId || selectedBatchId === 'all')) ? selectedDeptStudents : undefined,
+                    batchId: (!selectedStudentId && selectedBatchId && selectedBatchId !== 'all') ? selectedBatchId : undefined,
+                    type: selectedStudentId ? 'student' : (selectedBatchId && selectedBatchId !== 'all') ? 'batch' : 'dept'
                 })
             });
 
@@ -712,9 +708,12 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                             <div className="space-y-3">
                                 {accessList.map((student, idx) => (
                                     <div key={student.student_id || idx} className="flex items-center gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
-                                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary flex-shrink-0">
+                                        <Avatar className="h-10 w-10">
+                                            <AvatarImage src={student.student_avatar} />
+                                            <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                                 {student.student_name?.charAt(0)?.toUpperCase() || 'S'}
-                                            </div>
+                                            </AvatarFallback>
+                                        </Avatar>
                                         <div className="flex-1 min-w-0">
                                             <p className="font-bold text-slate-900 truncate uppercase text-[11px] tracking-tight">{student.student_name}</p>
                                             <p className="text-[10px] text-slate-500 truncate lowercase font-medium">{student.student_email}</p>
@@ -884,370 +883,120 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
 
                     <ScrollArea className="flex-1 overflow-y-auto pr-1">
                         <div className="p-8 space-y-8 bg-white relative">
-                            <Tabs value={grantType} onValueChange={(v) => setGrantType(v as 'student' | 'batch' | 'dept')} className="w-full">
-                                <TabsList className="grid grid-cols-3 mb-8 bg-slate-50 p-1.5 rounded-3xl border border-slate-100 h-12">
-                                    <TabsTrigger
-                                        value="student"
-                                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-primary font-black text-[9px] uppercase tracking-[0.1em] transition-all"
-                                    >
-                                        Student
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        value="batch"
-                                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-primary font-black text-[9px] uppercase tracking-[0.1em] transition-all"
-                                    >
-                                        Batch
-                                    </TabsTrigger>
-                                    <TabsTrigger
-                                        value="college"
-                                        className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-primary font-black text-[9px] uppercase tracking-[0.1em] transition-all"
-                                    >
-                                        College
-                                    </TabsTrigger>
-                                </TabsList>
+                            <div className="w-full space-y-6">
 
-                                <TabsContent value="student" className="space-y-4 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                    {/* Year Filter */}
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Year</Label>
-                                        <Select value={studentFilterYear} onValueChange={(v) => { setStudentFilterYear(v); setStudentFilterDept("all"); setStudentFilterBatch("all"); setSelectedStudentId(""); }}>
-                                            <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 font-bold text-slate-700 hover:bg-white hover:shadow-md transition-all">
-                                                <SelectValue placeholder="Select Year..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border-slate-200 shadow-xl p-1">
-                                                <SelectItem value="all" className="font-bold rounded-xl mb-1">All Years</SelectItem>
-                                                {Array.from(new Set(students.map(s => s.year || (s.profile as any)?.year).filter(Boolean))).sort().map(y => (
-                                                    <SelectItem key={y} value={y!} className="font-bold rounded-xl mb-1">Year {y}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+  {/* YEAR */}
+  <div className="space-y-1.5">
+    <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Year</Label>
+    <Select value={selectedBatchTypeFilter} onValueChange={(v) => {
+      setSelectedBatchTypeFilter(v);
+      setSelectedBatchId("all");
+      setSelectedDeptStudents([]);
+    }}>
+      <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-slate-50 font-bold text-slate-700">
+        <SelectValue placeholder="All Years" />
+      </SelectTrigger>
+      <SelectContent className="rounded-2xl shadow-xl p-1">
+        <SelectItem value="all" className="font-bold rounded-xl">All Years</SelectItem>
+        <SelectItem value="1" className="font-bold rounded-xl">Year 1</SelectItem>
+        <SelectItem value="2" className="font-bold rounded-xl">Year 2</SelectItem>
+        <SelectItem value="3" className="font-bold rounded-xl">Year 3</SelectItem>
+        <SelectItem value="4" className="font-bold rounded-xl">Year 4</SelectItem>
+      </SelectContent>
+    </Select>
+  </div>
 
-                                    {/* Dept Filter */}
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Department</Label>
-                                        <Select value={studentFilterDept} onValueChange={(v) => { setStudentFilterDept(v); setStudentFilterBatch("all"); setSelectedStudentId(""); }}>
-                                            <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 font-bold text-slate-700 hover:bg-white hover:shadow-md transition-all">
-                                                <SelectValue placeholder="Select Department..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border-slate-200 shadow-xl p-1">
-                                                <SelectItem value="all" className="font-bold rounded-xl mb-1">All Departments</SelectItem>
-                                                {Array.from(new Set(
-                                                    students
-                                                        .filter(s => studentFilterYear === "all" || (s.year || (s.profile as any)?.year) === studentFilterYear)
-                                                        .map(s => s.department || s.profile?.department)
-                                                        .filter(Boolean)
-                                                )).sort().map(d => (
-                                                    <SelectItem key={d} value={d!} className="font-bold rounded-xl mb-1">{d}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+  {/* DEPT */}
+  <div className="space-y-1.5">
+    <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Department</Label>
+    <Select value={selectedDept} onValueChange={(v) => {
+      setSelectedDept(v);
+      setSelectedBatchId("all");
+      setSelectedStudentId("");
+      const yearVal = selectedBatchTypeFilter;
+      const pool = students.filter(s => (v === "all" || ((s as any).department || "").toUpperCase() === v.toUpperCase()) && (yearVal === "all" || String((s as any).year) === yearVal));
+      setSelectedDeptStudents(pool.map(s => s.id));
+      setGrantType("dept");
+    }}>
+      <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-slate-50 font-bold text-slate-700">
+        <SelectValue placeholder="All Departments" />
+      </SelectTrigger>
+      <SelectContent className="rounded-2xl shadow-xl p-1">
+        <SelectItem value="all" className="font-bold rounded-xl">All Departments</SelectItem>
+        {Array.from(new Set(students.map(s => ((s as any).department || "").toUpperCase()).filter(Boolean))).map(dept => (
+          <SelectItem key={dept} value={dept} className="font-bold rounded-xl">{dept}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
 
-                                    {/* Batch Filter */}
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">Batch</Label>
-                                        <Select value={studentFilterBatch} onValueChange={(v) => { setStudentFilterBatch(v); setSelectedStudentId(""); }}>
-                                            <SelectTrigger className="h-12 rounded-2xl border-slate-200 bg-slate-50/50 font-bold text-slate-700 hover:bg-white hover:shadow-md transition-all">
-                                                <SelectValue placeholder="Select Batch..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border-slate-200 shadow-xl p-1">
-                                                <SelectItem value="all" className="font-bold rounded-xl mb-1">All Batches</SelectItem>
-                                                {Array.from(new Set(
-                                                    students
-                                                        .filter(s => {
-                                                            const yr = s.year || (s.profile as any)?.year;
-                                                            const dept = s.department || s.profile?.department;
-                                                            return (studentFilterYear === "all" || yr === studentFilterYear) &&
-                                                                   (studentFilterDept === "all" || dept === studentFilterDept);
-                                                        })
-                                                        .map(s => s.batch_name)
-                                                        .filter(Boolean)
-                                                )).sort().map(b => (
-                                                    <SelectItem key={b} value={b!} className="font-bold rounded-xl mb-1">{b}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+  {/* BATCH filtered by dept */}
+  <div className="space-y-1.5">
+    <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+      Batch {selectedBatchId && selectedBatchId !== "all" && batchStudents.length > 0 && <span className="text-primary ml-1">({batchStudents.length} auto-selected)</span>}
+    </Label>
+    <Select value={selectedBatchId} onValueChange={(v) => {
+      setSelectedBatchId(v);
+      setSelectedStudentId("");
+      setGrantType(v && v !== "all" ? "batch" : "dept");
+      // Student list will update via batchStudents after fetch (useEffect)
+    }}>
+      <SelectTrigger className="h-11 rounded-2xl border-slate-200 bg-slate-50 font-bold text-slate-700">
+        <SelectValue placeholder="All Batches" />
+      </SelectTrigger>
+      <SelectContent className="rounded-2xl shadow-xl p-1 max-h-48">
+        <SelectItem value="all" className="font-bold rounded-xl">All Batches</SelectItem>
+        {(selectedDept === "all" ? batches : batches.filter(b => b.batch_name.toLowerCase().startsWith(selectedDept.toLowerCase().replace("/","").replace("-","").substring(0,3)))).map(b => (
+          <SelectItem key={b.id || b._id} value={(b.id || b._id)?.toString() || ""} className="font-bold rounded-xl">
+            {b.batch_name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+    {batchStudents.length > 0 && selectedBatchId && selectedBatchId !== "all" && (
+      <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2 text-[10px] font-bold text-emerald-700">
+        All {batchStudents.length} students in this batch will get access
+      </div>
+    )}
+  </div>
 
-                                    {/* Student Select */}
-                                    <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-2">
-                                            Select Student
-                                        </Label>
-                                        <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
-                                            <SelectTrigger className="h-14 rounded-3xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700 transition-all hover:bg-white hover:shadow-md">
-                                                <SelectValue placeholder="Search for a student..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-3xl border-slate-200 shadow-[0_10px_40px_rgba(0,0,0,0.1)] max-h-[320px] p-2">
-                                                {students
-                                                    .filter(student => {
-                                                        const yr = student.year || (student.profile as any)?.year;
-                                                        const dept = student.department || student.profile?.department;
-                                                        const batch = student.batch_name;
-                                                        return (studentFilterYear === "all" || yr === studentFilterYear) &&
-                                                               (studentFilterDept === "all" || dept === studentFilterDept) &&
-                                                               (studentFilterBatch === "all" || batch === studentFilterBatch);
-                                                    })
-                                                    .map((student) => (
-                                                    <SelectItem
-                                                        key={student.id}
-                                                        value={student.id}
-                                                        className="font-bold py-3 hover:bg-slate-50 rounded-xl mb-1 data-[state=selected]:bg-primary/5 data-[state=selected]:text-primary"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-xs flex-shrink-0">
-                                                                {student.full_name.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            <div className="flex flex-col">
-                                                                <span className="text-xs leading-none">{student.full_name}</span>
-                                                                <span className="text-[9px] text-slate-400 font-medium tracking-tight truncate w-32">
-                                                                    {student.roll_number ? `${student.roll_number} · ` : ''}{student.email}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </SelectItem>
-                                                ))}
-                                                {students.filter(s => {
-                                                    const yr = s.year || (s.profile as any)?.year;
-                                                    const dept = s.department || s.profile?.department;
-                                                    return (studentFilterYear === "all" || yr === studentFilterYear) &&
-                                                           (studentFilterDept === "all" || dept === studentFilterDept) &&
-                                                           (studentFilterBatch === "all" || s.batch_name === studentFilterBatch);
-                                                }).length === 0 && (
-                                                    <div className="p-8 text-center">
-                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">No students found</p>
-                                                    </div>
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </TabsContent>
+  {/* STUDENTS multi-select */}
+  <div className="space-y-1.5">
+    <div className="flex items-center justify-between">
+      <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+        Students {selectedDeptStudents.length > 0 && <span className="text-primary ml-1">({selectedDeptStudents.length} selected)</span>}
+      </Label>
+      <button type="button" onClick={() => {
+        const pool = (selectedBatchId && selectedBatchId !== "all") ? batchStudents : students.filter(s => (selectedDept === "all" || ((s as any).department || "").toUpperCase() === selectedDept.toUpperCase()) && (selectedBatchTypeFilter === "all" || String((s as any).year) === selectedBatchTypeFilter));
+        if (selectedDeptStudents.length === pool.length) { setSelectedDeptStudents([]); } else { setSelectedDeptStudents(pool.map(s => s.id)); }
+        setGrantType("dept"); setSelectedBatchId("all"); setSelectedStudentId("");
+      }} className="text-[9px] font-black text-primary uppercase tracking-widest hover:underline">
+        {selectedDeptStudents.length > 0 ? "Deselect All" : "Select All"}
+      </button>
+    </div>
+    <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-52 overflow-y-auto bg-slate-50/50">
+      {(selectedBatchId && selectedBatchId !== "all" ? batchStudents : students.filter(s => (selectedDept === "all" || ((s as any).department || "").toUpperCase() === selectedDept.toUpperCase()) && (selectedBatchTypeFilter === "all" || String((s as any).year) === selectedBatchTypeFilter))).map(s => {
+        const isSel = selectedDeptStudents.includes(s.id);
+        return (
+          <div key={s.id} onClick={() => {
+            setSelectedDeptStudents(prev => isSel ? prev.filter(id => id !== s.id) : [...prev, s.id]);
+            setGrantType("dept"); setSelectedStudentId(""); setSelectedBatchId("all");
+          }} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer border-b last:border-0 transition-colors ${isSel ? "bg-primary/5" : "hover:bg-white"}`}>
+            <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${isSel ? "bg-primary border-primary" : "border-slate-300"}`}>
+              {isSel && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-800 truncate">{s.full_name}</p>
+              <p className="text-[9px] text-slate-400 truncate">{(s as any).roll_number || s.email}</p>
+            </div>
+            {(s as any).year && <span className="text-[9px] font-bold text-slate-400 shrink-0">Y{(s as any).year}</span>}
+          </div>
+        );
+      })}
+    </div>
+  </div>
+</div>
 
-                                <TabsContent value="batch" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest pl-1">Instructor</Label>
-                                            <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
-                                                <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700">
-                                                    <SelectValue placeholder="All Instructors" />
-                                                </SelectTrigger>
-                                                <SelectContent className="rounded-3xl border-slate-200 shadow-xl p-1">
-                                                    <SelectItem value="all" className="font-bold rounded-lg mb-1">Show All</SelectItem>
-                                                    {instructors.map((inst) => (
-                                                        <SelectItem key={inst.id} value={inst.id?.toString()} className="font-bold rounded-lg mb-1 py-2">{inst.full_name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest pl-1">Batch Schedule</Label>
-                                            <Select value={selectedBatchTypeFilter} onValueChange={setSelectedBatchTypeFilter}>
-                                                <SelectTrigger className="h-12 rounded-xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700">
-                                                    <SelectValue placeholder="Any Time" />
-                                                </SelectTrigger>
-                                                <SelectContent className="rounded-3xl border-slate-200 shadow-xl p-1">
-                                                    <SelectItem value="all" className="font-bold rounded-lg mb-1 uppercase text-[10px]">All Slots</SelectItem>
-                                                    <SelectItem value="morning" className="font-bold rounded-lg mb-1 text-xs">Morning</SelectItem>
-                                                    <SelectItem value="afternoon" className="font-bold rounded-lg mb-1 text-xs">Afternoon</SelectItem>
-                                                    <SelectItem value="evening" className="font-bold rounded-lg mb-1 text-xs">Evening</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    {(selectedInstructorId !== "all" || selectedBatchTypeFilter !== "all" || instructors.length > 0) && (
-                                        <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1 flex items-center gap-2">
-                                                Select Batch
-                                            </Label>
-                                            {loadingBatches ? (
-                                                <div className="h-14 rounded-3xl border border-dashed border-slate-200 flex items-center justify-center gap-3 text-slate-300 bg-slate-50/30">
-                                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Loading Batches...</span>
-                                                </div>
-                                            ) : (
-                                                <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
-                                                    <SelectTrigger className="h-14 rounded-3xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700 transition-all hover:bg-white hover:shadow-md overflow-hidden">
-                                                        <SelectValue placeholder={filteredBatches.length > 0 ? "Choose a batch..." : "No batches available"} />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="rounded-3xl border-slate-200 shadow-xl max-h-[300px] p-2">
-                                                        {filteredBatches.length === 0 ? (
-                                                            <div className="p-8 text-center text-[10px] font-black text-slate-300 uppercase italic tracking-widest">No matching batches</div>
-                                                        ) : (
-                                                            filteredBatches.map((batch) => {
-                                                                const bId = (batch.id || batch._id)?.toString();
-                                                                return (
-                                                                    <SelectItem
-                                                                        key={bId}
-                                                                        value={bId}
-                                                                        className="font-bold py-3 hover:bg-slate-50 rounded-xl mb-1 data-[state=selected]:bg-primary/5 data-[state=selected]:text-primary"
-                                                                    >
-                                                                        <div className="flex flex-col items-start">
-                                                                            <div className="flex items-center gap-2 mb-0.5">
-                                                                                <span className="text-xs">{batch.batch_name}</span>
-                                                                                {batch.student_count !== undefined && (
-                                                                                    <Badge variant="secondary" className="h-4 px-1.5 text-[7px] bg-emerald-50 text-emerald-600 border-none font-black uppercase">
-                                                                                        {batch.student_count} Students
-                                                                                    </Badge>
-                                                                                )}
-                                                                            </div>
-                                                                            <div className="flex items-center gap-2 opacity-50">
-                                                                                <span className="text-[8px] h-3.5 px-1 uppercase font-black tracking-tight">{batch.batch_type}</span>
-                                                                                {batch.instructor_name && <span className="text-[8px] font-black truncate w-24">/ {batch.instructor_name}</span>}
-                                                                            </div>
-                                                                        </div>
-                                                                    </SelectItem>
-                                                                );
-                                                            })
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    {selectedBatchId && grantType === 'batch' && (
-                                        <div className="space-y-4 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-500 mt-6 relative">
-                                            <div className="flex items-center justify-between px-1">
-                                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Students in Batch ({batchStudents.length})</Label>
-                                                <div className="flex -space-x-1.5">
-                                                    {batchStudents.slice(0, 4).map((s, i) => (
-                                                        <div key={i} className="h-6 w-6 rounded-full bg-primary/10 border-2 border-white shadow-sm flex items-center justify-center text-[8px] font-black text-primary">
-                                                            {(s.profile?.full_name || 'S').charAt(0)}
-                                                        </div>
-                                                    ))}
-                                                    {batchStudents.length > 4 && (
-                                                        <div className="h-6 w-6 rounded-full bg-primary/5 border-2 border-white flex items-center justify-center text-[8px] font-black text-primary">
-                                                            +{batchStudents.length - 4}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <ScrollArea className="h-[120px] rounded-3xl border border-slate-100 bg-slate-50/20 p-2">
-                                                {loadingBatchStudents ? (
-                                                    <div className="flex flex-col items-center justify-center p-8 space-y-3">
-                                                        <div className="h-8 w-8 rounded-full border-2 border-primary/20 border-t-primary animate-spin" />
-                                                        <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Loading...</span>
-                                                    </div>
-                                                ) : (
-                                                    <div className="grid grid-cols-1 gap-1">
-                                                        {batchStudents.map((s) => (
-                                                            <div
-                                                                key={s.id}
-                                                                className="flex items-center gap-3 p-2 rounded-xl bg-white/50 border border-slate-50 hover:bg-white hover:border-primary/20 hover:shadow-sm transition-all group"
-                                                            >
-                                                                <div className="h-6 w-6 rounded-full bg-slate-100 flex items-center justify-center text-[8px] font-black flex-shrink-0">
-                                                                    {(s.full_name || 'S').charAt(0)}
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className="text-[10px] font-bold text-slate-700 truncate">{s.full_name || s.profile?.full_name || s.student_name}</span>
-                                                                    <span className="text-[8px] text-slate-400 truncate opacity-70">{s.profile?.email || s.student_email}</span>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </ScrollArea>
-                                        </div>
-                                    )}
-                                </TabsContent>
-
-                                <TabsContent value="college" className="space-y-6 mt-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                    <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] ml-1">
-                                            Select College
-                                        </Label>
-                                        <Select value={selectedDept} onValueChange={(val) => {
-                                            setSelectedDept(val);
-                                            // Reset selected students when college changes
-                                            setSelectedDeptStudents([]);
-                                        }}>
-                                            <SelectTrigger className="h-14 rounded-3xl border-slate-200 bg-slate-50/50 focus:ring-primary/20 font-bold text-slate-700 transition-all hover:bg-white hover:shadow-md">
-                                                <SelectValue placeholder="Select a college..." />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-3xl border-slate-200 shadow-xl max-h-[250px] p-2">
-                                                <SelectItem value="all" className="font-bold py-3 rounded-xl mb-1">Show All Students</SelectItem>
-                                                {Array.from(new Set(students.map(s => s.department || s.profile?.department).filter(Boolean))).map((college) => (
-                                                    <SelectItem key={college} value={college!} className="font-bold py-3 rounded-xl mb-1">
-                                                        {college}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {selectedDept && (
-                                        <div className="space-y-4 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-2 duration-500 mt-6 relative">
-                                            <div className="flex items-center justify-between px-1">
-                                                <Label className="text-[9px] font-black uppercase text-slate-400 tracking-widest">
-                                                    Students ({students.filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept).length})
-                                                </Label>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="sm"
-                                                    className="h-6 text-[8px] font-black uppercase tracking-widest text-primary hover:bg-primary/5"
-                                                    onClick={() => {
-                                                        const filtered = students.filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept);
-                                                        if (selectedDeptStudents.length === filtered.length) {
-                                                            setSelectedDeptStudents([]);
-                                                        } else {
-                                                            setSelectedDeptStudents(filtered.map(s => s.id));
-                                                        }
-                                                    }}
-                                                >
-                                                    {selectedDeptStudents.length === students.filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept).length 
-                                                        ? 'Deselect All' : 'Select All'}
-                                                </Button>
-                                            </div>
-
-                                            <ScrollArea className="h-[200px] rounded-[2rem] border border-slate-100 bg-slate-50/30 p-4">
-                                                <div className="grid grid-cols-1 gap-2">
-                                                    {students
-                                                        .filter(s => selectedDept === 'all' || (s.department || s.profile?.department) === selectedDept)
-                                                        .map((s) => (
-                                                            <div
-                                                                key={s.id}
-                                                                onClick={() => {
-                                                                    setSelectedDeptStudents(prev => 
-                                                                        prev.includes(s.id) 
-                                                                            ? prev.filter(id => id !== s.id) 
-                                                                            : [...prev, s.id]
-                                                                    );
-                                                                }}
-                                                                className={cn(
-                                                                    "flex items-center gap-4 p-3 rounded-2xl border transition-all cursor-pointer group",
-                                                                    selectedDeptStudents.includes(s.id)
-                                                                        ? "bg-primary/5 border-primary/30 shadow-sm"
-                                                                        : "bg-white border-slate-100 hover:border-primary/20"
-                                                                )}
-                                                            >
-                                                                <div className={cn(
-                                                                    "h-6 w-6 rounded-lg border-2 flex items-center justify-center transition-all",
-                                                                    selectedDeptStudents.includes(s.id)
-                                                                        ? "bg-primary border-primary"
-                                                                        : "border-slate-200 group-hover:border-primary/30"
-                                                                )}>
-                                                                    {selectedDeptStudents.includes(s.id) && <CheckCircle className="h-4 w-4 text-white" />}
-                                                                </div>
-                                                                <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black flex-shrink-0">
-                                                                    {(s.full_name || 'S').charAt(0)}
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0 flex-1">
-                                                                    <span className="text-[11px] font-bold text-slate-800 truncate">{s.full_name}</span>
-                                                                    <span className="text-[9px] text-slate-400 truncate opacity-70">
-                                                                        {s.email} {s.department || s.profile?.department ? `• ${s.department || s.profile?.department}` : ''}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                </div>
-                                            </ScrollArea>
-                                        </div>
-                                    )}
-                                </TabsContent>
-                            </Tabs>
                             
                             <div className="p-6 rounded-[1.5rem] bg-emerald-50/30 border border-emerald-500/10 space-y-3 relative overflow-hidden group">
                                 <div className="flex items-center gap-2">
@@ -1272,11 +1021,11 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
                                 </Button>
                                 <Button
                                     onClick={handleGrantAccess}
-                                    disabled={(grantType === 'student' && !selectedStudentId) || (grantType === 'batch' && !selectedBatchId) || (grantType === 'dept' && selectedDeptStudents.length === 0) || isGranting}
+                                    disabled={(!selectedStudentId && !selectedBatchId && selectedDeptStudents.length === 0) || isGranting}
                                     className="flex-[2] h-14 rounded-3xl bg-slate-900 hover:bg-black text-white shadow-2xl shadow-slate-900/40 font-black text-[10px] uppercase tracking-[.2em] transition-all active:scale-[0.98]"
                                 >
                                     {isGranting ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3 text-primary" />}
-                                    {grantType === 'batch' ? 'Confirm Batch' : grantType === 'dept' ? `Grant to ${selectedDeptStudents.length}` : 'Confirm Access'}
+                                    {selectedStudentId ? 'Grant to Student' : selectedBatchId && selectedBatchId !== 'all' ? 'Grant to Batch' : selectedDeptStudents.length > 0 ? `Grant to ${selectedDeptStudents.length} Students` : 'Grant Access'}
                                 </Button>
                             </div>
                         </div>

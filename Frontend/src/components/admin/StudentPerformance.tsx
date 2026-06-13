@@ -59,6 +59,7 @@ interface StudentProfile {
   email: string | null;
   mobile_number?: string | null;
   department?: string | null;
+  year?: string | null;
   institute_name?: string | null; // kept for legacy, replaced by roll_number
   roll_number?: string | null;
   full_address?: string | null;

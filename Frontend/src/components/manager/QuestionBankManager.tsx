@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchWithAuth } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -478,8 +479,10 @@ export function QuestionBankManager({
   const [globalTopic, setGlobalTopic] = useState('');
   const [globalType, setGlobalType] = useState('mcq');
   const [globalDifficulty, setGlobalDifficulty] = useState('medium');
-  const [globalCount, setGlobalCount] = useState(1);
-  const [globalMarks, setGlobalMarks] = useState(1);
+  const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState<string>('bank');
+  const [globalCount, setGlobalCount] = useState<number | ''>('');
+  const [globalMarks, setGlobalMarks] = useState<number | ''>('');
   const [globalPrompt, setGlobalPrompt] = useState(''); // for AI context
 
   // ─── Batch Editor State ───
@@ -554,12 +557,12 @@ export function QuestionBankManager({
       return;
     }
     const targetType = specificType || globalType;
-    const blanks = Array.from({ length: Math.max(1, globalCount) }).map(() => ({
+    const blanks = Array.from({ length: Math.max(1, Number(globalCount) || 1) }).map(() => ({
       ...EMPTY_QUESTION,
       topic: globalTopic,
       type: targetType,
       difficulty: globalDifficulty,
-      marks: globalMarks,
+      marks: Number(globalMarks) || 1,
     }));
     setBatchQuestions(prev => [...prev, ...blanks]);
   };
@@ -606,9 +609,9 @@ export function QuestionBankManager({
         body: JSON.stringify({
           topic: globalTopic,
           type: globalType,
-          count: globalCount,
+          count: Number(globalCount) || 1,
           difficulty: globalDifficulty,
-          prompt: globalPrompt || `Generate ${globalCount} ${globalType} questions about ${globalTopic}`
+          prompt: globalPrompt || `Generate ${Number(globalCount) || 1} ${globalType} questions about ${globalTopic}`
         }),
       });
 
@@ -639,7 +642,7 @@ export function QuestionBankManager({
           options: (q.options && q.options.length >= 2) ? q.options : ['', '', '', ''],
           correct_answer: q.correct_answer || '',
           explanation: q.explanation || '',
-          marks: q.marks || globalMarks,
+          marks: q.marks || Number(globalMarks) || 1,
         }));
 
         setBatchQuestions(prev => [...prev, ...newForms]);
@@ -696,7 +699,7 @@ export function QuestionBankManager({
         options: (q.options && q.options.length >= 2) ? q.options : ['', '', '', ''],
         correct_answer: q.correct_answer || '',
         explanation: q.explanation || '',
-        marks: q.marks || globalMarks,
+        marks: q.marks || Number(globalMarks) || 1,
       }));
       setBatchQuestions(prev => [...prev, ...newForms]);
       setShowRaw(false);
@@ -799,7 +802,7 @@ export function QuestionBankManager({
   }
   return (
     <div className="space-y-8 px-1 py-2 animate-in fade-in duration-500">
-    <Tabs defaultValue="bank" className="space-y-8">
+    <Tabs value={activeSection} onValueChange={setActiveSection} className="space-y-8">
       <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 pb-6 border-b-2 border-slate-100">
         <div className="space-y-1.5">
           <h2 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase italic text-slate-900 leading-none">
@@ -887,19 +890,18 @@ export function QuestionBankManager({
               <Label>Each Mark</Label>
               <Input
                 type="number"
-                min={1}
+                placeholder="e.g. 5"
                 value={globalMarks}
-                onChange={(e) => setGlobalMarks(parseInt(e.target.value) || 1)}
+                onChange={(e) => { const v = e.target.value; setGlobalMarks(v === '' ? '' : parseInt(v) || ''); }}
               />
             </div>
             <div className="space-y-2">
               <Label>Count</Label>
               <Input
                 type="number"
-                min={1}
-                max={50}
+                placeholder="e.g. 10"
                 value={globalCount}
-                onChange={(e) => setGlobalCount(parseInt(e.target.value) || 1)}
+                onChange={(e) => { const v = e.target.value; setGlobalCount(v === '' ? '' : parseInt(v) || ''); }}
               />
             </div>
           </div>
@@ -924,7 +926,7 @@ export function QuestionBankManager({
               className="gap-2"
             >
               <Plus className="h-4 w-4 shrink-0" />
-              <span className="truncate">Add {globalCount} Blank {globalCount > 1 ? 'Questions' : 'Question'}</span>
+              <span className="truncate">Add {globalCount || 1} Blank {(globalCount || 1) > 1 ? 'Questions' : 'Question'}</span>
             </Button>
 
             <Button
@@ -1692,7 +1694,8 @@ export function QuestionBankManager({
                       onClick={() => {
                         setSelectedExamId(exam.id);
                         setGlobalTopic(exam.title);
-                        toast({ title: "Protocol Initiated", description: `You can now add questions to ${exam.title}` });
+                        setActiveSection('bank');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
                       className="w-full h-14 rounded-2xl bg-slate-900 hover:bg-black text-white text-[10px] font-black uppercase tracking-widest gap-3 shadow-xl shadow-slate-200 active:scale-95 transition-all"
                   >
