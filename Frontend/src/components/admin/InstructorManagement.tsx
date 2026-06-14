@@ -897,19 +897,7 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
                                 {batch.batch_name}
                               </p>
                               <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[10px] font-black px-2 py-0.5 tracking-tighter uppercase text-slate-500 border-slate-200 shrink-0 whitespace-nowrap"
-                                  >
-                                    {batch.batch_type} Session
-                                  </Badge>
-                                  <span className="text-[9px] font-bold text-slate-300 hidden sm:block">
-                                    •
-                                  </span>
-                                  <div className="flex items-center gap-1 text-[9px] font-bold text-indigo-500 uppercase tracking-widest bg-indigo-50/50 px-2 py-0.5 rounded-lg border border-indigo-100/50 truncate">
-                                    <Clock className="h-2.5 w-2.5" />
-                                    {batch.start_time && batch.end_time ? `${batch.start_time} — ${batch.end_time}` : 'Full Duration'}
-                                  </div>
+
                                 </div>
                             </div>
                           </div>
@@ -1169,12 +1157,6 @@ export function InstructorManagement({ onSync, loading: parentLoading = false }:
                                   </Badge>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 text-[9px] font-bold text-indigo-600 uppercase tracking-widest mt-2 bg-indigo-50/50 py-1 px-2 rounded-lg border border-indigo-100/30 w-fit max-w-full truncate">
-                                  <Clock className="h-3 w-3 shrink-0" />
-                                  {batch.start_time && batch.end_time
-                                    ? `${batch.start_time} — ${batch.end_time}`
-                                    : "Full Duration"}
-                                </div>
                               </div>
 
                               <div className="flex items-center justify-between border-t border-slate-100/50 pt-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
