@@ -579,6 +579,12 @@ export function LiveMonitoring({ onSync, loading: parentLoading = false }: LiveM
                                                             <div>
                                                                 <div className="text-sm font-black text-slate-900">{r.student}</div>
                                                                 <div className="text-[10px] font-bold text-slate-400 tracking-tighter">{r.email}</div>
+                                                                <div className="flex flex-wrap gap-1 mt-1">
+                                                                    {(r as any).roll_number && <span className="text-[9px] font-black bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase">{(r as any).roll_number}</span>}
+                                                                    {(r as any).department && <span className="text-[9px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded uppercase">{(r as any).department}</span>}
+                                                                    {(r as any).batch_name && <span className="text-[9px] font-black bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase">{(r as any).batch_name}</span>}
+                                                                    {(r as any).year && <span className="text-[9px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded uppercase">Y{(r as any).year}</span>}
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </td>
@@ -591,10 +597,10 @@ export function LiveMonitoring({ onSync, loading: parentLoading = false }: LiveM
                                                     <td className="px-8 py-5 align-middle">
                                                         <div className="flex items-center gap-3">
                                                             <div className={`h-10 w-10 rounded-xl flex items-center justify-center text-xs font-black shadow-inner border ${r.percentage >= 75 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : r.percentage >= 40 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
-                                                                {r.percentage}%
+                                                                {Math.min(r.percentage, 100)}%
                                                             </div>
                                                             <div className="text-[10px] font-bold text-slate-400">
-                                                                <span className="text-slate-900 font-black">{r.score}/{r.total}</span> Points
+                                                                <span className="text-slate-900 font-black">{r.score}/{r.total}</span> Marks
                                                             </div>
                                                         </div>
                                                     </td>

@@ -9,6 +9,7 @@ import { ManagerHeader } from "@/components/manager/ManagerHeader";
 import { ExamScheduler } from "@/components/manager/ExamScheduler";
 import { QuestionBankManager } from "@/components/manager/QuestionBankManager";
 import { LeaderboardManager } from "@/components/manager/LeaderboardManager";
+import { StudentDirectory } from "@/components/admin/StudentDirectory";
 import { LiveMonitoring } from "@/components/admin/LiveMonitoring";
 import { ExamRulesManager } from "@/components/manager/ExamRulesManager";
 import { ManagerCourses } from "@/components/manager/ManagerCourses";
@@ -289,7 +290,7 @@ export default function ManagerDashboard() {
   }
 
   if (userRole !== "manager" && userRole !== "admin") {
-    const fallback = userRole === "intern" ? "/intern-dashboard" : "/student-dashboard";
+    const fallback = "/student-dashboard";
     return <Navigate to={fallback} replace />;
   }
 
@@ -395,7 +396,6 @@ export default function ManagerDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
               { role: 'Students',    count: roleCounts.student || 0,    color: 'bg-blue-100 text-blue-800' },
-              { role: 'Interns',     count: roleCounts.intern || 0,     color: 'bg-amber-100 text-amber-800' },
               { role: 'Instructors', count: roleCounts.instructor || 0, color: 'bg-green-100 text-green-800' },
               { role: 'Managers',    count: roleCounts.manager || 0,    color: 'bg-purple-100 text-purple-800' },
             ].map((r) => (
@@ -417,6 +417,8 @@ export default function ManagerDashboard() {
         return renderOverview();
       case "profile":
         return <UserProfile />;
+      case "students":
+        return <StudentDirectory />;
       case "users":
         return (
           <UserManagement 
@@ -450,9 +452,16 @@ export default function ManagerDashboard() {
       case "video-library":
         return <ManagerVideoLibrary onSync={() => refresh()} loading={dataLoading} />;
       case "all-courses":
+        const deptCourses = managerDept
+          ? (courses || []).filter((c: { department?: string; category?: string }) => {
+              const dept = (c.department || '').toLowerCase();
+              // Show dept courses + skill courses (no department set)
+              return dept === managerDept.toLowerCase() || !c.department;
+            })
+          : (courses || []);
         return (
           <AllCoursesList 
-            courses={courses} 
+            courses={deptCourses} 
             loading={dataLoading} 
             onSync={() => refresh()}
             onUpdatePrice={updateCoursePrice}

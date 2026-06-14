@@ -49,7 +49,6 @@ import {
   useCourses,
   useBatches,
   type Exam,
-  type ExamResult,
 } from "@/hooks/useManagerData";
 import { useInstructorRatings } from "@/hooks/useInstructorData";
 import { useAuth } from "@/hooks/useAuth";
@@ -77,6 +76,8 @@ import {
   Target,
   AlertCircle,
   Trophy,
+  BarChart2,
+  XCircle,
   Activity,
   ShieldAlert,
   GraduationCap,
@@ -89,11 +90,7 @@ import {
   BrainCircuit,
   ChevronDown,
   ChevronUp,
-  BarChart2,
-  Users2,
-  TrendingUp,
-  Award,
-  AlertTriangle,
+  Users,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { format } from "date-fns";
@@ -103,7 +100,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SyncDataButton } from "../admin/data/SyncDataButton";
 
-// ─── 1. Validation Schema ────────────────────────────────────────────────────
+// --- 1. Validation Schema ----------------------------------------------------
 
 const examSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters"),
@@ -184,7 +181,7 @@ interface GeneratedQuestion {
   difficulty: string;
 }
 
-// ─── 2. Internal Components ──────────────────────────────────────────────────
+// --- 2. Internal Components --------------------------------------------------
 
 function getImageSrc(path: string | null | undefined) {
   if (!path) return null;
@@ -196,11 +193,11 @@ function ExamCard({
   exam,
   onUpdate,
   onDelete,
-  onDeleteRequest,
   onConfigure,
   isPast,
   userRole,
   onEdit,
+  batches = [],
 }: {
   exam: Exam;
   onUpdate: (params: {
@@ -209,11 +206,11 @@ function ExamCard({
     approval_status?: string;
   }) => void;
   onDelete: (id: string) => void;
-  onDeleteRequest?: (exam: Exam) => void;
   onConfigure?: (exam: Exam) => void;
   isPast?: boolean;
   userRole?: string | null;
   onEdit?: (exam: Exam) => void;
+  batches?: { id: string; _id?: string; batch_name: string }[];
 }) {
   const isPending = exam.approval_status === "pending";
   const isRejected = exam.approval_status === "rejected";
@@ -295,6 +292,23 @@ function ExamCard({
             </span>
           </div>
 
+
+
+          {/* Batch names */}
+          {(() => {
+            const batchNames: string[] = (exam as any).batch_names || [];
+            if (batchNames.length === 0) return null;
+            return (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {batchNames.map((name, i) => (
+                  <span key={i} className="flex items-center gap-1 bg-primary/10 text-primary text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-lg">
+                    <Users className="h-2.5 w-2.5" />
+                    {name}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
           {exam.custom_fields && exam.custom_fields.length > 0 && (
             <div className="flex flex-wrap gap-1.5 pt-1">
                {exam.custom_fields.slice(0, 3).map((f, i: number) => (
@@ -390,11 +404,7 @@ function ExamCard({
             className="h-11 xl:h-12 w-11 xl:w-12 rounded-xl xl:rounded-2xl text-slate-900 hover:text-destructive hover:bg-rose-50 transition-all border border-transparent hover:border-rose-100"
             onClick={(e) => {
               e.stopPropagation();
-              if (onDeleteRequest) {
-                onDeleteRequest(exam);
-              } else {
-                onDelete(exam.id);
-              }
+              onDelete(exam.id);
             }}
           >
             <Trash2 className="h-4 w-4" />
@@ -436,7 +446,7 @@ function ExamCardSkeleton() {
   );
 }
 
-// ─── 3. Main Horizontal Scheduler ──────────────────────────────────────────
+// --- 3. Main Horizontal Scheduler ---
 
 interface ExamSchedulerProps {
   onNavigateToRepository?: () => void;
@@ -465,6 +475,13 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
   const courses = useMemo(() => Array.isArray(rawCourses) ? rawCourses : [], [rawCourses]);
   const { data: rawBatches } = useBatches();
   // Only show batches belonging to this instructor (for instructors), all batches for admin/manager
+  const managerDept = userRole === "manager" ? ((user as any)?.department?.toUpperCase() || "all") : "all";
+  const [deptBatchFilter, setDeptBatchFilter] = useState<string>(managerDept);
+  const [analysisExamId, setAnalysisExamId] = useState<string | null>(null);
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
+
   const batches = useMemo(() => {
     const all = Array.isArray(rawBatches) ? rawBatches : [];
     if (userRole === 'instructor' && user?.id) {
@@ -486,16 +503,6 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
     "approved"
   );
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-
-  // Analysis dialog state
-  const [showAnalysisDialog, setShowAnalysisDialog] = useState(false);
-  const [analysisExam, setAnalysisExam] = useState<Exam | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<ExamResult[]>([]);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
-
-  // Delete confirm dialog state
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
 
   const form = useForm<ExamFormValues>({
     resolver: zodResolver(examSchema),
@@ -577,26 +584,6 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
     },
     [form, toast],
   );
-
-  const handleViewAnalysis = async (exam: Exam) => {
-    setAnalysisExam(exam);
-    setShowAnalysisDialog(true);
-    setLoadingAnalysis(true);
-    try {
-      const data = await fetchWithAuth(`/data/student_exam_results?sort=completed_at&order=desc`) as ExamResult[];
-      const filtered = Array.isArray(data) ? data.filter(r => r.exam_id === exam.id) : [];
-      setAnalysisResults(filtered);
-    } catch {
-      setAnalysisResults([]);
-    } finally {
-      setLoadingAnalysis(false);
-    }
-  };
-
-  const handleDeleteRequest = (exam: Exam) => {
-    setExamToDelete(exam);
-    setShowDeleteDialog(true);
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -695,6 +682,7 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
   );
 
   return (
+    <>
     <div className="space-y-8 animate-in fade-in duration-700">
       <div className="flex items-center justify-between gap-6">
         <SyncDataButton 
@@ -877,11 +865,10 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
                             
                             const hours = Array.from({length: 12}, (_, i) => String(i === 0 ? 12 : i).padStart(2, '0'));
                             const availableHours = isToday && p === currentP ? hours.filter(hr => {
-                                let hrNum = parseInt(hr, 10);
-                                let currNum = currentHNum;
-                                if (hrNum === 12) hrNum = 0;
-                                let checkCurrNum = currNum === 12 ? 0 : currNum;
-                                return hrNum >= checkCurrNum;
+                                // Compare in 12h format directly: 12 > 11 > 10 > ... > 1
+                                const hrNum = parseInt(hr, 10);
+                                // currentHNum is already 1-12
+                                return hrNum >= currentHNum;
                             }) : hours;
                           
                             const mins = Array.from({length: 60}, (_, i) => String(i).padStart(2, '0'));
@@ -904,48 +891,24 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
                                         className="h-14 rounded-2xl border-slate-300 bg-white pl-10 font-bold text-slate-900 shadow-sm w-full"
                                       />
                                     </div>
-                                    <div className="flex gap-2 w-full">
-                                      <Select 
-                                        value={availableHours.includes(h) ? h : ""} 
-                                        onValueChange={(val) => field.onChange(compileDateTime(date, val, m, p))}
-                                      >
-                                        <SelectTrigger className="h-14 flex-1 rounded-2xl border-slate-300 bg-white font-bold text-slate-900 shadow-sm">
-                                          <SelectValue placeholder="HH" />
-                                        </SelectTrigger>
-                                        <SelectContent className="max-h-[200px]">
-                                          {availableHours.map(hr => (
-                                            <SelectItem key={hr} value={hr} className="font-bold">{hr}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                            
-                                      <Select 
-                                        value={availableMins.includes(m) ? m : ""} 
-                                        onValueChange={(val) => field.onChange(compileDateTime(date, h, val, p))}
-                                      >
-                                        <SelectTrigger className="h-14 flex-1 rounded-2xl border-slate-300 bg-white font-bold text-slate-900 shadow-sm">
-                                          <SelectValue placeholder="MM" />
-                                        </SelectTrigger>
-                                        <SelectContent className="max-h-[200px]">
-                                          {availableMins.map(mn => (
-                                            <SelectItem key={mn} value={mn} className="font-bold">{mn}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                            
-                                      <Select 
-                                        value={availablePeriods.includes(p) ? p : ""} 
-                                        onValueChange={(val) => field.onChange(compileDateTime(date, h, m, val))}
-                                      >
-                                        <SelectTrigger className="h-14 w-[85px] rounded-2xl border-slate-300 bg-white font-bold text-slate-900 shadow-sm">
-                                          <SelectValue placeholder="AM/PM" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {availablePeriods.map(per => (
-                                            <SelectItem key={per} value={per} className="font-bold">{per}</SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                    <div className="relative flex items-center w-full">
+                                      <Clock className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none z-10" />
+                                      <input
+                                        type="time"
+                                        value={h && m ? `${h === '12' && p === 'AM' ? '00' : h === '12' && p === 'PM' ? '12' : p === 'PM' ? String(parseInt(h)+12).padStart(2,'0') : h}:${m}` : ''}
+                                        min={isToday ? `${String(currentHour24).padStart(2,'0')}:${String(currentMinute).padStart(2,'0')}` : undefined}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          if (!val) return;
+                                          const [hh, mm] = val.split(':');
+                                          const h24 = parseInt(hh);
+                                          const per = h24 >= 12 ? 'PM' : 'AM';
+                                          let h12 = h24 % 12;
+                                          if (h12 === 0) h12 = 12;
+                                          field.onChange(compileDateTime(date, String(h12).padStart(2,'0'), mm, per));
+                                        }}
+                                        className="h-14 w-full rounded-2xl border border-slate-300 bg-white pl-12 pr-4 font-bold text-slate-900 shadow-sm text-base focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                      />
                                     </div>
                                   </div>
                                 </FormControl>
@@ -983,11 +946,24 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
                         />
 
                         <div className="space-y-2">
-                           <FormLabel className="text-[11px] font-black uppercase tracking-widest text-slate-800">Target Batches</FormLabel>
+                           <div className="flex items-center justify-between mb-1">
+                             <FormLabel className="text-[11px] font-black uppercase tracking-widest text-slate-800">Target Batches</FormLabel>
+                             <Select value={deptBatchFilter} onValueChange={setDeptBatchFilter} disabled={userRole === "manager"}>
+                               <SelectTrigger className="h-7 w-[100px] rounded-lg border-slate-200 text-[9px] font-black uppercase">
+                                 <SelectValue placeholder="All Depts" />
+                               </SelectTrigger>
+                               <SelectContent className="rounded-xl shadow-xl">
+                                 {userRole !== "manager" && <SelectItem value="all" className="font-bold text-xs">All Depts</SelectItem>}
+                                 {(userRole === "manager" ? [managerDept] : ["CSE","ECE","EEE","DS","AI/ML","IT"]).map(d => (
+                                   <SelectItem key={d} value={d} className="font-bold text-xs">{d}</SelectItem>
+                                 ))}
+                               </SelectContent>
+                             </Select>
+                           </div>
                            <div className="flex flex-wrap gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-200 max-h-[120px] overflow-y-auto custom-scrollbar min-h-[50px] content-start">
                               {batches.length === 0 ? (
                                 <p className="text-[8px] font-bold text-slate-400 uppercase">No batches defined</p>
-                              ) : batches.map(batch => (
+                              ) : batches.filter(b => deptBatchFilter === "all" || b.batch_name.toLowerCase().startsWith(deptBatchFilter.toLowerCase().replace("/","").replace("-","").substring(0,3))).map(batch => (
                                 <Badge 
                                   key={batch.id}
                                   variant="outline"
@@ -1276,10 +1252,23 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
                     key={exam.id}
                     exam={exam}
                     userRole={userRole}
+                    batches={batches}
                     onUpdate={(p) => updateExam.mutate({ id: p.id, ...p })}
                     onDelete={(id) => deleteExam.mutate(id)}
-                    onDeleteRequest={handleDeleteRequest}
-                    onConfigure={handleViewAnalysis}
+                    onConfigure={async (exam) => {
+                      setAnalysisExamId(exam.id);
+                      setAnalysisData(null);
+                      setShowAnalysisDialog(true);
+                      setAnalysisLoading(true);
+                      try {
+                        const data = await fetchWithAuth(`/admin/exams/${exam.id}/analysis`);
+                        setAnalysisData(data);
+                      } catch (_e) {
+                        setAnalysisData(null);
+                      } finally {
+                        setAnalysisLoading(false);
+                      }
+                    }}
                     onEdit={(examToEdit) => {
                       let dateStr = "";
                       if (examToEdit.scheduled_date) {
@@ -1334,141 +1323,97 @@ export function ExamScheduler({ onNavigateToRepository, onSync, loading: parentL
           </TabsContent>
         ))}
       </Tabs>
+    </div>
 
-      {/* View Analysis Dialog */}
-      <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
-        <DialogContent className="sm:max-w-lg rounded-[2rem] border-slate-200 shadow-2xl p-0 overflow-hidden">
-          <div className="bg-slate-900 px-6 py-5 text-white">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-primary/20 flex items-center justify-center">
-                <BarChart2 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h2 className="text-base font-black leading-none">Exam Analysis</h2>
-                <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-widest font-bold">{analysisExam?.title}</p>
-              </div>
-            </div>
+    {/* Exam Analysis Dialog */}
+    <Dialog open={showAnalysisDialog} onOpenChange={setShowAnalysisDialog}>
+      <DialogContent className="sm:max-w-2xl p-0 border-0 rounded-[2rem] shadow-2xl bg-white overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogHeader className="sr-only"><DialogTitle>Exam Analysis</DialogTitle></DialogHeader>
+        <div className="bg-gradient-to-br from-slate-900 to-slate-700 p-8 text-white shrink-0">
+          <div className="flex items-center gap-3 mb-2">
+            <BarChart2 className="h-8 w-8 text-blue-400" />
+            <h2 className="text-2xl font-black">Exam Analysis</h2>
           </div>
-
-          <div className="p-6 space-y-4">
-            {loadingAnalysis ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-3">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Loading results...</p>
-              </div>
-            ) : analysisResults.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center opacity-50">
-                <Activity className="h-12 w-12 mb-3" />
-                <p className="font-bold text-slate-900">No Submissions Yet</p>
-                <p className="text-xs text-slate-500 mt-1">Students have not attempted this exam yet.</p>
-              </div>
-            ) : (() => {
-              const completed = analysisResults.filter(r => r.status === 'completed');
-              const avgScore = completed.length > 0
-                ? Math.round(completed.reduce((sum, r) => sum + (r.percentage ?? 0), 0) / completed.length)
-                : 0;
-              const passed = completed.filter(r => (r.percentage ?? 0) >= (analysisExam?.passing_percentage || 40)).length;
-              return (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { label: 'Total Attempts', value: analysisResults.length, icon: Users2, color: 'bg-blue-50 text-blue-700' },
-                      { label: 'Completed', value: completed.length, icon: CheckCircle2, color: 'bg-emerald-50 text-emerald-700' },
-                      { label: 'Avg Score', value: `${avgScore}%`, icon: TrendingUp, color: 'bg-violet-50 text-violet-700' },
-                      { label: 'Passed', value: passed, icon: Award, color: 'bg-amber-50 text-amber-700' },
-                    ].map(stat => (
-                      <div key={stat.label} className={`p-4 rounded-2xl flex items-center gap-3 ${stat.color.split(' ')[0]}`}>
-                        <stat.icon className={`h-5 w-5 ${stat.color.split(' ')[1]}`} />
-                        <div>
-                          <p className="text-xl font-black leading-none">{stat.value}</p>
-                          <p className="text-[10px] font-bold uppercase tracking-wider opacity-70 mt-0.5">{stat.label}</p>
-                        </div>
-                      </div>
-                    ))}
+          <p className="text-slate-400 text-sm">Performance overview for this exam{analysisData?.passingMarks ? ` · Passing: ${analysisData.passingMarks} pts` : ""}</p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+          {analysisLoading ? (
+            <div className="flex items-center justify-center py-16 gap-3 text-slate-400">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="font-medium">Loading analysis...</span>
+            </div>
+          ) : !analysisData ? (
+            <div className="text-center py-16 text-slate-400">
+              <BarChart2 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+              <p className="font-medium">No results found for this exam yet</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Total", value: analysisData.total, cls: "bg-blue-50 text-blue-700 border-blue-200" },
+                  { label: "Passed", value: analysisData.passed, cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+                  { label: "Failed", value: analysisData.failed, cls: "bg-rose-50 text-rose-700 border-rose-200" },
+                  { label: "Pass Rate", value: `${analysisData.passRate}%`, cls: "bg-amber-50 text-amber-700 border-amber-200" },
+                ].map(s => (
+                  <div key={s.label} className={`rounded-2xl border p-4 ${s.cls}`}>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-70">{s.label}</p>
+                    <p className="text-2xl font-black mt-1">{s.value}</p>
                   </div>
-
-                  <div className="space-y-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Top Scores</p>
-                    <div className="space-y-1 max-h-48 overflow-y-auto">
-                      {completed
-                        .sort((a, b) => (b.percentage ?? 0) - (a.percentage ?? 0))
-                        .slice(0, 10)
-                        .map((r, i) => (
-                          <div key={r.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-100">
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] font-black text-slate-400 w-5">#{i + 1}</span>
-                              <span className="text-xs font-bold text-slate-700">{r.student_id?.toString().slice(0, 8)}...</span>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: "Avg Score", value: analysisData.avgScore },
+                  { label: "Highest", value: analysisData.highest },
+                  { label: "Lowest", value: analysisData.lowest },
+                ].map(s => (
+                  <div key={s.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{s.label}</p>
+                    <p className="text-2xl font-black text-slate-900 mt-1">{s.value} pts</p>
+                  </div>
+                ))}
+              </div>
+              {analysisData.results?.length > 0 && (
+                <div className="space-y-2">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-500">Student Results</h3>
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                    <div className="grid grid-cols-12 bg-slate-50 px-4 py-2.5 text-[9px] font-black uppercase tracking-widest text-slate-400 border-b">
+                      <span className="col-span-5">Student</span>
+                      <span className="col-span-2 text-center">Score</span>
+                      <span className="col-span-2 text-center">%</span>
+                      <span className="col-span-2 text-center">Time</span>
+                      <span className="col-span-1 text-center">Pass</span>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto">
+                      {analysisData.results.map((r: any, i: number) => (
+                        <div key={i} className="grid grid-cols-12 px-4 py-3 border-b last:border-0 hover:bg-slate-50">
+                          <div className="col-span-5 flex items-center gap-2 min-w-0">
+                            <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                              <span className="text-[10px] font-black text-primary">{r.student_name?.charAt(0)?.toUpperCase() || '?'}</span>
                             </div>
-                            <Badge className={`text-[10px] font-black ${
-                              (r.percentage ?? 0) >= (analysisExam?.passing_percentage || 40)
-                                ? 'bg-emerald-100 text-emerald-700 border-none'
-                                : 'bg-rose-100 text-rose-700 border-none'
-                            }`}>{r.score}/{r.total_marks} ({r.percentage}%)</Badge>
+                            <p className="text-xs font-bold text-slate-800 truncate">{r.student_name}</p>
                           </div>
-                        ))}
+                          <span className="col-span-2 text-center text-xs font-bold text-slate-700 self-center">{r.score}</span>
+                          <span className="col-span-2 text-center text-xs font-bold text-slate-700 self-center">{r.percentage}%</span>
+                          <span className="col-span-2 text-center text-xs text-slate-500 self-center">{r.time_taken}m</span>
+                          <div className="col-span-1 flex justify-center self-center">
+                            {r.is_passed ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <XCircle className="h-4 w-4 text-rose-400" />}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </>
-              );
-            })()}
-          </div>
-
-          <div className="px-6 pb-5 flex justify-end">
-            <Button onClick={() => setShowAnalysisDialog(false)} className="rounded-2xl h-10 px-6 font-black text-[10px] uppercase tracking-widest">
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirm Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-w-md rounded-2xl border-rose-200 shadow-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-rose-700">
-              <AlertTriangle className="h-5 w-5" />
-              Delete Exam
-            </DialogTitle>
-            <DialogDescription className="text-slate-600">
-              Are you sure you want to permanently delete this exam? This action{" "}
-              <span className="font-black text-rose-600">cannot be undone</span>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-3">
-            <div className="p-4 bg-rose-50 rounded-xl border border-rose-200 space-y-1">
-              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Exam to be deleted</p>
-              <p className="text-base font-black text-rose-900">{examToDelete?.title}</p>
-              {examToDelete?.exam_type && (
-                <Badge className="bg-rose-100 text-rose-700 border-none text-[9px] font-black uppercase">{examToDelete.exam_type}</Badge>
+                </div>
               )}
-            </div>
-            <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200">
-              <p className="text-[10px] font-bold text-slate-500 leading-relaxed">
-                All student submissions, scores, and results associated with this exam will also be permanently removed.
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-3 pt-1">
-            <Button variant="ghost" onClick={() => setShowDeleteDialog(false)} className="flex-1 rounded-xl">
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              className="flex-1 rounded-xl bg-rose-600 hover:bg-rose-700"
-              onClick={() => {
-                if (examToDelete) {
-                  deleteExam.mutate(examToDelete.id);
-                  setShowDeleteDialog(false);
-                  setExamToDelete(null);
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" /> Yes, Delete Exam
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-    </div>
+            </>
+          )}
+        </div>
+        <div className="px-6 pb-6 shrink-0">
+          <Button onClick={() => setShowAnalysisDialog(false)} className="w-full rounded-xl bg-slate-900 hover:bg-black text-white font-bold">Close</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

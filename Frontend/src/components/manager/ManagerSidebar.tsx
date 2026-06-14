@@ -84,6 +84,7 @@ const navGroups = [
   {
     label: "Analytics & Monitoring",
     items: [
+      { id: "students", title: "Students", url: "/manager/students", icon: Users },
       { id: "student-performance", title: "Academic Scores", url: "/manager/student-performance", icon: BarChart3 },
       { id: "leaderboard",  title: "Leaderboard",        url: "/manager/leaderboard",           icon: Trophy },
       { id: "monitoring",   title: "Live Monitoring",    url: "/manager/monitoring",            icon: Activity },

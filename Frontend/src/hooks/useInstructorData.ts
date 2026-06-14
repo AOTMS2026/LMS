@@ -1568,11 +1568,11 @@ export function useCreateTopic() {
 
           let status: InstructorStudent["status"] = student.status;
           if (status !== "completed") {
-            if (daysSinceActive > 14) {
+            if (daysSinceActive > 30) {
               status = "inactive";
-            } else if (daysSinceActive > 7) {
+            } else if (daysSinceActive > 14) {
               status = "at-risk";
-            } else if (daysSinceActive <= 1) {
+            } else {
               status = "active";
             }
           }
@@ -1915,7 +1915,7 @@ export function useCreateTopic() {
       queryFn: async () => {
         if (!user?.id) return [];
         const data = (await fetchWithAuth(
-          `/data/live_classes?instructor_id=eq.${user.id}&order=scheduled_at.desc`,
+          `/data/live_classes?order=scheduled_at.desc`,
         )) as LiveClass[];
         return data;
       },

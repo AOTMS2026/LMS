@@ -18,6 +18,7 @@ import {
   SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { fetchWithAuth } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { SyncDataButton } from "./data/SyncDataButton";
 
@@ -59,7 +60,6 @@ interface StudentProfile {
   email: string | null;
   mobile_number?: string | null;
   department?: string | null;
-  year?: string | null;
   institute_name?: string | null; // kept for legacy, replaced by roll_number
   roll_number?: string | null;
   full_address?: string | null;
@@ -448,7 +448,9 @@ export function StudentPerformance({
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [fStatus, setFStatus] = useState("all");
-  const [fCollege, setFCollege] = useState("all");
+  const { user: _mUser, userRole: _mRole } = useAuth();
+  const _mgrDept = _mRole === "manager" ? ((_mUser as any)?.department?.toUpperCase() || "all") : "all";
+  const [fCollege, setFCollege] = useState(_mgrDept);
   const [fYear, setFYear] = useState("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, StudentDetail>>({});
@@ -552,6 +554,8 @@ export function StudentPerformance({
 
   // ── Filter ────────────────────────────────────────────────────────────────────
   const DEPARTMENTS = ["CSE", "ECE", "EEE", "DS", "AI/ML", "IT"];
+  const { user, userRole } = useAuth();
+  const managerDept = userRole === "manager" ? ((user as any)?.department?.toUpperCase() || null) : null;
 
   const uniqueDepartments = Array.from(
     new Set(students.map(s => (s as any).department).filter(Boolean))
@@ -650,13 +654,13 @@ export function StudentPerformance({
               <SelectItem value="pending" className="font-bold text-xs py-3">PENDING</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={fCollege} onValueChange={setFCollege}>
+          <Select value={fCollege} onValueChange={setFCollege} disabled={!!managerDept}>
             <SelectTrigger className="h-12 min-w-44 rounded-2xl bg-slate-50 border-none font-black text-[11px] uppercase tracking-tighter shadow-sm">
               <SelectValue placeholder="Department" />
             </SelectTrigger>
             <SelectContent className="rounded-2xl border-slate-100 shadow-2xl max-h-80">
-              <SelectItem value="all" className="font-bold text-xs py-3">ALL DEPARTMENTS</SelectItem>
-              {(uniqueDepartments.length > 0 ? uniqueDepartments : DEPARTMENTS).map(d => (
+              {!managerDept && <SelectItem value="all" className="font-bold text-xs py-3">ALL DEPARTMENTS</SelectItem>}
+              {(managerDept ? [managerDept] : (uniqueDepartments.length > 0 ? uniqueDepartments : DEPARTMENTS)).map(d => (
                 <SelectItem key={d} value={d} className="font-bold text-xs py-3">{d}</SelectItem>
               ))}
             </SelectContent>

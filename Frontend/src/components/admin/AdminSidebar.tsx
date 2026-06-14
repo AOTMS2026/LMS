@@ -62,6 +62,7 @@ const navGroups = [
   {
     label: "Platform Performance",
     items: [
+      { title: "Students", url: "/admin/students", icon: Users },
       { title: "Academic Scores", url: "/admin/student-performance", icon: TrendingUp },
       { title: "Leaderboard", url: "/admin/leaderboard", icon: Trophy },
       { title: "Resume Scans", url: "/admin/resume-scans", icon: ClipboardList },

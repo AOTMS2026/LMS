@@ -124,7 +124,7 @@ export function useCourses() {
         is_active: c.is_active,
         status: c.status,
         instructor_id: c.instructor_id
-      }));
+      })).sort((a, b) => (a.title || '').localeCompare(b.title || ''));
 
       // Client-side pagination since we fetch all active courses at once
       const ITEMS_PER_PAGE = pageSize;

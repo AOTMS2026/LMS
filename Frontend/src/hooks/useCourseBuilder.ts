@@ -38,15 +38,18 @@ export function useInstructorS3Courses(showAll?: boolean) {
         queryFn: async () => {
             if (!user?.id) return [];
             
+            const sort = (data: unknown[]) =>
+                (data || []).slice().sort((a: any, b: any) => (a.title || '').localeCompare(b.title || ''));
+
             // If showAll is requested, fetch all courses for the catalogue
             if (showAll) {
                 console.log(`[useInstructorS3Courses] Fetching all courses for Catalogue`);
-                return await fetchWithAuth('/instructor/courses?all=true');
+                return sort(await fetchWithAuth('/instructor/courses?all=true') as unknown[]);
             }
             
             // Otherwise, fetch courses assigned to this instructor/user
             console.log(`[useInstructorS3Courses] Fetching assigned courses for: ${user.id}`);
-            return await fetchWithAuth('/instructor/courses');
+            return sort(await fetchWithAuth('/instructor/courses') as unknown[]);
         },
         enabled: !!user?.id,
         staleTime: 5 * 60 * 1000,

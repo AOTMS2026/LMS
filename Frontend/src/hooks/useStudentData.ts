@@ -71,6 +71,7 @@ export function useStudentExams() {
                         duration_minutes: sched.duration_minutes,
                         total_marks: sched.total_marks,
                         is_completed: !!a.is_completed,
+                        result_id: a.result_id,
                         assigned_image: a.assigned_image,
                         scheduled_date: sched.scheduled_date
                     };
@@ -98,6 +99,7 @@ export function useStudentMockPapers() {
                         duration_minutes: mock.duration_minutes,
                         total_marks: mock.total_marks,
                         is_completed: !!a.is_completed,
+                        result_id: a.result_id,
                         assigned_image: a.assigned_image,
                         scheduled_date: mock.scheduled_date
                     };
@@ -182,6 +184,7 @@ export interface AccessibleExam {
     exam_schedules?: Record<string, unknown>;
     mock_papers?: Record<string, unknown>;
     is_completed?: boolean;
+    result_id?: string;
     assigned_image?: string;
 }
 
@@ -192,6 +195,7 @@ export interface StudentExam {
     duration_minutes: number;
     total_marks: number;
     is_completed: boolean;
+    result_id?: string;
     assigned_image?: string;
     scheduled_date?: string;
 }

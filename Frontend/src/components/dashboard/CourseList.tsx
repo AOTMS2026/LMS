@@ -32,9 +32,6 @@ function CourseBatchBadge({ courseId }: { courseId: string }) {
             <Layers className="h-3 w-3 text-primary" />
             <div className="flex flex-col">
                 <span className="text-[9px] font-black uppercase tracking-widest text-primary leading-tight">Assigned: {batch.batch_name}</span>
-                <span className="text-[8px] font-bold text-slate-400 leading-tight uppercase">
-                    {batch.batch_type && batch.batch_type !== 'all' ? batch.batch_type : batch.requested_batch_type || 'Selected Session'} • {formatTime(batch.start_time)} - {formatTime(batch.end_time)}
-                </span>
             </div>
         </div>
     );
@@ -54,6 +51,11 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
     if (type === 'available' && courses && enrolledQuery.data) {
         const enrolledIds = new Set(enrolledQuery.data.map(c => c.id || c._id));
         courses = courses.filter(c => !enrolledIds.has(c.id || c._id));
+    }
+
+    // Sort alphabetically by title
+    if (courses) {
+        courses = [...courses].sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     }
 
     if (isLoading) {

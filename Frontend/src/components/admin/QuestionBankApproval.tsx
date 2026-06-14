@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { fetchWithAuth } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2, CheckCircle, XCircle, FileText, AlertCircle, LayoutGrid, Clock, History, Eye, Users, UserPlus, Trash2, ShieldCheck, BrainCircuit, RefreshCw, Award, Calendar, User, BookOpen, ArrowRight, ShieldAlert, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -161,7 +162,9 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
     const [removingTopic, setRemovingTopic] = useState<string | null>(null);
 
     const [showGrantDialog, setShowGrantDialog] = useState(false);
-    const [grantingTopic, setGrantingTopic] = useState<string | null>(null);
+      const { user: _qaUser, userRole: _qaRole } = useAuth();
+  const managerDeptQA = _qaRole === "manager" ? ((_qaUser as any)?.department?.toUpperCase() || null) : null;
+const [grantingTopic, setGrantingTopic] = useState<string | null>(null);
     const [students, setStudents] = useState<Student[]>([]);
     const [loadingStudents, setLoadingStudents] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState("");
@@ -922,8 +925,8 @@ export function QuestionBankApproval({ onSync, loading: externalLoading, mode }:
         <SelectValue placeholder="All Departments" />
       </SelectTrigger>
       <SelectContent className="rounded-2xl shadow-xl p-1">
-        <SelectItem value="all" className="font-bold rounded-xl">All Departments</SelectItem>
-        {Array.from(new Set(students.map(s => ((s as any).department || "").toUpperCase()).filter(Boolean))).map(dept => (
+        {!managerDeptQA && <SelectItem value="all" className="font-bold rounded-xl">All Departments</SelectItem>}
+        {(managerDeptQA ? [managerDeptQA] : Array.from(new Set(students.map(s => ((s as any).department || "").toUpperCase()).filter(Boolean)))).map(dept => (
           <SelectItem key={dept} value={dept} className="font-bold rounded-xl">{dept}</SelectItem>
         ))}
       </SelectContent>

@@ -90,6 +90,7 @@ interface BatchContact {
   role: string;
   batch_session: string;
   batch_name: string;
+  roll_number?: string;
   batch_id: string | null;
   course_id: string;
 }
@@ -102,7 +103,7 @@ interface BatchGroupedContacts {
   all: BatchContact[];
 }
 
-type BatchTab = 'all' | 'morning' | 'afternoon' | 'evening';
+type BatchTab = 'all';
 
 export function ChatInterface() {
   const { user, userRole } = useAuth();
@@ -440,16 +441,13 @@ export function ChatInterface() {
 
   // Batch-filtered contacts for instructor view
   const batchTabStudents: BatchContact[] = batchContacts
-    ? (batchContacts[activeBatchTab] || []).filter(s =>
+    ? (batchContacts['all'] || []).filter(s =>
         (s.name || '').toLowerCase().includes(searchQuery.toLowerCase())
       )
     : [];
 
   const BATCH_TABS: { key: BatchTab; label: string; icon: React.ReactNode; color: string; bg: string }[] = [
-    { key: 'all',       label: 'All',       icon: <Users className="h-3 w-3" />,  color: 'text-slate-600', bg: 'bg-slate-100' },
-    { key: 'morning',   label: 'Morning',   icon: <Sun className="h-3 w-3" />,    color: 'text-amber-600', bg: 'bg-amber-50' },
-    { key: 'afternoon', label: 'Afternoon', icon: <Cloud className="h-3 w-3" />,  color: 'text-blue-600',  bg: 'bg-blue-50' },
-    { key: 'evening',   label: 'Evening',   icon: <Moon className="h-3 w-3" />,   color: 'text-indigo-600',bg: 'bg-indigo-50' },
+    { key: 'all', label: 'All', icon: <Users className="h-3 w-3" />, color: 'text-slate-600', bg: 'bg-slate-100' },
   ];
 
   const getBatchBadgeStyle = (session: string) => {
@@ -641,12 +639,12 @@ export function ChatInterface() {
                             <h3 className="text-[15px] text-[#111b21] font-medium truncate">{student.name}</h3>
                             <span className={cn(
                               'text-[9px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full border shrink-0',
-                              getBatchBadgeStyle(student.batch_session)
+                              'bg-blue-50 text-blue-700 border-blue-100'
                             )}>
-                              {student.batch_session === 'unassigned' ? 'No Batch' : student.batch_session}
+                              {student.batch_name || 'No Batch'}
                             </span>
                           </div>
-                          <p className="text-[12px] text-[#667781] truncate mt-0.5">{student.batch_name}</p>
+                          <p className="text-[12px] text-[#667781] truncate mt-0.5">{student.roll_number || student.batch_name}</p>
                         </div>
                       </div>
                     ))

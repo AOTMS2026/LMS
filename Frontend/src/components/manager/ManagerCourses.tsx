@@ -19,8 +19,17 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Clock, Calendar, ShieldAlert, GraduationCap, Mail, Monitor, BookOpen as BookOpenIcon } from 'lucide-react';
 
-export function ManagerCourses() {
-    const { data: courses, isLoading, refetch } = useInstructorS3Courses(true);
+export function ManagerCourses({ managerDept }: { managerDept?: string | null } = {}) {
+    const { data: allCourses, isLoading, refetch } = useInstructorS3Courses(true);
+
+    // Filter to manager's department only (skip filter if no dept set)
+    const courses = React.useMemo(() => {
+        const list = Array.isArray(allCourses) ? allCourses as Course[] : [];
+        if (!managerDept) return list;
+        return list.filter(c =>
+            (c.department || c.category || '').toLowerCase() === managerDept.toLowerCase()
+        );
+    }, [allCourses, managerDept]);
     const [viewingCourse, setViewingCourse] = useState<Course | null>(null);
     const [selectedCourseProfile, setSelectedCourseProfile] = useState<Course | null>(null);
     const [showProfile, setShowProfile] = useState(false);

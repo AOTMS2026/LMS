@@ -173,6 +173,18 @@ export default function Auth() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const navigateToDashboard = () => {
+    const role = localStorage.getItem("user_role");
+    const map: Record<string, string> = {
+      student: "/student-dashboard",
+      intern: "/intern-dashboard",
+      instructor: "/instructor",
+      admin: "/admin",
+      manager: "/manager",
+    };
+    navigate(map[role || ""] || "/student-dashboard", { replace: true });
+  };
+
   // Reset gaze when clicking anywhere outside input fields
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -196,7 +208,7 @@ export default function Auth() {
   // Redirect if already logged in
   useEffect(() => {
     if (user && !authLoading) {
-      navigate("/");
+      navigateToDashboard();
     }
   }, [user, authLoading, navigate]);
 
@@ -572,7 +584,7 @@ export default function Auth() {
         variant: "destructive",
       });
     } else {
-      navigate("/");
+      navigateToDashboard();
     }
   };
 
@@ -614,7 +626,7 @@ export default function Auth() {
       ) {
         navigate("/pending-approval");
       } else {
-        navigate("/");
+        navigateToDashboard();
       }
     }
   };
@@ -636,7 +648,7 @@ export default function Auth() {
         title: "Admin Login Verified",
         description: "Welcome to the admin panel.",
       });
-      navigate("/");
+      navigate("/admin", { replace: true });
     }
   };
 
@@ -1364,12 +1376,12 @@ export default function Auth() {
                                 className="w-full h-11 bg-slate-50 border border-slate-200 rounded-xl px-3 text-sm font-medium text-slate-900 focus:outline-none focus:ring-4 focus:ring-[#0075CF]/10 focus:border-[#0075CF] transition-all appearance-none cursor-pointer"
                               >
                                 <option value="" disabled>Select your department...</option>
-                                <option value="CSE">CSE</option>
-                                <option value="ECE">ECE</option>
-                                <option value="EEE">EEE</option>
-                                <option value="DS">DS</option>
-                                <option value="AI/ML">AI/ML</option>
-                                <option value="IT">IT</option>
+                                <option value="cse">CSE</option>
+                                <option value="ece">ECE</option>
+                                <option value="eee">EEE</option>
+                                <option value="ds">DS</option>
+                                <option value="ai/ml">AI/ML</option>
+                                <option value="it">IT</option>
                               </select>
                             </FormControl>
                             <FormMessage className="text-[10px]" />
@@ -1451,7 +1463,7 @@ export default function Auth() {
                                 <option value="manager">Manager</option>
                                 <option value="instructor">Instructor</option>
                                 <option value="student">Student</option>
-                                <option value="intern">Intern</option>
+
                               </select>
                             </FormControl>
                             <FormMessage className="text-[10px]" />

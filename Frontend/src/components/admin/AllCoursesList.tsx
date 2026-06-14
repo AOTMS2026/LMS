@@ -194,7 +194,7 @@ export function AllCoursesList({
         </motion.div>
       ) : (
         <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {coursesList.map((course: AdminCourse, index: number) => {
+          {[...coursesList].sort((a, b) => (a.title || '').localeCompare(b.title || '')).map((course: AdminCourse, index: number) => {
             const CategoryIcon = course.title
               ?.toLowerCase()
               .includes("security")
@@ -276,14 +276,6 @@ export function AllCoursesList({
                   </div>
 
                   <div className="space-y-3 mb-6">
-                    {course.duration !== "4 Months" && (
-                      <div className="flex items-center gap-2 text-slate-400">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span className="text-xs font-semibold">
-                          {course.duration || "3 Months"} • ONLINE / LIVE
-                        </span>
-                      </div>
-                    )}
                   </div>
 
 
@@ -314,13 +306,6 @@ export function AllCoursesList({
                   </div>
 
                   <div className="flex flex-col sm:flex-row xl:flex-row gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      className="w-full sm:flex-1 rounded-xl h-10 font-black text-[10px] uppercase tracking-wider border-slate-200 hover:bg-slate-50 truncate"
-                      onClick={() => window.open("https://aotms.in", "_blank")}
-                    >
-                      Explore
-                    </Button>
                     <Button
                       className="w-full sm:flex-1 rounded-xl h-10 font-black text-[10px] uppercase tracking-wider bg-orange-500 hover:bg-orange-600 text-white shadow-lg shadow-orange-100 truncate"
                       onClick={() => onViewSyllabus?.(course)}

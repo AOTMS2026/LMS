@@ -414,12 +414,31 @@ export function UserProfile() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="department">Department</Label>
-                                    <Input
-                                        id="department"
-                                        placeholder="e.g. CSE, ECE, EEE, DS, AI/ML, IT"
-                                        value={profile.department || ''}
-                                        onChange={(e) => setProfile({ ...profile, department: e.target.value })}
-                                    />
+                                    {(userRole === 'manager' || userRole === 'instructor') ? (
+                                        <select
+                                            id="department"
+                                            value={profile.department || ''}
+                                            onChange={(e) => setProfile({ ...profile, department: e.target.value })}
+                                            className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                                        >
+                                            <option value="">Select department...</option>
+                                            {['CSE','ECE','EEE','DS','AIML','IT','MECH','CIVIL'].map(d => (
+                                                <option key={d} value={d}>{d}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <select
+                                            id="department"
+                                            value={profile.department || ''}
+                                            onChange={(e) => setProfile({ ...profile, department: e.target.value })}
+                                            className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                                        >
+                                            <option value="">Select department...</option>
+                                            {['CSE','ECE','EEE','DS','AIML','IT','MECH','CIVIL'].map(d => (
+                                                <option key={d} value={d}>{d}</option>
+                                            ))}
+                                        </select>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="rollNumber">Roll Number</Label>
@@ -432,18 +451,35 @@ export function UserProfile() {
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="year">Year</Label>
-                                    <select
-                                        id="year"
-                                        value={profile.year || ''}
-                                        onChange={(e) => setProfile({ ...profile, year: e.target.value })}
-                                        className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
-                                    >
-                                        <option value="">Select year...</option>
-                                        <option value="1">1st Year</option>
-                                        <option value="2">2nd Year</option>
-                                        <option value="3">3rd Year</option>
-                                        <option value="4">4th Year</option>
-                                    </select>
+                                    {(userRole === 'manager' || userRole === 'instructor') ? (
+                                        <select
+                                            id="year"
+                                            value={profile.year || ''}
+                                            onChange={(e) => setProfile({ ...profile, year: e.target.value })}
+                                            className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                                        >
+                                            <option value="">Select year...</option>
+                                            <option value="never">Never (All Years)</option>
+                                            <option value="1">1st Year</option>
+                                            <option value="2">2nd Year</option>
+                                            <option value="3">3rd Year</option>
+                                            <option value="4">4th Year</option>
+                                        </select>
+                                    ) : (
+                                        <select
+                                            id="year"
+                                            value={profile.year || ''}
+                                            onChange={(e) => setProfile({ ...profile, year: e.target.value })}
+                                            className="w-full h-10 bg-background border border-input rounded-md px-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                                        >
+                                            <option value="">Select year...</option>
+                                            <option value="never">Never (All Years)</option>
+                                            <option value="1">1st Year</option>
+                                            <option value="2">2nd Year</option>
+                                            <option value="3">3rd Year</option>
+                                            <option value="4">4th Year</option>
+                                        </select>
+                                    )}
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="linkedin">LinkedIn Profile URL</Label>

@@ -25,7 +25,7 @@ export interface Profile {
   department?: string | null;
   roll_number?: string | null;
   year?: string | null;
-  course_type?: 'full_time' | 'internship' | 'bridge' | string | null;
+  course_type?: 'full_time' | 'bridge' | string | null;
 }
 
 export interface UserRole {

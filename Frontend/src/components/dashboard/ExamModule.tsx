@@ -183,6 +183,10 @@ export function ExamModule({ type }: ExamModuleProps) {
                                whileHover={{ y: -5 }}
                                className="group relative flex flex-col rounded-[2rem] border border-slate-100 bg-white shadow-sm hover:shadow-2xl transition-all duration-500 overflow-hidden cursor-pointer h-full"
                                onClick={() => {
+                                  if (item.is_completed && item.result_id) {
+                                     setViewingReviewId(item.result_id);
+                                     return;
+                                  }
                                   if (isExpired) {
                                       toast({
                                          title: "Session Expired",
@@ -218,8 +222,8 @@ export function ExamModule({ type }: ExamModuleProps) {
                                      {(() => {
                                         if (item.is_completed) {
                                            return (
-                                              <Button className="rounded-full font-black uppercase text-[10px] tracking-widest h-12 px-8 bg-red-500 text-white border-none transform translate-y-4 group-hover:translate-y-0 transition-all duration-500">
-                                                 🚫 Already Attempted
+                                              <Button className="rounded-full font-black uppercase text-[10px] tracking-widest h-12 px-8 bg-primary text-white border-none transform translate-y-4 group-hover:translate-y-0 transition-all duration-500">
+                                                 📊 View Result
                                               </Button>
                                            );
                                         }

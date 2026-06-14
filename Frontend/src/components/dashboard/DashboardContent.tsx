@@ -1,6 +1,16 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { format } from 'date-fns';
 const API_URL = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : 'https://loyola-lms.onrender.com/api');
+
+// Fix Cloudinary PDF URLs: image/upload → raw/upload so browser can render them
+const fixPdfUrl = (url: string): string => {
+  if (!url) return url;
+  if (url.includes('cloudinary.com') && url.includes('/image/upload/') &&
+      (url.toLowerCase().endsWith('.pdf') || url.includes('.pdf'))) {
+    return url.replace('/image/upload/', '/raw/upload/');
+  }
+  return url;
+};
 import {
   Card,
   CardContent,
@@ -969,7 +979,10 @@ function DashboardHome({ basePath = "/student-dashboard" }: { basePath?: string 
                  <div className="py-8 text-center text-xs text-slate-400 font-medium italic">No recent materials</div>
                ) : (
                  recentResources.map((res, i: number) => (
-                   <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => res.view_url && window.open(res.view_url, '_blank')}>
+                   <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-50 hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => {
+                     const url = res.view_url || res.file_url || '';
+                     if (url) window.open(url, '_blank');
+                   }}>
                       <div className="flex items-center gap-3">
                          <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black group-hover:bg-slate-900 group-hover:text-white transition-all uppercase">
                            {res.upload_format || res.file_url?.split('.').pop() || 'PDF'}
@@ -1128,13 +1141,9 @@ import { RatingModal } from "./RatingModal";
 
 export function DashboardContent({ basePath = "/student-dashboard" }: { basePath?: string } = {}) {
   const location = useLocation();
-  const rawPath = location.pathname;
-  // Normalize intern-dashboard paths to student-dashboard for route matching
-  const currentPath = rawPath.startsWith(basePath) && basePath !== "/student-dashboard"
-    ? rawPath.replace(basePath, "/student-dashboard")
-    : rawPath;
+  const currentPath = location.pathname;
   const navigate = useNavigate();
-  const _navigateTo = (path: string) => navigate(path.replace("/student-dashboard", basePath));
+  const _navigateTo = (path: string) => navigate(path);
   const queryClient = useQueryClient();
   const { socket } = useSocket();
   const [ratingModalOpen, setRatingModalOpen] = useState(false);
@@ -1156,14 +1165,11 @@ export function DashboardContent({ basePath = "/student-dashboard" }: { basePath
     };
   }, [socket, queryClient]);
 
-  const INTERN_HIDDEN_ROUTES = ["/student-dashboard/resume-ats", "/student-dashboard/mock-papers"];
-  const isIntern = basePath !== "/student-dashboard";
-
   if (currentPath === "/student-dashboard" || currentPath === "/student-dashboard/") {
     return <DashboardHome basePath={basePath} />;
   }
 
-  const config = (isIntern && INTERN_HIDDEN_ROUTES.includes(currentPath)) ? undefined : routeConfig[currentPath];
+  const config = routeConfig[currentPath];
 
   if (config) {
     if (config.component) {

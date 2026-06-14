@@ -524,7 +524,7 @@ function CreateCandidateTab({ toast }: any) {
   const [search, setSearch] = useState('');
   const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
   const [assignExamId, setAssignExamId] = useState('');
-  const [tab, setTab] = useState<'roster'|'manual'>('roster');
+  const [tab, setTab] = useState<'roster'|'manual'>('manual');
   const [form, setForm] = useState({
     full_name: "", email: "", mobile_number: "",
     username: "", password: "", assigned_exam_id: ""
@@ -610,9 +610,6 @@ function CreateCandidateTab({ toast }: any) {
     <div className="space-y-5 max-w-3xl">
       {/* Tab switcher */}
       <div className="flex gap-2">
-        <Button size="sm" variant={tab === 'roster' ? 'default' : 'outline'} onClick={() => setTab('roster')} className="rounded-xl h-9 px-5 font-bold text-xs">
-          <Users className="w-3.5 h-3.5 mr-2" /> From Student Roster
-        </Button>
         <Button size="sm" variant={tab === 'manual' ? 'default' : 'outline'} onClick={() => setTab('manual')} className="rounded-xl h-9 px-5 font-bold text-xs">
           <UserPlus className="w-3.5 h-3.5 mr-2" /> Manual Entry
         </Button>

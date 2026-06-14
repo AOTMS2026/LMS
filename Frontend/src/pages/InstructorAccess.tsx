@@ -483,7 +483,7 @@ export default function InstructorAccess({ onSync, loading: externalLoading }: I
                 <div className="col-span-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Image</div>
                 <div className="col-span-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Instructor & Email</div>
                 <div className="col-span-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Course Target</div>
-                <div className="col-span-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Session Unit</div>
+                <div className="col-span-2 text-[10px] font-black uppercase tracking-widest text-slate-400">Batch</div>
                 <div className="col-span-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Status</div>
                 <div className="col-span-1 text-[10px] font-black uppercase tracking-widest text-slate-400">Date</div>
                 <div className="col-span-2 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Actions</div>
@@ -535,19 +535,15 @@ export default function InstructorAccess({ onSync, loading: externalLoading }: I
 
                       {/* Batch Column */}
                       <div className="md:col-span-2 flex flex-col md:block gap-1 mt-2 md:mt-0">
-                         <span className="md:hidden text-[9px] font-black text-slate-400 uppercase tracking-widest">Session Unit</span>
+                         <span className="md:hidden text-[9px] font-black text-slate-400 uppercase tracking-widest">Batch</span>
                          <div className="flex items-center gap-2">
-                            <div className={`h-8 px-4 py-1 rounded-full flex items-center gap-2 border ${
-                              course.batch_type === 'morning' ? 'bg-orange-50 border-orange-100 text-orange-600' :
-                              course.batch_type === 'afternoon' ? 'bg-blue-50 border-blue-100 text-blue-600' :
-                              course.batch_type === 'evening' ? 'bg-violet-50 border-violet-100 text-violet-600' :
-                              'bg-slate-50 border-slate-100 text-slate-400'
-                            }`}>
-                              <Clock className="h-3.5 w-3.5" />
-                              <span className="text-[10px] font-black uppercase tracking-widest">
-                                  {course.batch_type || 'unassigned'}
-                              </span>
-                            </div>
+                            {course.batch_name ? (
+                              <Badge variant="outline" className="px-3 py-1 text-[10px] font-black uppercase bg-primary/5 text-primary border-primary/20">
+                                {course.batch_name}
+                              </Badge>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-medium">No batch</span>
+                            )}
                          </div>
                       </div>
 

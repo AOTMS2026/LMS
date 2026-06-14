@@ -61,7 +61,8 @@ import {
   Zap,
   ShieldCheck,
   RefreshCw,
-  Trash2
+  Trash2,
+  BookX
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -128,7 +129,7 @@ interface UserManagementProps {
   ) => Promise<boolean>;
   onUpdateRole: (
     userId: string,
-    role: "admin" | "manager" | "instructor" | "student" | "intern",
+    role: "admin" | "manager" | "instructor" | "student",
   ) => Promise<boolean>;
   onSendEmail: (userId: string) => Promise<boolean>;
   onUpdateEnrollmentStatus?: (id: string, status: "rejected" | "active") => Promise<void>;
@@ -161,6 +162,11 @@ export function UserManagement({
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingAction, setProcessingAction] = useState<string | null>(null);
   const [showSuspendDialog, setShowSuspendDialog] = useState(false);
+  const [showRevokeDialog, setShowRevokeDialog] = useState(false);
+  const [revokingAccess, setRevokingAccess] = useState(false);
+  const [revokeEnrollments, setRevokeEnrollments] = useState<{id:string; title:string}[]>([]);
+  const [revokeLoading, setRevokeLoading] = useState(false);
+  const [selectedRevokeIds, setSelectedRevokeIds] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [suspensionDays, setSuspensionDays] = useState("7");
   
@@ -360,7 +366,7 @@ export function UserManagement({
     if (selectedUser && newRole) {
       await onUpdateRole(
         selectedUser.id,
-        newRole as "admin" | "manager" | "instructor" | "student" | "intern",
+        newRole as "admin" | "manager" | "instructor" | "student",
       );
       setShowRoleDialog(false);
       setSelectedUser(null);
@@ -458,7 +464,7 @@ export function UserManagement({
                   <SelectItem value="manager" className="text-xs font-bold py-2">MANAGERS</SelectItem>
                   <SelectItem value="instructor" className="text-xs font-bold py-2">INSTRUCTORS</SelectItem>
                   <SelectItem value="student" className="text-xs font-bold py-2">STUDENTS</SelectItem>
-                  <SelectItem value="intern" className="text-xs font-bold py-2">INTERNS</SelectItem>
+
                 </SelectContent>
               </Select>
 
@@ -519,14 +525,12 @@ export function UserManagement({
                         <Badge
                           variant="outline"
                           className={`shrink-0 text-[10px] h-6 px-2.5 rounded-lg uppercase font-black tracking-tight border shadow-sm ${
-                            user.role === 'intern'
-                              ? 'border-amber-200 bg-amber-50 text-amber-800'
-                              : user.role === 'student'
+                            user.role === 'student'
                               ? 'border-blue-100 bg-blue-50 text-blue-900'
                               : 'border-slate-100 bg-slate-50 text-slate-900'
                           }`}
                         >
-                          {user.role === 'intern' ? '🎓 Intern' : user.role || "student"}
+                          {user.role || "student"}
                         </Badge>
                       </div>
                       <p className="text-xs text-slate-500 font-bold truncate flex items-center gap-2">
@@ -615,6 +619,28 @@ export function UserManagement({
                           }} className="rounded-xl font-bold text-[13px] py-2.5 cursor-pointer hover:bg-slate-50">
                             <UserCog className="mr-3 h-4 w-4 text-emerald-500" /> Reassign Role
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setSelectedRevokeIds([]);
+                              setRevokeEnrollments([]);
+                              setRevokeLoading(true);
+                              setShowRevokeDialog(true);
+                              void (async () => {
+                                try {
+                                  const d = await fetchWithAuth(`/admin/user-enrollments/${user.id}`) as any[];
+                                  setRevokeEnrollments((d||[]).map((e:any) => ({id: e.id, title: e.course_title || 'Course'})));
+                                } catch (_e) {
+                                  setRevokeEnrollments([]);
+                                } finally {
+                                  setRevokeLoading(false);
+                                }
+                              })();
+                            }}
+                            className="rounded-xl font-bold text-[13px] py-2.5 cursor-pointer hover:bg-orange-50 text-orange-600"
+                          >
+                            <BookX className="mr-3 h-4 w-4" /> Revoke Course Access
+                          </DropdownMenuItem>
                           <DropdownMenuSeparator className="my-1.5 bg-slate-100" />
                           {user.approval_status === 'rejected' && (
                             <DropdownMenuItem onClick={() => onUpdateStatus(user.id, "approved")} className="rounded-xl font-bold text-[13px] py-2.5 text-emerald-600 bg-emerald-50 cursor-pointer mb-1 shadow-sm">
@@ -671,7 +697,6 @@ export function UserManagement({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { label: "Students",    count: roleCounts.student    || 0, icon: Users,        desc: "Full-time registered students",     accent: "bg-blue-50",   iconColor: "text-blue-600" },
-            { label: "Interns",     count: roleCounts.intern     || 0, icon: Briefcase,    desc: "Internship programme students",     accent: "bg-amber-50",  iconColor: "text-amber-600" },
             { label: "Instructors", count: roleCounts.instructor || 0, icon: Presentation, desc: "Course & content management",       accent: "bg-emerald-50",iconColor: "text-emerald-600" },
             { label: "Managers",    count: roleCounts.manager    || 0, icon: UserCog,      desc: "Operational management team",       accent: "bg-purple-50", iconColor: "text-purple-600" },
             { label: "Admins",      count: roleCounts.admin      || 0, icon: ShieldCheck,  desc: "Platform administrators",           accent: "bg-red-50",    iconColor: "text-red-600" },
@@ -737,12 +762,6 @@ export function UserManagement({
                     className="rounded-lg h-10 font-medium hover:bg-slate-50"
                   >
                     Student (Full-Time)
-                  </SelectItem>
-                  <SelectItem
-                    value="intern"
-                    className="rounded-lg h-10 font-medium hover:bg-slate-50"
-                  >
-                    Intern (Internship)
                   </SelectItem>
                   <SelectItem
                     value="instructor"
@@ -1289,16 +1308,16 @@ export function UserManagement({
                 </Button>
 
                 {/* Dashboard Access Button — routes based on role */}
-                {(selectedUser.role === 'student' || selectedUser.role === 'intern') && (
+                {selectedUser.role === 'student' && (
                   <a
-                    href={selectedUser.role === 'intern' ? '/intern-dashboard' : '/student-dashboard'}
+                    href={'/student-dashboard'}
                     target="_blank"
                     rel="noreferrer"
                     className="flex-1"
                   >
-                    <Button variant="outline" className={`w-full ${selectedUser.role === 'intern' ? 'border-amber-200 text-amber-700 hover:bg-amber-50' : 'border-blue-200 text-blue-700 hover:bg-blue-50'}`}>
+                    <Button variant="outline" className="w-full border-blue-200 text-blue-700 hover:bg-blue-50">
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      {selectedUser.role === 'intern' ? 'Intern Dashboard' : 'Student Dashboard'}
+                      Student Dashboard
                     </Button>
                   </a>
                 )}
@@ -1439,6 +1458,85 @@ export function UserManagement({
               }}
             >
               {isProcessing ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Deleting...</> : <><Trash2 className="mr-2 h-4 w-4" /> Yes, Delete Permanently</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Revoke Course Access Dialog */}
+      <Dialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
+        <DialogContent className="w-[95vw] sm:max-w-md p-0 border-0 rounded-[2rem] shadow-2xl bg-white overflow-hidden">
+          <DialogHeader className="sr-only"><DialogTitle>Revoke Access</DialogTitle></DialogHeader>
+          <div className="bg-gradient-to-br from-orange-500 to-rose-600 p-8 text-white">
+            <BookX className="h-10 w-10 mb-3 opacity-80" />
+            <h2 className="text-2xl font-black">Revoke Course Access</h2>
+            <p className="text-white/70 text-sm mt-1">{selectedUser?.full_name}</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-slate-600 text-sm font-medium">Select which courses to revoke access for <strong>{selectedUser?.full_name}</strong>:</p>
+            {revokeLoading ? (
+              <div className="flex items-center gap-2 py-4 text-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading enrollments...</span>
+              </div>
+            ) : revokeEnrollments.length === 0 ? (
+              <p className="text-slate-400 text-sm italic py-2">No active course enrollments found.</p>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                {revokeEnrollments.map(e => {
+                  const checked = selectedRevokeIds.includes(e.id);
+                  return (
+                    <div key={e.id} onClick={() => setSelectedRevokeIds(prev => checked ? prev.filter(x => x !== e.id) : [...prev, e.id])}
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-0 transition-colors ${checked ? 'bg-orange-50' : 'hover:bg-slate-50'}`}>
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${checked ? 'bg-orange-500 border-orange-500' : 'border-slate-300'}`}>
+                        {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+                      </div>
+                      <span className="text-sm font-medium text-slate-800 truncate">{e.title}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs font-medium text-orange-700">
+              Can be reversed by re-granting course access from Grant Access section.
+            </div>
+          </div>
+          <DialogFooter className="px-6 pb-6 gap-2 flex-wrap">
+            <Button variant="ghost" onClick={() => { setShowRevokeDialog(false); setSelectedRevokeIds([]); }} className="rounded-xl">Cancel</Button>
+            <Button
+              disabled={revokingAccess || selectedRevokeIds.length === 0}
+              variant="outline"
+              className="rounded-xl border-orange-300 text-orange-600 hover:bg-orange-50"
+              onClick={async () => {
+                if (!selectedUser || selectedRevokeIds.length === 0) return;
+                setRevokingAccess(true);
+                try {
+                  await fetchWithAuth(`/admin/users/${selectedUser.id}/revoke-access`, { method: 'POST', body: JSON.stringify({ enrollmentIds: selectedRevokeIds }) });
+                  toast.success(`Revoked ${selectedRevokeIds.length} course(s) for ${selectedUser.full_name}.`);
+                  setShowRevokeDialog(false); setSelectedUser(null); setSelectedRevokeIds([]);
+                } catch (_e) {
+                  toast.error('Failed to revoke access. Try again.');
+                } finally { setRevokingAccess(false); }
+              }}
+            >
+              {revokingAccess ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Revoking...</> : <>Revoke Selected ({selectedRevokeIds.length})</>}
+            </Button>
+            <Button
+              disabled={revokingAccess}
+              className="rounded-xl bg-orange-600 hover:bg-orange-700 text-white"
+              onClick={async () => {
+                if (!selectedUser) return;
+                setRevokingAccess(true);
+                try {
+                  await fetchWithAuth(`/admin/users/${selectedUser.id}/revoke-access`, { method: 'POST' });
+                  toast.success(`All courses revoked for ${selectedUser.full_name}.`);
+                  setShowRevokeDialog(false); setSelectedUser(null); setSelectedRevokeIds([]);
+                } catch (_e) {
+                  toast.error('Failed to revoke access. Try again.');
+                } finally { setRevokingAccess(false); }
+              }}
+            >
+              {revokingAccess ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>...</> : <><BookX className="mr-2 h-4 w-4"/>Revoke All</>}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -383,13 +383,30 @@ const getManagerDepartment = async (userId) => {
         if (Date.now() - timestamp < DEPT_CACHE_TTL) return dept;
     }
     try {
-        const profile = await Profile.findOne({ user_id: userId }).select('department role').lean();
+        const profile = await Profile.findOne({ user_id: userId }).select('department year role').lean();
         const dept = profile?.department || null;
         deptCache.set(strId, { dept, timestamp: Date.now() });
         return dept;
     } catch (e) {
         return null;
     }
+};
+
+// Parse manager's multi-dept string into array e.g. "CSE, ECE" -> ["CSE","ECE"]
+const getManagerDepts = async (userId) => {
+    const raw = await getManagerDepartment(userId);
+    if (!raw) return null;
+    return raw.split(',').map(d => d.trim().toUpperCase()).filter(Boolean);
+};
+
+// Parse manager's multi-year string into array e.g. "2, 3, 4" -> ["2","3","4"]
+const getManagerYears = async (userId) => {
+    try {
+        const profile = await Profile.findOne({ user_id: userId }).select('year').lean();
+        const raw = profile?.year || null;
+        if (!raw) return null;
+        return raw.split(',').map(y => y.trim()).filter(Boolean);
+    } catch (e) { return null; }
 };
 
 const requireRole = (allowedRoles) => async (req, res, next) => {
@@ -438,13 +455,7 @@ app.post('/api/admin/broadcast', authenticateToken, requireAdminOrManager, async
         if (requesterRole === 'manager') {
             const managerDept = await getManagerDepartment(req.user.id);
             if (managerDept) {
-                const deptProfiles = await Profile.find({ department: managerDept }).select('user_id').lean();
-                const allowedIds = new Set(deptProfiles.map(p => p.user_id.toString()));
-                const unauthorized = selectedUsers.filter(id => !allowedIds.has(id));
-                if (unauthorized.length > 0) {
-                    console.warn(`[Broadcast] Manager tried to message outside dept: ${unauthorized.length} blocked`);
-                    return res.status(403).json({ error: `You can only broadcast to ${managerDept} department students.` });
-                }
+                // Manager can broadcast to any student
             }
         }
 
@@ -858,8 +869,34 @@ app.post('/api/manager/generate-questions', authenticateToken, requireInstructor
             timestamp: new Date().toISOString()
         }, { timeout: 120000 }); // AI generation can be slow
 
-        // Forward the response data directly
-        res.json(response.data);
+        // Shuffle MCQ options so correct answer isn't always in position A
+        const shuffleArray = (arr) => {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a;
+        };
+
+        let responseData = response.data;
+        if (type === 'mcq' && Array.isArray(responseData)) {
+            responseData = responseData.map(q => ({
+                ...q,
+                options: Array.isArray(q.options) ? shuffleArray(q.options) : q.options
+            }));
+        } else if (type === 'mcq' && responseData?.questions) {
+            responseData = {
+                ...responseData,
+                questions: responseData.questions.map(q => ({
+                    ...q,
+                    options: Array.isArray(q.options) ? shuffleArray(q.options) : q.options
+                }))
+            };
+        }
+
+        // Forward the response data with shuffled options
+        res.json(responseData);
     } catch (error) {
         console.error('Error calling n8n webhook:', error.message);
         if (error.response) {
@@ -1256,11 +1293,101 @@ app.post('/api/public/enroll', async (req, res) => {
     }
 });
 
-// One-time migration: uppercase all department fields in profiles
+// Migration: uppercase departments + fill missing departments from course enrollments
+// Exam analysis - get all results for a specific exam
+app.get('/api/admin/exams/:examId/analysis', authenticateToken, requireAdminOrManager, async (req, res) => {
+    try {
+        // Get exam to find passing_marks and total_marks
+        const exam = await Exam.findById(req.params.examId).select('passing_marks total_marks').lean();
+        const passingMarks = exam?.passing_marks || 0;
+
+        const results = await ExamResult.find({ exam_id: req.params.examId })
+            .populate('student_id', 'full_name email')
+            .select('student_id score percentage time_taken_minutes time_spent submitted_at')
+            .sort({ score: -1 }).lean();
+
+        const total = results.length;
+        // Calculate is_passed from score vs passing_marks
+        const enriched = results.map(r => ({
+            ...r,
+            is_passed: passingMarks > 0 ? (r.score || 0) >= passingMarks : (r.percentage || 0) >= 40
+        }));
+        const passed = enriched.filter(r => r.is_passed).length;
+        const scores = enriched.map(r => r.score || 0);
+        const avgScore = total ? Math.round(scores.reduce((s, v) => s + v, 0) / total) : 0;
+        const highest = total ? Math.max(...scores) : 0;
+        const lowest = total ? Math.min(...scores) : 0;
+        res.json({
+            total, passed, failed: total - passed,
+            avgScore, highest, lowest,
+            passRate: total ? Math.round((passed / total) * 100) : 0,
+            passingMarks,
+            results: enriched.map(r => ({
+                student_name: r.student_id?.full_name || 'Unknown',
+                student_email: r.student_id?.email || '',
+                score: r.score || 0,
+                percentage: Math.round(r.percentage || 0),
+                time_taken: r.time_taken_minutes || Math.round((r.time_spent || 0) / 60) || 0,
+                is_passed: r.is_passed,
+                submitted_at: r.submitted_at
+            }))
+        });
+    } catch (err) { handleError(res, err, 'exam-analysis'); }
+});
+
+// Admin batch students (no instructor restriction)
+app.get('/api/admin/batches/:batchId/students', authenticateToken, requireAdminOrManager, async (req, res) => {
+    try {
+        const assignments = await StudentBatch.find({ batch_id: req.params.batchId }).lean();
+        res.json(assignments.map(a => ({ student_id: a.student_id?.toString() })));
+    } catch (err) { handleError(res, err, 'admin-batch-students'); }
+});
+
+// Get enrollments for a specific user (for revoke dialog)
+app.get('/api/admin/user-enrollments/:userId', authenticateToken, requireAdminOrManager, async (req, res) => {
+    try {
+        const enrollments = await Enrollment.find({
+            user_id: req.params.userId,
+            status: { $in: ['active', 'pending'] }
+        }).populate('course_id', 'title').lean();
+        res.json(enrollments.map(e => ({
+            id: e._id.toString(),
+            course_title: e.course_id?.title || 'Unknown Course',
+            status: e.status
+        })));
+    } catch (err) { handleError(res, err, 'user-enrollments'); }
+});
+
+// Revoke course access for a student (all or specific enrollments)
+app.post('/api/admin/users/:userId/revoke-access', authenticateToken, requireAdminOrManager, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { enrollmentIds } = req.body || {};
+        let result;
+        if (enrollmentIds && enrollmentIds.length > 0) {
+            // Revoke specific enrollments
+            result = await Enrollment.updateMany(
+                { _id: { $in: enrollmentIds }, user_id: userId },
+                { $set: { status: 'rejected' } }
+            );
+        } else {
+            // Revoke all
+            result = await Enrollment.updateMany(
+                { user_id: userId, status: { $in: ['active', 'pending'] } },
+                { $set: { status: 'rejected' } }
+            );
+        }
+        res.json({ message: `Revoked access for ${result.modifiedCount} enrollments.` });
+    } catch (err) { handleError(res, err, 'revoke-access'); }
+});
+
 app.post('/api/admin/fix-departments', authenticateToken, async (req, res) => {
     try {
-        const profiles = await Profile.find({ department: { $exists: true, $ne: null, $ne: '' } }).lean();
         let fixed = 0;
+        let filled = 0;
+
+        // 1. Uppercase all existing department values
+        const profiles = await Profile.find({ department: { $exists: true, $ne: null, $ne: '' } }).lean();
         for (const p of profiles) {
             const upper = (p.department || '').toUpperCase();
             if (p.department !== upper) {
@@ -1268,7 +1395,26 @@ app.post('/api/admin/fix-departments', authenticateToken, async (req, res) => {
                 fixed++;
             }
         }
-        res.json({ message: `Fixed ${fixed} profiles. All departments now uppercase.` });
+
+        // 2. Fill missing departments from course enrollments
+        const emptyProfiles = await Profile.find({ 
+            $or: [{ department: null }, { department: '' }, { department: { $exists: false } }]
+        }).lean();
+
+        for (const p of emptyProfiles) {
+            const enrollment = await Enrollment.findOne({ user_id: p.user_id })
+                .populate('course_id', 'department')
+                .lean();
+            const dept = enrollment?.course_id?.department;
+            if (dept) {
+                await Profile.updateOne({ _id: p._id }, { $set: { department: dept.toUpperCase() } });
+                filled++;
+            }
+        }
+
+        res.json({ 
+            message: `Done. Uppercased: ${fixed}, Filled from enrollment: ${filled}. Total fixed: ${fixed + filled} profiles.` 
+        });
     } catch (err) { handleError(res, err, 'fix-departments'); }
 });
 
@@ -1298,11 +1444,11 @@ app.post('/api/auth/signup', async (req, res) => {
         const registrationTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
         // Determine role based on courseType/role parameter
-        const assignedRole = ['admin', 'manager', 'instructor', 'student', 'intern'].includes(courseType)
+        const assignedRole = ['admin', 'manager', 'instructor', 'student'].includes(courseType)
             ? courseType
-            : (courseType === 'internship' ? 'intern' : 'student');
+            : 'student';
 
-        const profileCourseType = assignedRole === 'intern' ? 'internship' : 'full_time';
+        const profileCourseType = 'full_time';
 
         // Create User
         const user = await User.create({
@@ -2589,7 +2735,8 @@ app.get('/api/admin/student-performance/:studentId', authenticateToken, requireA
 
         const enrollments = await Enrollment.find({ user_id: studentId }).populate('course_id').lean();
 
-        const activeEnrollments = enrollments.filter(e => e.course_id && e.course_id.is_active !== false);
+        // Exclude rejected/revoked - only show active enrollments in My Courses
+        const activeEnrollments = enrollments.filter(e => e.course_id && e.course_id.is_active !== false && e.status === 'active');
 
         const courseProgress = activeEnrollments.map(e => ({
             course_name: e.course_id.title,
@@ -2735,8 +2882,8 @@ app.get('/api/admin/exams-list', authenticateToken, requireInstructor, async (re
             }).select('_id').lean();
             examQuery = { course_id: { $in: instrCourses.map(c => c._id) } };
         } else if (role === 'manager') {
-            const managerDept = await getManagerDepartment(req.user.id);
-            if (managerDept) examQuery = { department: managerDept };
+            // Managers see ALL exams for scheduling/monitoring purposes
+            examQuery = {};
         }
 
         const rawExams = await Exam.find(examQuery)
@@ -2744,6 +2891,8 @@ app.get('/api/admin/exams-list', authenticateToken, requireInstructor, async (re
             .limit(100)
             .populate('approved_by', 'full_name _id')
             .populate('created_by', 'full_name _id')
+            .populate('target_batches', 'batch_name department')
+            .populate('course_id', 'title department')
             .lean();
 
         // Enrich approved_by with profile (roll_number)
@@ -2754,12 +2903,44 @@ app.get('/api/admin/exams-list', authenticateToken, requireInstructor, async (re
         const profMap = {};
         profiles.forEach(p => { profMap[p.user_id.toString()] = p; });
 
-        const transformedExams = rawExams.map(e => {
+        const transformedExams = await Promise.all(rawExams.map(async e => {
             const approver = e.approved_by;
             const creator  = e.created_by;
+
+            // Get batch names: from target_batches (populated) OR from StudentBatch via exam access
+            let batchNames = [];
+            if (e.target_batches && e.target_batches.length > 0) {
+                batchNames = e.target_batches
+                    .map(b => typeof b === 'object' ? b.batch_name : null)
+                    .filter(Boolean);
+            }
+            if (batchNames.length === 0) {
+                // Look up which students have access and what batches they're in
+                const examOrMockId = e._id;
+                const accessRecords = await StudentExamAccess.find({
+                    $or: [{ exam_id: examOrMockId }, { mock_paper_id: examOrMockId }]
+                }).select('student_id').lean();
+
+                if (accessRecords.length > 0) {
+                    const studentIds = accessRecords.map(a => a.student_id);
+                    const assignments = await StudentBatch.find({
+                        student_id: { $in: studentIds },
+                        ...(e.course_id?._id ? { course_id: e.course_id._id } : {})
+                    }).populate('batch_id', 'batch_name').lean();
+
+                    const uniqueNames = [...new Set(
+                        assignments
+                            .map(a => a.batch_id?.batch_name)
+                            .filter(Boolean)
+                    )];
+                    batchNames = uniqueNames;
+                }
+            }
+
             return {
                 ...e,
                 id: e._id,
+                batch_names: batchNames,
                 approved_by_info: approver ? {
                     full_name:   approver.full_name,
                     roll_number: profMap[approver._id?.toString()]?.roll_number || null
@@ -2769,7 +2950,7 @@ app.get('/api/admin/exams-list', authenticateToken, requireInstructor, async (re
                     roll_number: profMap[creator._id?.toString()]?.roll_number || null
                 } : null,
             };
-        });
+        }));
 
         res.json(transformedExams);
     } catch (err) {
@@ -2798,7 +2979,7 @@ app.get('/api/instructor/students', authenticateToken, requireInstructor, async 
 
         // Get students enrolled in instructor's courses
         const enrolledStudents = courseIds.length > 0
-            ? await Enrollment.find({ course_id: { $in: courseIds }, status: { $in: ['active', 'completed', 'pending'] } }).select('user_id').lean()
+            ? await Enrollment.find({ course_id: { $in: courseIds }, status: 'active' }).select('user_id').lean()
             : [];
         const enrolledStudentIds = enrolledStudents.map(e => e.user_id);
 
@@ -3052,7 +3233,86 @@ app.delete('/api/admin/courses/:id', authenticateToken, requireAdminOrManager, a
     }
 });
 
-// Health check endpoint (used by keep-alive ping and monitoring)
+// GET /api/student/live-classes — only classes assigned to this student's batch/course
+app.get('/api/student/live-classes', authenticateToken, async (req, res) => {
+    try {
+        const studentId = req.user.id;
+
+        // Get student's batch assignments
+        const studentBatches = await StudentBatch.find({ student_id: studentId })
+            .select('batch_id course_id').lean();
+        const studentBatchIds = studentBatches.map(sb => sb.batch_id?.toString()).filter(Boolean);
+        const studentCourseIds = studentBatches.map(sb => sb.course_id?.toString()).filter(Boolean);
+
+        // Get student's enrollments
+        const enrollments = await Enrollment.find({ user_id: studentId }).select('course_id').lean();
+        const enrolledCourseIds = enrollments.map(e => e.course_id?.toString()).filter(Boolean);
+        const allCourseIds = [...new Set([...studentCourseIds, ...enrolledCourseIds])];
+
+        // Find live classes assigned to student's batches or courses, or broadcast to all
+        const classes = await LiveClass.find({
+            $or: [
+                { target_batch: 'all' },
+                { batch_id: { $in: studentBatchIds } },
+                { course_id: { $in: allCourseIds } },
+            ]
+        }).sort({ scheduled_at: 1 }).lean();
+
+        res.json(classes);
+    } catch (err) {
+        handleError(res, err, 'student-live-classes');
+    }
+});
+
+
+app.post('/api/admin/fix-exam-batches', authenticateToken, requireAdmin, async (req, res) => {
+    try {
+        const exams = await Exam.find({
+            $or: [
+                { target_batches: { $exists: false } },
+                { target_batches: { $size: 0 } },
+                { target_batches: null }
+            ]
+        }).lean();
+
+        const results = [];
+
+        for (const exam of exams) {
+            const accessRecords = await StudentExamAccess.find({
+                $or: [{ exam_id: exam._id }, { mock_paper_id: exam._id }]
+            }).select('student_id').lean();
+
+            if (accessRecords.length === 0) continue;
+
+            const studentIds = accessRecords.map(a => a.student_id);
+            const assignments = await StudentBatch.find({
+                student_id: { $in: studentIds }
+            }).select('batch_id').lean();
+
+            const batchIds = [...new Set(
+                assignments.map(a => a.batch_id?.toString()).filter(Boolean)
+            )];
+
+            if (batchIds.length === 0) continue;
+
+            await Exam.findByIdAndUpdate(exam._id, {
+                $set: { target_batches: batchIds }
+            });
+
+            const batchDocs = await Batch.find({ _id: { $in: batchIds } }).select('batch_name').lean();
+            results.push({
+                exam: exam.title,
+                batches: batchDocs.map(b => b.batch_name)
+            });
+        }
+
+        res.json({ message: 'Done', updated: results.length, results });
+    } catch (err) {
+        handleError(res, err, 'fix-exam-batches');
+    }
+});
+
+
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
@@ -3062,7 +3322,11 @@ app.get('/api/manager/me', authenticateToken, requireAdminOrManager, async (req,
     try {
         const role = await getUserRole(req.user.id);
         const dept = role === 'manager' ? await getManagerDepartment(req.user.id) : null;
-        const deptStudentCount = dept ? await Profile.countDocuments({ department: dept }) : null;
+        // Support multi-dept: count students in any of manager's departments
+        const depts = dept ? dept.split(',').map(d => d.trim()).filter(Boolean) : [];
+        const deptStudentCount = depts.length > 0
+            ? await Profile.countDocuments({ department: { $in: depts } })
+            : null;
         res.json({ role, department: dept, deptStudentCount });
     } catch (err) {
         handleError(res, err, 'manager-me');
@@ -3112,8 +3376,11 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
             if (existing) return res.status(400).json({ error: 'This mobile number is already registered with another account.' });
         }
         if (updates.roll_number) {
-            const existing = await Profile.findOne({ roll_number: updates.roll_number, user_id: { $ne: req.user.id } });
-            if (existing) return res.status(400).json({ error: 'This roll number is already registered with another account.' });
+            const callerRole = await getUserRole(req.user.id);
+            if (callerRole === 'student') {
+                const existing = await Profile.findOne({ roll_number: updates.roll_number, user_id: { $ne: req.user.id } });
+                if (existing) return res.status(400).json({ error: 'This roll number is already registered with another account.' });
+            }
         }
 
         // Update Profile
@@ -3133,6 +3400,8 @@ app.put('/api/user/profile', authenticateToken, async (req, res) => {
         }
 
         res.json({ message: 'Profile updated' });
+        // Clear manager dept cache so new dept/year takes effect immediately
+        deptCache.delete(req.user.id.toString());
     } catch (err) {
         handleError(res, err, 'update-profile');
     }
@@ -3485,7 +3754,7 @@ app.get('/api/chat/contacts', authenticateToken, async (req, res) => {
     }
 });
 
-// GET /api/chat/contacts/by-batch — Instructor sees students grouped by batch session
+// GET /api/chat/contacts/by-batch — Instructor sees students grouped by batch
 app.get('/api/chat/contacts/by-batch', authenticateToken, requireInstructor, async (req, res) => {
     try {
         // 1. Find all courses the instructor teaches
@@ -3495,7 +3764,7 @@ app.get('/api/chat/contacts/by-batch', authenticateToken, requireInstructor, asy
         const courseIds = myCourses.map(c => c._id);
 
         if (courseIds.length === 0) {
-            return res.json({ morning: [], afternoon: [], evening: [], unassigned: [], all: [] });
+            return res.json({ all: [] });
         }
 
         // 2. Find batches this instructor is assigned to
@@ -3536,24 +3805,15 @@ app.get('/api/chat/contacts/by-batch', authenticateToken, requireInstructor, asy
                 avatar: profile?.avatar_url || null,
                 email: profile?.email || user?.email || '',
                 role: 'student',
-                batch_session: a.assigned_session || batch?.batch_type || 'unassigned',
-                batch_name: batch?.batch_name || 'Unknown Batch',
+                roll_number: profile?.roll_number || null,
+                batch_name: batch?.batch_name || 'No Batch',
                 batch_id: batch?._id?.toString() || null,
                 course_id: a.course_id?.toString()
             });
             return acc;
         }, []);
 
-        // 6. Group by session
-        const grouped = {
-            morning: studentList.filter(s => s.batch_session === 'morning'),
-            afternoon: studentList.filter(s => s.batch_session === 'afternoon'),
-            evening: studentList.filter(s => s.batch_session === 'evening'),
-            unassigned: studentList.filter(s => !['morning', 'afternoon', 'evening'].includes(s.batch_session)),
-            all: studentList
-        };
-
-        res.json(grouped);
+        res.json({ all: studentList });
     } catch (err) {
         handleError(res, err, 'get-chat-contacts-by-batch');
     }
@@ -3687,9 +3947,11 @@ app.post('/api/upload/course-resources', authenticateToken, requireInstructor, u
 
         console.log(`[System] Instructor ${req.user.id} uploading course resource to Cloudinary...`);
 
+        const isPdf = (req.file.originalname || '').toLowerCase().endsWith('.pdf') || req.file.mimetype === 'application/pdf';
+
         const result = await cloudinary.uploader.upload(dataURI, {
             folder: 'course_resources',
-            resource_type: 'auto'
+            resource_type: isPdf ? 'raw' : 'auto'
         });
 
         res.json({
@@ -4734,7 +4996,16 @@ app.get('/api/admin/resume-scans', authenticateToken, async (req, res) => {
                     .sort({ created_at: -1 });
             }
             console.log(`[API] Found ${scans.length} resume scans for role: ${userRole}${managerDept ? ` dept: ${managerDept}` : ''}`);
-            return res.json(scans);
+            const scanUserIds = scans.map(s => s.user_id?._id || s.user_id);
+            const scanProfiles = await Profile.find({ user_id: { $in: scanUserIds } }).select('user_id year department').lean();
+            const scanProfileMap = {};
+            scanProfiles.forEach(p => { scanProfileMap[p.user_id.toString()] = p; });
+            const enrichedScans = scans.map(s => {
+                const uid = (s.user_id?._id || s.user_id)?.toString();
+                const prof = scanProfileMap[uid] || {};
+                return { ...s.toObject(), year: prof.year || null, department: prof.department || null };
+            });
+            return res.json(enrichedScans);
         } else if (userRole === 'instructor') {
             // 1. Fetch instructor's courses
             // Ensure userId is converted to ObjectId for robust matching
@@ -4770,7 +5041,16 @@ app.get('/api/admin/resume-scans', authenticateToken, async (req, res) => {
                 .populate('user_id', 'full_name email avatar_url')
                 .sort({ created_at: -1 });
             console.log(`[API] Instructor ${userId} found ${studentIds.length} students and ${scans.length} scans`);
-            return res.json(scans);
+            // Enrich with year/department from profiles
+            const scanProfiles2 = await Profile.find({ user_id: { $in: studentIds } }).select('user_id year department').lean();
+            const scanProfileMap2 = {};
+            scanProfiles2.forEach(p => { scanProfileMap2[p.user_id.toString()] = p; });
+            const enrichedScans2 = scans.map(s => {
+                const uid = (s.user_id?._id || s.user_id)?.toString();
+                const prof = scanProfileMap2[uid] || {};
+                return { ...s.toObject(), year: prof.year || null, department: prof.department || null };
+            });
+            return res.json(enrichedScans2);
         } else {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -4808,21 +5088,71 @@ app.post('/api/admin/refill-ats-credits', authenticateToken, requireAdminOrManag
 
 app.get('/api/admin/live-monitoring', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
-        // 1. Fetch All Enrollments with Progress
-        const enrollments = await Enrollment.find()
+        const role = await getUserRole(req.user.id);
+        const managerDept = role === 'manager' ? await getManagerDepartment(req.user.id) : null;
+
+        // Build enrollment filter scoped to manager's dept if applicable
+        let enrollmentFilter = {};
+        if (managerDept) {
+            // Find courses in manager's department
+            const deptCourses = await Course.find({ department: managerDept }).select('_id').lean();
+            const deptCourseIds = deptCourses.map(c => c._id);
+            // Also include skill courses (no dept) for all students
+            const skillCourses = await Course.find({ $or: [{ department: null }, { department: { $exists: false } }] }).select('_id').lean();
+            const allCourseIds = [...deptCourseIds, ...skillCourses.map(c => c._id)];
+
+            // Get students in manager's dept
+            const deptProfiles = await Profile.find({ department: managerDept }).select('user_id').lean();
+            const deptUserIds = deptProfiles.map(p => p.user_id);
+
+            enrollmentFilter = {
+                $or: [
+                    { course_id: { $in: deptCourseIds } },       // dept course enrollments
+                    { user_id: { $in: deptUserIds } }              // dept students in any course
+                ]
+            };
+        }
+
+        // 1. Fetch enrollments with optional dept filter
+        const enrollments = await Enrollment.find(enrollmentFilter)
             .populate('user_id', 'full_name email')
-            .populate('course_id', 'title category')
+            .populate('course_id', 'title category department')
             .sort({ updated_at: -1, enrolled_at: -1 })
             .lean();
 
-        // 2. Fetch All Exam/Mock Results
-        const examResults = await ExamResult.find()
+        // 2. Fetch Exam/Mock Results scoped to same students
+        let examFilter = {};
+        if (managerDept) {
+            const enrolledUserIds = [...new Set(enrollments.map(e => e.user_id?._id).filter(Boolean))];
+            examFilter = { student_id: { $in: enrolledUserIds } };
+        }
+
+        const examResults = await ExamResult.find(examFilter)
             .populate('student_id', 'full_name email')
             .populate('exam_id', 'title exam_type')
             .populate('mock_paper_id', 'title')
             .sort({ submitted_at: -1 })
             .limit(200)
             .lean();
+
+        // Get student profiles for roll_number, department, year
+        const resultStudentIds = [...new Set(examResults.map(r => r.student_id?._id?.toString()).filter(Boolean))];
+        const studentProfiles = await Profile.find({ user_id: { $in: resultStudentIds } })
+            .select('user_id roll_number department year').lean();
+        const studentProfileMap = studentProfiles.reduce((acc, p) => {
+            acc[p.user_id.toString()] = p;
+            return acc;
+        }, {});
+
+        // Get batch assignments for students
+        const studentBatchAssignments = await StudentBatch.find({ student_id: { $in: resultStudentIds } })
+            .populate('batch_id', 'batch_name').lean();
+        const studentBatchMap = studentBatchAssignments.reduce((acc, a) => {
+            const sid = a.student_id.toString();
+            if (!acc[sid]) acc[sid] = [];
+            if (a.batch_id?.batch_name) acc[sid].push(a.batch_id.batch_name);
+            return acc;
+        }, {});
 
         res.json({
             enrollments: enrollments.map(e => ({
@@ -4835,18 +5165,31 @@ app.get('/api/admin/live-monitoring', authenticateToken, requireAdminOrManager, 
                 status: e.status,
                 last_accessed: e.last_accessed_at || e.enrolled_at
             })),
-            results: examResults.map(r => ({
-                id: r._id,
-                student: r.student_id?.full_name || 'Deleted User',
-                email: r.student_id?.email || 'N/A',
-                test_title: r.exam_id?.title || r.mock_paper_id?.title || 'System Generated Test',
-                type: r.exam_id?.exam_type || 'mock',
-                score: r.score,
-                total: r.total_questions,
-                percentage: Math.round(r.percentage || 0),
-                time_spent: r.time_spent,
-                submitted_at: r.submitted_at
-            }))
+            results: examResults.map(r => {
+                const sid = r.student_id?._id?.toString();
+                const prof = studentProfileMap[sid] || {};
+                const batches = studentBatchMap[sid] || [];
+                // Fix percentage: use total_marks from snapshot if available
+                const snapshotMarks = (r.questions_snapshot || []).reduce((s, q) => s + (q.marks || 1), 0);
+                const totalMarks = snapshotMarks > 0 ? snapshotMarks : r.total_questions;
+                const correctedPct = totalMarks > 0 ? Math.min(Math.round((r.score / totalMarks) * 100), 100) : Math.round(r.percentage || 0);
+                return {
+                    id: r._id,
+                    student: r.student_id?.full_name || 'Deleted User',
+                    email: r.student_id?.email || 'N/A',
+                    roll_number: prof.roll_number || null,
+                    department: prof.department || null,
+                    year: prof.year || null,
+                    batch_name: batches.join(', ') || null,
+                    test_title: r.exam_id?.title || r.mock_paper_id?.title || 'System Generated Test',
+                    type: r.exam_id?.exam_type || 'mock',
+                    score: r.score,
+                    total: totalMarks,
+                    percentage: correctedPct,
+                    time_spent: r.time_spent,
+                    submitted_at: r.submitted_at
+                };
+            })
         });
     } catch (err) {
         handleError(res, err, 'admin-live-monitoring');
@@ -4896,7 +5239,13 @@ app.get('/api/student/all-resources', authenticateToken, async (req, res) => {
                     console.error('Error signing file_url:', e);
                 }
             } else {
-                item.view_url = item.file_url;
+                // Fix Cloudinary PDF URLs: replace image/upload with raw/upload
+                let url = item.file_url || '';
+                if (url.includes('cloudinary.com') && url.includes('/image/upload/') &&
+                    (url.endsWith('.pdf') || item.upload_format === 'pdf')) {
+                    url = url.replace('/image/upload/', '/raw/upload/');
+                }
+                item.view_url = url;
             }
             if (item._id) item.id = item._id.toString();
             return item;
@@ -5030,6 +5379,14 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
         const completedExamIds = new Set(examResults.map(r => r.exam_id?.toString()).filter(Boolean));
         const completedMockIds = new Set(examResults.map(r => r.mock_paper_id?.toString()).filter(Boolean));
         const completedQBTopics = new Set(examResults.map(r => r.test_title).filter(Boolean));
+
+        // Map exam/mock id -> result _id for review navigation
+        const examResultIdMap = {};
+        const mockResultIdMap = {};
+        examResults.forEach(r => {
+            if (r.exam_id) examResultIdMap[r.exam_id.toString()] = r._id.toString();
+            if (r.mock_paper_id) mockResultIdMap[r.mock_paper_id.toString()] = r._id.toString();
+        });
 
         const checkCompleted = (type, id) => {
             if (!id) return false;
@@ -5188,6 +5545,9 @@ app.get('/api/student/accessible-exams', authenticateToken, async (req, res) => 
                     is_completed: isMockAccess
                         ? checkCompleted('mock', finalMockId)
                         : checkCompleted('exam', access.exam_id?._id),
+                    result_id: isMockAccess
+                        ? (finalMockId ? mockResultIdMap[finalMockId.toString()] || null : null)
+                        : (access.exam_id?._id ? examResultIdMap[access.exam_id._id.toString()] || null : null),
                     assigned_image: access.exam_id?.assigned_image || access.mock_paper_id?.assigned_image || null,
                     exam_schedules: (!isExamMock && access.exam_id) ? {
                         title: access.exam_id.title,
@@ -5376,12 +5736,8 @@ app.get('/api/manager/approved-question-banks', authenticateToken, requireInstru
         const role = await getUserRole(req.user.id);
         const managerDept = role === 'manager' ? await getManagerDepartment(req.user.id) : null;
 
-        // Build match filter — scope to dept if manager
+        // Build match filter — show all approved question banks (no dept restriction for managers)
         const matchFilter = { approval_status: 'approved' };
-        if (managerDept) {
-            matchFilter.department = managerDept;
-            console.log(`[ACL] Manager question-banks scoped to dept: ${managerDept}`);
-        }
 
         const banks = await QuestionBank.aggregate([
             { $match: matchFilter },
@@ -5409,11 +5765,9 @@ app.get('/api/admin/question-bank-summary', authenticateToken, requireInstructor
         const role = await getUserRole(req.user.id);
         const managerDept = role === 'manager' ? await getManagerDepartment(req.user.id) : null;
 
-        // Scope by manager dept or instructor's courses
+        // Scope by instructor's courses only; manager sees all
         let matchStage = { $match: {} };
-        if (managerDept) {
-            matchStage = { $match: { department: managerDept } };
-        } else if (role === 'instructor') {
+        if (role === 'instructor') {
             const instrCourses = await Course.find({
                 $or: [{ instructor_ids: req.user.id }, { instructor_id: req.user.id }]
             }).select('_id').lean();
@@ -5868,7 +6222,9 @@ app.post('/api/student/submit-exam', authenticateToken, async (req, res) => {
             }
         }
 
-        const percentage = totalQuestions > 0 ? (score / totalQuestions) * 100 : 0;
+        // Calculate percentage based on total marks (sum of all question marks)
+        const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+        const percentage = totalMarks > 0 ? Math.min((score / totalMarks) * 100, 100) : 0;
 
         // Resolve title and snapshot for easy viewing/grading
         let resolvedCourseId = null;
@@ -6009,7 +6365,9 @@ app.post('/api/instructor/grade-result/:resultId', authenticateToken, requireIns
 
             // Score = Initial objective score + new subjective marks
             result.score = (result.objective_score || 0) + totalSubjectiveMarks;
-            result.percentage = result.total_questions > 0 ? (result.score / result.total_questions) * 100 : 0;
+            // Recalculate percentage from total marks in snapshot
+            const snapshotTotalMarks = (result.questions_snapshot || []).reduce((s, q) => s + (q.marks || 1), 0);
+            result.percentage = snapshotTotalMarks > 0 ? Math.min((result.score / snapshotTotalMarks) * 100, 100) : 0;
         }
 
         if (global_feedback) result.global_feedback = global_feedback;
@@ -6119,11 +6477,22 @@ app.get('/api/student/exam-review/:resultId', authenticateToken, async (req, res
             };
         });
 
+        // Recalculate percentage from actual marks (not question count)
+        const totalMarksFromSnapshot = (result.questions_snapshot || []).reduce(
+            (sum, q) => sum + (q.marks || 1), 0
+        );
+        // Fallback: use questions array marks if snapshot missing
+        const totalMarksFromQuestions = questions.reduce((sum, q) => sum + (q.marks || 1), 0);
+        const totalMarks = totalMarksFromSnapshot > 0 ? totalMarksFromSnapshot : totalMarksFromQuestions;
+        const correctedPercentage = totalMarks > 0
+            ? Math.min(Math.round((result.score / totalMarks) * 100), 100)
+            : Math.round(result.percentage || 0);
+
         res.json({
             meta: {
                 score: result.score,
-                total: result.total_questions,
-                percentage: result.percentage,
+                total: totalMarks,
+                percentage: correctedPercentage,
                 submitted_at: result.submitted_at,
                 grading_status: result.grading_status,
                 global_feedback: result.global_feedback,
@@ -6569,6 +6938,7 @@ app.get('/api/admin/students', authenticateToken, requireAdminOrManager, async (
                     mobile_number: '$profile.mobile_number',
                     department: '$profile.department',
                     roll_number: '$profile.roll_number',
+                    year: '$profile.year',
                     course_type: { $ifNull: ['$profile.course_type', 'full_time'] },
                     full_address: '$profile.full_address',
                     city: '$profile.city',
@@ -6711,18 +7081,32 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
             if (managerDept) {
                 // Tables scoped via student user_ids (student-related data)
                 const studentUserScopedTables = ['leaderboard_stats', 'leaderboard', 'course_enrollments', 'exam_results', 'resumescans', 'student_exam_access', 'attendance', 'coupons'];
-                // Tables scoped via department field directly (content created by dept manager)
-                const deptFieldTables = ['exams', 'question_bank', 'courses', 'batches', 'live_classes', 'course_modules', 'course_videos', 'course_resources'];
+                // Tables scoped via department field (only course content, not exams/qbank/live)
+                const deptFieldTables = ['courses', 'batches', 'course_modules', 'course_videos', 'course_resources'];
 
                 if (table === 'profiles') {
-                    // Also find users enrolled in dept courses (catches students with missing department field)
+                    // Find users enrolled in manager's dept courses
                     const deptCourses = await Course.find({ department: managerDept }).select('_id').lean();
                     const deptCourseIds = deptCourses.map(c => c._id);
                     const enrolledInDept = await Enrollment.find({ course_id: { $in: deptCourseIds } }).select('user_id').lean();
                     const enrolledUserIds = enrolledInDept.map(e => e.user_id);
-                    const deptFilter = { $or: [ { department: managerDept }, { user_id: { $in: enrolledUserIds } } ] };
+
+                    const managerYear = await (async () => {
+                        try {
+                            const p = await Profile.findOne({ user_id: req.user.id }).select('year').lean();
+                            return p?.year || null;
+                        } catch(e) { return null; }
+                    })();
+
+                    const orConditions = [
+                        { department: managerDept },
+                        { user_id: { $in: enrolledUserIds } }
+                    ];
+                    if (managerYear && managerYear !== 'never') orConditions.push({ year: managerYear });
+
+                    const deptFilter = { $or: orConditions };
                     query = Object.keys(query).length > 0 ? { $and: [query, deptFilter] } : deptFilter;
-                    console.log(`[ACL] Manager scoped profiles to dept: ${managerDept} (direct: ${enrolledUserIds.length} via enrollment)`);
+                    console.log(`[ACL] Manager scoped profiles to dept: ${managerDept} year: ${managerYear}`);
 
                 } else if (studentUserScopedTables.includes(table)) {
                     // Also include students enrolled in dept courses
@@ -6747,6 +7131,11 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                                 { department: { $exists: false } }
                             ]
                         };
+                    } else if (table === 'batches') {
+                        // Filter batches by their course's department (not batch.department which may not be set)
+                        const deptCoursesBatch = await Course.find({ department: managerDept }).select('_id').lean();
+                        const deptCourseIdsBatch = deptCoursesBatch.map(c => c._id);
+                        deptFilter = { course_id: { $in: deptCourseIdsBatch } };
                     } else {
                         deptFilter = { department: managerDept };
                     }
@@ -7654,10 +8043,15 @@ app.post('/api/batches', authenticateToken, requireInstructor, async (req, res) 
 
         const { batch_name, batch_type, max_students, start_time, end_time, course_id } = req.body;
 
+        // Auto-set department from the course
+        const courseDoc = await Course.findById(course_id).select('department').lean();
+        const batchDept = courseDoc?.department || null;
+
         const batch = await Batch.create({
             batch_name,
-            batch_type,
+            batch_type: batch_type || 'morning',
             course_id,
+            department: batchDept,
             max_students: parseInt(max_students) || 50,
             start_time: start_time || null,
             end_time: end_time || null,
@@ -7729,9 +8123,14 @@ app.get('/api/batches', authenticateToken, async (req, res) => {
                 filter.instructor_id = req.user.id;
             }
         } else if (userRole === 'manager') {
-            // Manager sees only batches in their department
+            // Manager sees batches whose course belongs to their department
             const managerDept = await getManagerDepartment(req.user.id);
-            if (managerDept) filter.department = managerDept;
+            if (managerDept) {
+                // Find courses in manager's department
+                const deptCourses = await Course.find({ department: managerDept }).select('_id').lean();
+                const deptCourseIds = deptCourses.map(c => c._id);
+                filter.course_id = { $in: deptCourseIds };
+            }
         }
         if (req.query.is_active !== undefined) filter.is_active = req.query.is_active === 'true';
 
@@ -7985,6 +8384,9 @@ app.get('/api/batches/course-roster/:courseId', authenticateToken, requireInstru
                 full_name: profile?.full_name || user?.full_name || 'Enrolled Student',
                 email: profile?.email || user?.email || 'No email',
                 avatar_url: profile?.avatar_url || user?.avatar_url || null,
+                roll_number: profile?.roll_number || null,
+                year: profile?.year || null,
+                department: profile?.department || null,
                 role: role,
                 enrollment_status: enrollmentStatusMap[uid] || 'pending',
                 batch: (assigned && assigned.batch) ? {

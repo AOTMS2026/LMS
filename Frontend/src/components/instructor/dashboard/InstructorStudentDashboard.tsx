@@ -185,6 +185,11 @@ function StudentRow({ student, onSendMessage, onViewDetails }: {
         </div>
         <div className="min-w-0">
           <p className="font-black text-xl text-slate-900 truncate tracking-tight mb-1 group-hover:text-black transition-colors">{student.name}</p>
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            {student.roll_number && <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider bg-slate-100 px-2 py-0.5 rounded-md">{student.roll_number}</span>}
+            {student.year && <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md">Year {student.year}</span>}
+            {student.department && <span className="text-[10px] font-black text-primary uppercase tracking-wider bg-primary/10 px-2 py-0.5 rounded-md">{student.department}</span>}
+          </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className={cn(
               "h-6 px-3 text-[10px] font-black border-none uppercase tracking-[0.05em] rounded-lg",

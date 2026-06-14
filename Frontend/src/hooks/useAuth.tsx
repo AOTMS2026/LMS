@@ -238,8 +238,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (newUser) {
           localStorage.setItem('user', JSON.stringify(newUser));
         }
-        // Use the role returned by the server (intern for internship, student for full_time)
-        const signupRole = data.user?.role || 'student';
+        // Always assign student role on signup
+        const signupRole = 'student';
         localStorage.setItem('user_role', signupRole);
 
         setUser(newUser);

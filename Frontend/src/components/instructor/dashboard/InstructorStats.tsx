@@ -93,7 +93,7 @@ export function InstructorStats({ coursesCount, stats, loading }: InstructorStat
     },
     {
       title: "Active Students",
-      value: stats?.activeStudents ?? Math.round((stats?.totalStudents ?? 0) * 0.72),
+      value: stats?.activeStudents ?? (stats?.totalStudents ?? 0),
       icon: UserCheck,
       gradient: "from-emerald-500/10 via-emerald-400/5 to-transparent",
       iconBg: "bg-emerald-500",

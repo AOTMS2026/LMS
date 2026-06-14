@@ -12,11 +12,9 @@ import {
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { SocketProvider } from "@/hooks/useSocket";
 import { useEffect, useRef, useState } from "react";
-import Home from "./pages/Home";
-import Auth from "./pages/Auth";
+import { Navigate } from "react-router-dom";import Auth from "./pages/Auth";
 import InstructorRegister from "./pages/InstructorRegister";
 import Dashboard from "./pages/Dashboard";
-import InternDashboard from "./pages/Interndashboard";
 import InstructorDashboard from "./pages/InstructorDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
 import ManagerDashboard from "./pages/ManagerDashboard";
@@ -65,7 +63,6 @@ const BackNavigationHandler = () => {
     const handlePopState = (event: PopStateEvent) => {
       const dashboardMap: Record<string, string> = {
         student: "/student-dashboard",
-        intern: "/intern-dashboard",
         instructor: "/instructor",
         admin: "/admin",
         manager: "/manager",
@@ -105,7 +102,6 @@ const RoleRedirector = () => {
     // Redirection Map
     const dashboardMap: Record<string, string> = {
       student: "/student-dashboard",
-      intern: "/intern-dashboard",
       instructor: "/instructor",
       admin: "/admin",
       manager: "/manager",
@@ -123,23 +119,15 @@ const RoleRedirector = () => {
       }
     }
     // 2. Handle Initial Load / Wrong Page
-    else if (location.pathname === "/auth") {
-      if (target) navigate(target);
+    else if (location.pathname === "/auth" || location.pathname === "/login" || location.pathname === "/") {
+      if (target) navigate(target, { replace: true });
     }
-    // Force specific redirection for non-students/non-interns if they wander into wrong area
+    // Force specific redirection for non-students if they wander into wrong area
     else if (
       userRole !== "student" &&
       location.pathname.startsWith("/student-dashboard")
     ) {
       if (target && target !== "/student-dashboard") {
-        navigate(target);
-      }
-    }
-    else if (
-      userRole !== "intern" &&
-      location.pathname.startsWith("/intern-dashboard")
-    ) {
-      if (target && target !== "/intern-dashboard") {
         navigate(target);
       }
     }
@@ -196,7 +184,7 @@ const App = () => (
             <BackNavigationHandler />
             <RoleRedirector />
             <Routes>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<Navigate to="/auth" replace />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/about" element={<About />} />
               <Route path="/auth" element={<Auth />} />
@@ -245,26 +233,6 @@ const App = () => (
                     allowedRoles={["student", "instructor", "admin"]}
                   >
                     <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/intern-dashboard"
-                element={
-                  <ProtectedRoute
-                    allowedRoles={["intern", "admin"]}
-                  >
-                    <InternDashboard />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/intern-dashboard/*"
-                element={
-                  <ProtectedRoute
-                    allowedRoles={["intern", "admin"]}
-                  >
-                    <InternDashboard />
                   </ProtectedRoute>
                 }
               />

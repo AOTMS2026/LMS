@@ -15,6 +15,7 @@ import { InstructorManagement } from "@/components/admin/InstructorManagement";
 import { GrantStudentAccess } from "@/components/admin/GrantStudentAccess";
 import { AllCoursesList } from "@/components/admin/AllCoursesList";
 import { ResumeScanHistory } from "@/components/admin/ResumeScanHistory";
+import { StudentDirectory } from "@/components/admin/StudentDirectory";
 import { LiveMonitoring } from "@/components/admin/LiveMonitoring";
 import { StudentPerformance } from "@/components/admin/StudentPerformance";
 import { AICommunicationHub } from "@/components/admin/AICommunicationHub";
@@ -422,6 +423,7 @@ export default function AdminDashboard() {
 
       "/admin/profile": "profile",
       "/admin/notifications": "notifications",
+      "/admin/students": "students",
       "/admin/student-performance": "student-performance",
       "/admin/grading": "grading",
       "/admin/resume-scans": "resume-scans",
@@ -784,6 +786,15 @@ export default function AdminDashboard() {
               </div>
 
               <div className="min-h-[600px]">
+                <TabsContent
+                  key="tab-students"
+                  value="students"
+                  className="mt-0 outline-none"
+                >
+                  <motion.div key="motion-students" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <StudentDirectory />
+                  </motion.div>
+                </TabsContent>
                 <TabsContent
                   key="tab-student-performance"
                   value="student-performance"

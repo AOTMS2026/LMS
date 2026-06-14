@@ -571,7 +571,10 @@ export function ResourcesDashboard() {
                                         variant="secondary" 
                                         size="sm" 
                                         className="h-10 px-6 rounded-xl font-bold flex-1 bg-primary/10 text-primary hover:bg-primary/20"
-                                        onClick={() => window.open(resource.file_url, '_blank')}
+                                        onClick={() => {
+                                          const url = resource.file_url || '';
+                                          window.open(url, '_blank');
+                                        }}
                                       >
                                         View Content
                                       </Button>
