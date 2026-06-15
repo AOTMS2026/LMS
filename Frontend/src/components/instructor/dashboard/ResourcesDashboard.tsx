@@ -5,10 +5,8 @@ import {
   FileText, 
   File as FileIcon, 
   Trash2, 
-  Download, 
   Eye, 
   Search, 
-  Filter, 
   RefreshCw,
   X,
   CheckCircle2,
@@ -113,6 +111,36 @@ export function ResourcesDashboard() {
   });
 
   const [batches, setBatches] = useState<Batch[]>([]);
+
+  // Viewer dialog state
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerUrl, setViewerUrl] = useState('');
+  const [viewerTitle, setViewerTitle] = useState('');
+  const [viewerType, setViewerType] = useState<'pdf' | 'image' | 'video' | 'other'>('pdf');
+  const [iframeLoading, setIframeLoading] = useState(false);
+
+  const getFileType = (url: string): 'pdf' | 'image' | 'video' | 'other' => {
+    const lower = url.toLowerCase().split('?')[0];
+    if (lower.endsWith('.pdf')) return 'pdf';
+    if (lower.match(/\.(jpeg|jpg|gif|png|webp|svg)$/)) return 'image';
+    if (lower.match(/\.(mp4|webm|ogg|mov)$/)) return 'video';
+    return 'other';
+  };
+
+  const handleViewContent = (resource: CourseResource) => {
+    const url = resource.file_url || '';
+    const type = getFileType(url);
+    setViewerTitle(resource.asset_title);
+    setViewerType(type);
+    setIframeLoading(true);
+    if (type === 'pdf' || type === 'other') {
+      // Google Docs Viewer — works for image PDFs, text PDFs, raw PDFs, all types
+      setViewerUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`);
+    } else {
+      setViewerUrl(url);
+    }
+    setViewerOpen(true);
+  };
 
   React.useEffect(() => {
     const loadBatches = async () => {
@@ -571,11 +599,9 @@ export function ResourcesDashboard() {
                                         variant="secondary" 
                                         size="sm" 
                                         className="h-10 px-6 rounded-xl font-bold flex-1 bg-primary/10 text-primary hover:bg-primary/20"
-                                        onClick={() => {
-                                          const url = resource.file_url || '';
-                                          window.open(url, '_blank');
-                                        }}
+                                        onClick={() => handleViewContent(resource)}
                                       >
+                                        <Eye className="h-4 w-4 mr-2" />
                                         View Content
                                       </Button>
                                       <Button 
@@ -603,6 +629,84 @@ export function ResourcesDashboard() {
         </div>
       )}
       
+      {/* ── Resource Viewer Dialog ── */}
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+        <DialogContent
+          className="max-w-5xl w-full h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl border-none shadow-2xl"
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          {/* Header */}
+          <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b bg-slate-900 shrink-0 space-y-0">
+            <DialogTitle className="text-white font-bold text-base truncate max-w-[85%]">
+              {viewerTitle}
+            </DialogTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl h-8 w-8 shrink-0"
+              onClick={() => setViewerOpen(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DialogHeader>
+
+          {/* Viewer Body */}
+          <div
+            className="flex-1 overflow-hidden relative bg-slate-100 select-none"
+            style={{ userSelect: 'none' }}
+          >
+            {iframeLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 z-10 gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm font-medium text-slate-500">Loading document…</p>
+              </div>
+            )}
+
+            {viewerType === 'image' ? (
+              <div className="w-full h-full flex items-center justify-center p-4">
+                <img
+                  src={viewerUrl}
+                  alt={viewerTitle}
+                  className="max-w-full max-h-full object-contain rounded-xl shadow-lg"
+                  onLoad={() => setIframeLoading(false)}
+                  onError={() => setIframeLoading(false)}
+                  draggable={false}
+                  onContextMenu={(e) => e.preventDefault()}
+                />
+              </div>
+            ) : viewerType === 'video' ? (
+              <div className="w-full h-full flex items-center justify-center p-4">
+                <video
+                  src={viewerUrl}
+                  controls
+                  controlsList="nodownload"
+                  className="max-w-full max-h-full rounded-xl shadow-lg"
+                  onLoadedData={() => setIframeLoading(false)}
+                  onContextMenu={(e) => e.preventDefault()}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+            ) : (
+              /* PDF & all other types — Google Docs Viewer handles image PDFs, text PDFs, raw PDFs */
+              <iframe
+                key={viewerUrl}
+                src={viewerUrl}
+                className="w-full h-full border-none"
+                title={viewerTitle}
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                onLoad={() => setIframeLoading(false)}
+              />
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="px-5 py-2 bg-slate-50 border-t text-[11px] text-slate-400 font-medium text-center shrink-0">
+            View only — downloading is disabled.
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <MetadataDialog 
         open={metadataDialogOpen}
         onOpenChange={setMetadataDialogOpen}

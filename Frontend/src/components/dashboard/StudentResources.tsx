@@ -6,11 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogTrigger, DialogTitle, DialogDescription, DialogHeader } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
     FileText, 
-    Download, 
     Search, 
     File as FileIcon, 
     Video, 
@@ -21,7 +20,8 @@ import {
     BookOpen,
     Presentation,
     RefreshCw,
-    Cloud
+    Cloud,
+    X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -30,11 +30,17 @@ export default function StudentResources() {
     const [selectedCourseId, setSelectedCourseId] = useState<string | null>('all');
     const [searchQuery, setSearchQuery] = useState('');
     const [activeTab, setActiveTab] = useState('all');
-    const [downloadingId, setDownloadingId] = useState<string | null>(null);
     const [viewedResources, setViewedResources] = useState<Set<string>>(() => {
         const saved = localStorage.getItem('viewed_resources');
         return new Set(saved ? JSON.parse(saved) : []);
     });
+
+    // Viewer dialog state
+    const [viewerOpen, setViewerOpen] = useState(false);
+    const [viewerUrl, setViewerUrl] = useState('');
+    const [viewerTitle, setViewerTitle] = useState('');
+    const [viewerType, setViewerType] = useState<'pdf' | 'image' | 'video' | 'other'>('other');
+    const [iframeLoading, setIframeLoading] = useState(false);
 
     const { data: resources, isLoading: isLoadingResources, refetch } = useStudentResources(selectedCourseId === 'all' ? null : selectedCourseId);
 
@@ -57,29 +63,48 @@ export default function StudentResources() {
         return <FileIcon className="h-6 w-6 text-slate-500" />;
     };
 
-    const handleDownload = async (url: string, id: string) => {
-        setDownloadingId(id);
-        
-        // 1. Trigger the download immediately
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.download = '';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+    const getFileType = (url: string): 'pdf' | 'image' | 'video' | 'other' => {
+        const lower = url.toLowerCase().split('?')[0]; // strip query params
+        if (lower.endsWith('.pdf')) return 'pdf';
+        if (lower.match(/\.(jpeg|jpg|gif|png|webp|svg)$/)) return 'image';
+        if (lower.match(/\.(mp4|webm|ogg|mov)$/)) return 'video';
+        return 'other';
+    };
 
-        // 2. Mark as viewed in local storage
+    // Build a viewer URL that works for ALL PDF types (image-based, text, raw)
+    // Google Docs viewer is the most universal approach
+    const getPdfViewerUrl = (fileUrl: string): string => {
+        const encoded = encodeURIComponent(fileUrl);
+        return `https://docs.google.com/viewer?url=${encoded}&embedded=true`;
+    };
+
+    const handleView = (resource: CourseResource) => {
+        const url = resource.file_url;
+        const type = getFileType(url);
+
+        // Mark as viewed
         const newViewed = new Set(viewedResources);
-        newViewed.add(id);
+        newViewed.add(resource.id);
         setViewedResources(newViewed);
         localStorage.setItem('viewed_resources', JSON.stringify(Array.from(newViewed)));
 
-        // 3. Wait 5 seconds then reload the page
-        setTimeout(() => {
-             setDownloadingId(null);
-             window.location.reload();
-        }, 5000);
+        setViewerTitle(resource.asset_title);
+        setViewerType(type);
+        setIframeLoading(true);
+
+        if (type === 'pdf') {
+            // Use Google Docs viewer — works for ALL PDF types
+            setViewerUrl(getPdfViewerUrl(url));
+        } else if (type === 'image') {
+            setViewerUrl(url);
+        } else if (type === 'video') {
+            setViewerUrl(url);
+        } else {
+            // For other files open Google Docs viewer as fallback
+            setViewerUrl(getPdfViewerUrl(url));
+        }
+
+        setViewerOpen(true);
     };
 
     return (
@@ -223,33 +248,14 @@ export default function StudentResources() {
                                                 {resource.short_description || "No description provided."}
                                             </p>
                                         </CardContent>
-                                                                             <CardFooter className="p-5 pt-0 mt-auto">
+
+                                        <CardFooter className="p-5 pt-0 mt-auto">
                                             <Button 
                                                 className="w-full rounded-xl font-bold bg-slate-900 shadow-lg shadow-slate-200 hover:scale-[1.02] transition-all gap-2"
-                                                onClick={() => {
-                                                    const isPreviewable = resource.file_url.toLowerCase().endsWith('.pdf') || 
-                                                                         resource.file_url.match(/\.(jpeg|jpg|gif|png)$/i) ||
-                                                                         resource.file_url.match(/\.(mp4|webm)$/i);
-                                                    
-                                                    if (isPreviewable) {
-                                                        // For previewable files, we still use the dialog but we can also trigger it directly if preferred.
-                                                        // However, the user said "click open form .. preview not available .. remove this type of trigger".
-                                                        // So for NON-previewable, just download.
-                                                        window.open(resource.file_url, '_blank');
-                                                    } else {
-                                                        handleDownload(resource.file_url, resource.id);
-                                                    }
-                                                }}
-                                                disabled={downloadingId === resource.id}
+                                                onClick={() => handleView(resource)}
                                             >
-                                                {downloadingId === resource.id ? (
-                                                    <Loader2 className="h-4 w-4 animate-spin text-white" />
-                                                ) : (
-                                                    <>
-                                                        <Eye className="h-4 w-4" />
-                                                        View or Download
-                                                    </>
-                                                )}
+                                                <Eye className="h-4 w-4" />
+                                                View
                                             </Button>
                                         </CardFooter>
                                     </Card>
@@ -259,6 +265,82 @@ export default function StudentResources() {
                     </div>
                 )}
             </div>
+
+            {/* Viewer Dialog */}
+            <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+                <DialogContent
+                    className="max-w-5xl w-full h-[90vh] p-0 flex flex-col overflow-hidden rounded-2xl border-none shadow-2xl"
+                    // Prevent right-click context menu to block save-as on images/video
+                    onContextMenu={(e) => e.preventDefault()}
+                >
+                    {/* Header */}
+                    <DialogHeader className="flex flex-row items-center justify-between px-5 py-3 border-b bg-slate-900 shrink-0">
+                        <DialogTitle className="text-white font-bold text-base truncate max-w-[80%]">
+                            {viewerTitle}
+                        </DialogTitle>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-slate-400 hover:text-white hover:bg-slate-700 rounded-xl h-8 w-8 shrink-0"
+                            onClick={() => setViewerOpen(false)}
+                        >
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </DialogHeader>
+
+                    {/* Viewer Content */}
+                    <div className="flex-1 overflow-hidden relative bg-slate-100 select-none" style={{ userSelect: 'none' }}>
+                        {iframeLoading && (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 z-10 gap-3">
+                                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                <p className="text-sm font-medium text-slate-500">Loading document...</p>
+                            </div>
+                        )}
+
+                        {viewerType === 'image' ? (
+                            <div className="w-full h-full flex items-center justify-center p-4">
+                                <img
+                                    src={viewerUrl}
+                                    alt={viewerTitle}
+                                    className="max-w-full max-h-full object-contain rounded-xl shadow-lg"
+                                    onLoad={() => setIframeLoading(false)}
+                                    onError={() => setIframeLoading(false)}
+                                    draggable={false}
+                                    onContextMenu={(e) => e.preventDefault()}
+                                />
+                            </div>
+                        ) : viewerType === 'video' ? (
+                            <div className="w-full h-full flex items-center justify-center p-4">
+                                <video
+                                    src={viewerUrl}
+                                    controls
+                                    controlsList="nodownload"
+                                    className="max-w-full max-h-full rounded-xl shadow-lg"
+                                    onLoadedData={() => setIframeLoading(false)}
+                                    onContextMenu={(e) => e.preventDefault()}
+                                >
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        ) : (
+                            /* PDF & others — Google Docs Viewer works for image PDFs, text PDFs, raw PDFs */
+                            <iframe
+                                key={viewerUrl}
+                                src={viewerUrl}
+                                className="w-full h-full border-none"
+                                title={viewerTitle}
+                                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                                onLoad={() => setIframeLoading(false)}
+                            />
+                        )}
+                    </div>
+
+                    {/* Footer note */}
+                    <div className="px-5 py-2 bg-slate-50 border-t text-[11px] text-slate-400 font-medium text-center shrink-0">
+                        This resource is for viewing only. Downloading is not permitted.
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
