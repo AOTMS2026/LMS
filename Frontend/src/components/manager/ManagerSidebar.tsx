@@ -75,7 +75,7 @@ const navGroups = [
       { id: "users",        title: "User Management",    url: "/manager/users",                 icon: Users },
       { id: "instructors",  title: "Instructors",        url: "/manager/instructors",           icon: UserPlus },
       { id: "instructor-access", title: "Instructor Access", url: "/manager/instructor-access", icon: ShieldCheck },
-      { id: "submissions-grading", title: "Submissions Grading", url: "/manager/submissions-grading", icon: ClipboardList },
+      
       { id: "live-broadcast", title: "Live Broadcast",      url: "/manager/live-broadcast",        icon: Radio },
       { id: "grant-access", title: "Grant Access",       url: "/manager/grant-access",          icon: KeyRound },
       { id: "student-access", title: "Student Access",   url: "/manager/student-access",        icon: UserCheck },

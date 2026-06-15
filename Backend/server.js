@@ -1362,22 +1362,35 @@ app.get('/api/admin/user-enrollments/:userId', authenticateToken, requireAdminOr
 app.post('/api/admin/users/:userId/revoke-access', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
         const { userId } = req.params;
-        const { enrollmentIds } = req.body || {};
+        const { enrollmentIds, courseId, courseName } = req.body || {};
         let result;
+
         if (enrollmentIds && enrollmentIds.length > 0) {
-            // Revoke specific enrollments
-            result = await Enrollment.updateMany(
-                { _id: { $in: enrollmentIds }, user_id: userId },
-                { $set: { status: 'rejected' } }
-            );
+            result = await Enrollment.deleteMany({ _id: { $in: enrollmentIds }, user_id: userId });
+        } else if (courseId) {
+            result = await Enrollment.deleteMany({ user_id: userId, course_id: courseId });
         } else {
-            // Revoke all
-            result = await Enrollment.updateMany(
-                { user_id: userId, status: { $in: ['active', 'pending'] } },
-                { $set: { status: 'rejected' } }
-            );
+            result = await Enrollment.deleteMany({ user_id: userId, status: { $in: ['active', 'pending'] } });
         }
-        res.json({ message: `Revoked access for ${result.modifiedCount} enrollments.` });
+
+        // Send dashboard notification to student
+        const revokerProfile = await Profile.findOne({ user_id: req.user.id }).select('full_name role').lean();
+        const revokerName = revokerProfile?.full_name || 'Admin';
+        const revokerRole = revokerProfile?.role || 'admin';
+        const notifMsg = courseId
+            ? `Your access to "${courseName || 'a course'}" has been revoked by ${revokerName} (${revokerRole}). The course is now available in the Course Catalog if you wish to re-enroll.`
+            : `Your course access has been revoked by ${revokerName} (${revokerRole}). Check Course Catalog to re-enroll.`;
+
+        await Notification.create({
+            user_id: userId,
+            title: 'Course Access Revoked',
+            message: notifMsg,
+            type: 'warning',
+            read: false,
+            created_at: new Date()
+        }).catch(() => {}); // Don't fail if notification model doesn't exist
+
+        res.json({ message: `Revoked access for ${result.deletedCount} enrollments.` });
     } catch (err) { handleError(res, err, 'revoke-access'); }
 });
 
@@ -3250,6 +3263,8 @@ app.get('/api/student/live-classes', authenticateToken, async (req, res) => {
         const allCourseIds = [...new Set([...studentCourseIds, ...enrolledCourseIds])];
 
         // Find live classes assigned to student's batches or courses, or broadcast to all
+        // Only show classes that haven't ended yet
+        const now = new Date();
         const classes = await LiveClass.find({
             $or: [
                 { target_batch: 'all' },
@@ -3258,7 +3273,18 @@ app.get('/api/student/live-classes', authenticateToken, async (req, res) => {
             ]
         }).sort({ scheduled_at: 1 }).lean();
 
-        res.json(classes);
+        // Filter: hide classes whose end_time has passed
+        const activeClasses = classes.filter(c => {
+            if (c.end_time) {
+                return new Date(c.end_time) > now;
+            }
+            // Fallback: use scheduled_at + duration_minutes
+            const start = new Date(c.scheduled_at);
+            const durationMs = (c.duration_minutes || 60) * 60 * 1000;
+            return (start.getTime() + durationMs) > now.getTime();
+        });
+
+        res.json(activeClasses);
     } catch (err) {
         handleError(res, err, 'student-live-classes');
     }
@@ -7082,7 +7108,7 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
                 // Tables scoped via student user_ids (student-related data)
                 const studentUserScopedTables = ['leaderboard_stats', 'leaderboard', 'course_enrollments', 'exam_results', 'resumescans', 'student_exam_access', 'attendance', 'coupons'];
                 // Tables scoped via department field (only course content, not exams/qbank/live)
-                const deptFieldTables = ['courses', 'batches', 'course_modules', 'course_videos', 'course_resources'];
+                const deptFieldTables = ['courses', 'batches', 'course_modules', 'course_resources'];
 
                 if (table === 'profiles') {
                     // Find users enrolled in manager's dept courses
@@ -8176,6 +8202,7 @@ app.post('/api/instructor/live-classes', authenticateToken, requireInstructor, a
         });
 
         // 2. Save Live Class Record
+        const { end_time } = req.body;
         const liveClass = new LiveClass({
             instructor_id,
             course_id: course_id || null,
@@ -8185,6 +8212,7 @@ app.post('/api/instructor/live-classes', authenticateToken, requireInstructor, a
             description,
             scheduled_at,
             duration_minutes,
+            end_time: end_time || null,
             meeting_id: zoomResponse.data.id.toString(),
             meeting_url: zoomResponse.data.join_url,
             start_url: zoomResponse.data.start_url,

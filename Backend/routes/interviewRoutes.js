@@ -538,6 +538,72 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
     // SECTION 4: AI QUESTION GENERATION
     // ─────────────────────────────────────────────────────────────────────────
 
+    // POST /api/interview/candidates/bulk - Create multiple candidates from CSV
+    router.post('/candidates/bulk', authenticateToken, requireInstructor, async (req, res) => {
+        try {
+            const { candidates, examId } = req.body;
+            if (!Array.isArray(candidates) || candidates.length === 0)
+                return res.status(400).json({ error: 'No candidates provided' });
+
+            const created = [], failed = [];
+
+            for (const c of candidates) {
+                if (!c.name || !c.email) { failed.push({ ...c, reason: 'Missing name/email' }); continue; }
+                try {
+                    const emailKey = c.email.toLowerCase().trim();
+                    const exists = await InterviewCandidate.findOne({ email: emailKey });
+                    const password = Math.random().toString(36).slice(-6) + Math.floor(Math.random() * 90 + 10);
+                    const password_hash = bcrypt.hashSync(password, 10);
+                    let finalUsername;
+
+                    if (exists) {
+                        await InterviewCandidate.updateOne({ email: emailKey }, {
+                            $set: { password_hash, initial_password: password, ...(examId ? { assigned_exam_id: examId } : {}) }
+                        });
+                        finalUsername = exists.username;
+                        created.push({ name: c.name.trim(), email: c.email.trim(), username: finalUsername, password });
+                    } else {
+                        const base = emailKey.split('@')[0].replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                        finalUsername = base + '_' + Math.floor(Math.random() * 900 + 100);
+                        await InterviewCandidate.create({
+                            full_name: c.name.trim(), email: emailKey, username: finalUsername,
+                            password_hash, initial_password: password,
+                            mobile_number: c.mobile || '0000000000',
+                            created_by: req.user.id,
+                            assigned_exam_id: examId || undefined
+                        });
+                        created.push({ name: c.name.trim(), email: c.email.trim(), username: finalUsername, password });
+                    }
+
+                    // Send via N8N_EMAIL_WEBHOOK_URL2 (interview-credentials workflow)
+                    try {
+                        const interviewEmailUrl = process.env.N8N_EMAIL_WEBHOOK_URL2;
+                        if (interviewEmailUrl) {
+                            await axios.post(interviewEmailUrl, {
+                                email: emailKey,
+                                name: c.name.trim(),
+                                username: finalUsername,
+                                password: password,
+                                type: 'interview_credentials',
+                                subject: 'Your Interview Exam Credentials – AOTMS LMS',
+                                message: `Hi ${c.name.trim()},\n\nYou have been registered for an Interview Examination on AOTMS LMS.\n\nYour login credentials:\n\nUsername: ${finalUsername}\nPassword: ${password}\n\nPlease keep these credentials safe.\n\nRegards,\nAOTMS LMS Team`
+                            }, { timeout: 10000 });
+                            console.log('[Bulk] Email sent to', c.email);
+                        } else {
+                            console.warn('[Bulk] N8N_EMAIL_WEBHOOK_URL2 not set — email skipped for', c.email);
+                        }
+                    } catch (emailErr) {
+                        console.warn('[Bulk] Email failed for', c.email, emailErr.message);
+                    }
+                } catch (e) {
+                    console.error('[Bulk] Failed for', c.email, e.message);
+                    failed.push({ ...c, reason: e.message });
+                }
+            }
+            res.json({ created: created.length, failed: failed.length, users: created, failedList: failed });
+        } catch (err) { handleError(res, err, 'bulk-candidates'); }
+    });
+
     // POST /api/interview/exams/:id/generate-questions
     router.post('/exams/:examId/generate-questions', authenticateToken, requireInstructor, async (req, res) => {
         const { examId } = req.params;
@@ -703,6 +769,12 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                 // Fallback: Ensure at least one correct option
                 if (opts.length > 0 && !opts.some(o => o.is_correct)) {
                     opts[0].is_correct = true;
+                }
+
+                // Shuffle options so correct answer isn't always position A
+                for (let i = opts.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [opts[i], opts[j]] = [opts[j], opts[i]];
                 }
 
                 return {
@@ -1172,9 +1244,13 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
             const myExams = await InterviewExamSchedule.find(examFilter).select('_id').lean();
             const myExamIds = myExams.map(e => e._id);
 
+            const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
             const activeAttempts = await InterviewAttempt.find({
                 exam_id: { $in: myExamIds },
-                status: 'in_progress'
+                $or: [
+                    { status: 'in_progress' },
+                    { status: 'started', started_at: { $gte: threeHoursAgo } }
+                ]
             })
                 .populate('candidate_id', 'full_name email username')
                 .populate('exam_id', 'title duration_minutes scheduled_date scheduled_time')

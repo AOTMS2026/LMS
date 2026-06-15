@@ -7,7 +7,7 @@
  * And render this component when that tab is active.
  */
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -82,6 +82,7 @@ export default function InstructorInterviewManagement() {
         <TabsContent value="create-candidate" className="mt-4"><CreateCandidateTab toast={toast} /></TabsContent>
       </Tabs>
     </div>
+
   );
 }
 
@@ -359,6 +360,7 @@ function ExamsTab({ toast }: any) {
         )}
       </div>
     </div>
+
   );
 }
 
@@ -511,280 +513,106 @@ function CandidatesTab({ toast }: any) {
         ))}
       </div>
     </div>
+
   );
 }
 
 // ─── CREATE CANDIDATE TAB ─────────────────────────────────────────────────────
 
 function CreateCandidateTab({ toast }: any) {
-  const [exams, setExams] = useState<any[]>([]);
-  const [students, setStudents] = useState<any[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [created, setCreated] = useState<any>(null);
-  const [search, setSearch] = useState('');
-  const [selectedStudents, setSelectedStudents] = useState<any[]>([]);
-  const [assignExamId, setAssignExamId] = useState('');
-  const [tab, setTab] = useState<'roster'|'manual'>('manual');
-  const [form, setForm] = useState({
-    full_name: "", email: "", mobile_number: "",
-    username: "", password: "", assigned_exam_id: ""
-  });
+  const [exams, setExams] = React.useState<any[]>([]);
+  const [bulkFile, setBulkFile] = React.useState<File | null>(null);
+  const [bulkExamId, setBulkExamId] = React.useState('');
+  const [bulkResult, setBulkResult] = React.useState<{created: number, failed: number, users?: {name:string,email:string,username:string,password:string}[]} | null>(null);
+  const [bulkLoading, setBulkLoading] = React.useState(false);
+  const API_BASE = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
-  useEffect(() => {
-    fetch(`${API_BASE}/api/interview/exams`, { headers: authHeaders() })
-      .then(r => r.json()).then(d => { if (Array.isArray(d)) setExams(d); });
-    // Fetch all students from instructor's courses and batches
-    fetch(`${API_BASE}/api/instructor/students`, { headers: authHeaders() })
-      .then(r => r.json()).then(d => { if (Array.isArray(d)) setStudents(d); })
-      .catch(() => setStudents([]));
+  React.useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    fetch(`${API_BASE}/api/interview/exams`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json()).then(data => { if (Array.isArray(data)) setExams(data); }).catch(() => {});
   }, []);
-
-  const filteredStudents = students.filter(s =>
-    !search || s.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.roll_number?.toLowerCase().includes(search.toLowerCase()) ||
-    s.email?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const toggleStudent = (s: any) => {
-    setSelectedStudents(prev =>
-      prev.find(p => p.user_id === s.user_id || p._id === s._id)
-        ? prev.filter(p => p.user_id !== s.user_id && p._id !== s._id)
-        : [...prev, s]
-    );
-  };
-
-  const handleBulkCreate = async () => {
-    if (selectedStudents.length === 0) {
-      toast({ title: "No students selected", description: "Select at least one student.", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    let successCount = 0;
-    const errors: string[] = [];
-    for (const s of selectedStudents) {
-      try {
-        const payload = {
-          full_name: s.full_name,
-          email: s.email,
-          mobile_number: s.mobile_number || s.phone || '',
-          username: s.email,
-          password: `Interview@${(s.roll_number || s.email.split('@')[0]).replace(/\s/g,'')}`,
-          assigned_exam_id: assignExamId || undefined,
-        };
-        const res = await fetch(`${API_BASE}/api/interview/candidates`, {
-          method: "POST", headers: authHeaders(), body: JSON.stringify(payload)
-        });
-        const data = await res.json();
-        if (res.ok) { successCount++; }
-        else { errors.push(`${s.full_name}: ${data.error || 'failed'}`); }
-      } catch (e) { errors.push(`${s.full_name}: network error`); }
-    }
-    setSaving(false);
-    setSelectedStudents([]);
-    if (successCount > 0) toast({ title: `✅ ${successCount} candidates created`, description: errors.length > 0 ? errors.join(', ') : 'All done!' });
-    else toast({ title: "Failed", description: errors.join(', '), variant: "destructive" });
-  };
-
-  const handleCreate = async () => {
-    if (!form.full_name || !form.email || !form.username || !form.password) {
-      toast({ title: "Error", description: "Full name, email, username, and password are required.", variant: "destructive" });
-      return;
-    }
-    setSaving(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/interview/candidates`, {
-        method: "POST", headers: authHeaders(), body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setCreated(data);
-        toast({ title: "Candidate Created!", description: `Account created for ${form.full_name}` });
-        setForm({ full_name: "", email: "", mobile_number: "", username: "", password: "", assigned_exam_id: "" });
-      } else {
-        toast({ title: "Error", description: data.error || JSON.stringify(data), variant: "destructive" });
-      }
-    } finally { setSaving(false); }
-  };
 
   return (
     <div className="space-y-5 max-w-3xl">
-      {/* Tab switcher */}
-      <div className="flex gap-2">
-        <Button size="sm" variant={tab === 'manual' ? 'default' : 'outline'} onClick={() => setTab('manual')} className="rounded-xl h-9 px-5 font-bold text-xs">
-          <UserPlus className="w-3.5 h-3.5 mr-2" /> Manual Entry
-        </Button>
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-2xl">📊</span>
+          <div>
+            <h3 className="text-lg font-black text-slate-900">Bulk Upload Candidates</h3>
+            <p className="text-xs text-slate-400">Upload CSV with columns: <b>Name, Email, Mobile</b>. Usernames and passwords are auto-generated and emailed. Works for single or multiple candidates.</p>
+          </div>
+        </div>
+
+        <a
+          href={"data:text/csv;charset=utf-8,Name,Email,Mobile%0AMahesh%20Choudare,maheshchoudare21%40gmail.com,9999999999%0ASwathi%20Raguthu,swathiraguthu%40gmail.com,9999999998%0AStudent,23hp1a0549%40gmail.com,9999999997"}
+          download="candidates_template.csv"
+          className="inline-flex items-center gap-2 text-xs font-bold text-primary border border-primary/20 px-3 py-1.5 rounded-lg hover:bg-primary/5"
+        >⬇️ Download Template CSV (Name, Email, Mobile)</a>
+
+        <div className="space-y-2">
+          <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Assign Exam (Optional)</label>
+          <select value={bulkExamId} onChange={e => setBulkExamId(e.target.value)} className="w-full h-10 border border-slate-200 rounded-xl px-3 text-sm bg-white">
+            <option value="">Select exam to assign...</option>
+            {exams.map((ex: any) => <option key={ex.id || ex._id} value={ex.id || ex._id}>{ex.title}</option>)}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label className="text-xs font-black text-slate-700 uppercase tracking-widest">Upload CSV File</label>
+          <input type="file" accept=".csv" onChange={e => setBulkFile(e.target.files?.[0] || null)} className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white" />
+          <p className="text-[10px] text-slate-400">For a single candidate, add just one row to the CSV.</p>
+        </div>
+
+        <button
+          disabled={!bulkFile || bulkLoading}
+          onClick={async () => {
+            if (!bulkFile) return;
+            setBulkLoading(true); setBulkResult(null);
+            try {
+              const text = await bulkFile.text();
+              const rows = text.split('\n').slice(1).filter(r => r.trim());
+              const candidates = rows.map(r => {
+                const c = r.split(',');
+                return { name: c[0]?.trim(), email: c[1]?.trim(), mobile: c[2]?.trim() };
+              }).filter((c: any) => c.name && c.email);
+
+              if (candidates.length === 0) { alert('No valid candidates found. Check Name and Email columns.'); setBulkLoading(false); return; }
+
+              const token = localStorage.getItem('access_token');
+              const res = await fetch(`${API_BASE}/api/interview/candidates/bulk`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ candidates, examId: bulkExamId || undefined })
+              });
+              const data = await res.json();
+              setBulkResult(data);
+              if (data.created > 0) toast({ title: `✅ Created ${data.created} candidate(s)`, description: 'Credentials emailed to each candidate.' });
+            } catch (e) { alert('Upload failed: ' + (e as Error).message); } finally { setBulkLoading(false); }
+          }}
+          className="w-full h-11 rounded-xl bg-primary text-white font-black text-sm disabled:opacity-50 cursor-pointer hover:bg-primary/90 transition-colors"
+        >{bulkLoading ? '⏳ Processing...' : '🚀 Upload & Create Accounts'}</button>
+
+        {bulkResult && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-3">
+            <p className="font-black text-green-700">✅ Created: {bulkResult.created} &nbsp; ❌ Failed: {bulkResult.failed}</p>
+            {bulkResult.users && bulkResult.users.length > 0 && (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-green-100"><th className="p-2 text-left">Name</th><th className="p-2 text-left">Email</th><th className="p-2 text-left">Username</th><th className="p-2 text-left">Password</th></tr></thead>
+                    <tbody>{bulkResult.users.map((u, i) => <tr key={i} className="border-t border-green-100"><td className="p-2">{u.name}</td><td className="p-2">{u.email}</td><td className="p-2 font-mono font-bold">{u.username}</td><td className="p-2 font-mono font-bold">{u.password}</td></tr>)}</tbody>
+                  </table>
+                </div>
+                <button onClick={() => {
+                  const csv = ['Name,Email,Username,Password', ...(bulkResult.users||[]).map(u=>`${u.name},${u.email},${u.username},${u.password}`)].join('\n');
+                  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv); a.download = 'credentials.csv'; a.click();
+                }} className="w-full h-9 rounded-xl border border-green-400 text-green-700 font-bold text-xs cursor-pointer bg-white hover:bg-green-50">⬇️ Export Credentials CSV</button>
+              </>
+            )}
+          </div>
+        )}
       </div>
-
-      {tab === 'roster' && (
-        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="pb-3 border-b border-slate-100">
-            <CardTitle className="text-slate-900 font-bold flex items-center gap-2 text-base">
-              <Users className="w-5 h-5 text-primary" /> Select Students from Roster
-            </CardTitle>
-            <p className="text-slate-400 text-xs">Click to select students. They'll be added as interview candidates automatically.</p>
-          </CardHeader>
-          <CardContent className="p-4 space-y-4">
-            {/* Search + assign exam */}
-            <div className="flex gap-3">
-              <Input
-                placeholder="Search by name, roll number, email..."
-                value={search} onChange={e => setSearch(e.target.value)}
-                className="h-9 rounded-xl bg-slate-50 border-slate-200 text-sm flex-1"
-              />
-              <Select value={assignExamId} onValueChange={v => setAssignExamId(v === 'none' ? '' : v)}>
-                <SelectTrigger className="h-9 rounded-xl bg-slate-50 border-slate-200 text-xs w-48">
-                  <SelectValue placeholder="Assign exam..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl">
-                  <SelectItem value="none" className="text-slate-400 text-xs">No exam</SelectItem>
-                  {exams.map(e => (
-                    <SelectItem key={e._id || e.id} value={e._id || e.id} className="text-xs">{e.title}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Student grid — card style matching the roster screenshot */}
-            <div className="max-h-96 overflow-y-auto pr-1">
-              {filteredStudents.length === 0 ? (
-                <div className="text-center py-12">
-                  <Users className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                  <p className="text-slate-400 text-sm font-medium">No students found.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {filteredStudents.map(s => {
-                    const uid = s.user_id || s._id;
-                    const isSelected = selectedStudents.some(p => (p.user_id || p._id) === uid);
-                    const initials = (s.full_name || '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
-                    const batchLabel = s.department || '';
-                    return (
-                      <div
-                        key={uid}
-                        onClick={() => toggleStudent(s)}
-                        className={`flex items-center gap-3 p-4 rounded-2xl cursor-pointer border-2 transition-all ${
-                          isSelected
-                            ? 'bg-primary/5 border-primary/40 shadow-sm'
-                            : 'bg-white border-slate-100 hover:border-slate-200 hover:shadow-sm'
-                        }`}
-                      >
-                        {/* Avatar */}
-                        <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border border-slate-200">
-                          <span className="text-sm font-black text-slate-600">{initials}</span>
-                        </div>
-                        {/* Info */}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate">{s.full_name}</p>
-                          {s.roll_number && (
-                            <p className="text-[11px] text-indigo-600 font-semibold truncate uppercase tracking-wider">
-                              {s.roll_number}
-                            </p>
-                          )}
-                          <p className="text-[10px] text-slate-400 truncate">{s.email}</p>
-                        </div>
-                        {/* Batch badge */}
-                        {batchLabel && (
-                          <span className="text-[10px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0 uppercase tracking-wide">
-                            {batchLabel}
-                          </span>
-                        )}
-                        {/* Select/deselect indicator */}
-                        <div
-                          onClick={e => { e.stopPropagation(); toggleStudent(s); }}
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border-2 transition-all ${
-                            isSelected ? 'bg-rose-50 border-rose-200 text-rose-400 hover:bg-rose-100' : 'border-slate-200 text-slate-300 hover:border-slate-300'
-                          }`}
-                          title={isSelected ? 'Remove' : 'Add'}
-                        >
-                          {isSelected ? (
-                            <span className="text-[12px] font-black">✕</span>
-                          ) : (
-                            <span className="text-[12px] font-black">+</span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Selected summary + create button */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              <p className="text-sm font-bold text-slate-600">
-                {selectedStudents.length === 0
-                  ? 'No students selected'
-                  : `${selectedStudents.length} student${selectedStudents.length > 1 ? 's' : ''} selected`
-                }
-              </p>
-              <Button
-                onClick={handleBulkCreate}
-                disabled={saving || selectedStudents.length === 0}
-                className="h-9 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
-              >
-                {saving ? 'Creating...' : `Create ${selectedStudents.length > 0 ? selectedStudents.length : ''} Candidate${selectedStudents.length !== 1 ? 's' : ''}`}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === 'manual' && (
-        <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-          <CardHeader className="pb-4 border-b border-slate-50">
-            <CardTitle className="text-slate-900 font-bold flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-primary" /> New Interview Candidate
-            </CardTitle>
-            <p className="text-slate-500 text-sm font-medium">Create login credentials manually. No self-registration is allowed.</p>
-          </CardHeader>
-          <CardContent className="p-6 space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Full Name *" value={form.full_name} onChange={v => setForm(f => ({ ...f, full_name: v }))} placeholder="Candidate full name" />
-              <Field label="Email *" value={form.email} onChange={v => setForm(f => ({ ...f, email: v }))} type="email" placeholder="candidate@email.com" />
-              <Field label="Mobile Number" value={form.mobile_number} onChange={v => setForm(f => ({ ...f, mobile_number: v }))} placeholder="+91 9999999999" />
-              <Field label="Username *" value={form.username} onChange={v => setForm(f => ({ ...f, username: v }))} placeholder="candidate_username" />
-              <Field label="Password *" value={form.password} onChange={v => setForm(f => ({ ...f, password: v }))} type="password" placeholder="Set a secure password" />
-              <div>
-                <Label className="text-slate-700 text-sm font-semibold">Assign Exam (Optional)</Label>
-                <Select value={form.assigned_exam_id} onValueChange={v => setForm(f => ({ ...f, assigned_exam_id: v === "none" ? "" : v }))}>
-                  <SelectTrigger className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-700 mt-1 focus:bg-white">
-                    <SelectValue placeholder="Select exam..." />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-slate-200">
-                    <SelectItem value="none" className="text-slate-400 font-medium">No exam assigned</SelectItem>
-                    {exams.map(e => (
-                      <SelectItem key={e._id || e.id} value={e._id || e.id} className="font-medium">
-                        {e.title} — {e.scheduled_date}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <Button onClick={handleCreate} disabled={saving} className="w-full h-11 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-sm mt-2">
-              {saving ? 'Creating...' : <><UserPlus className="w-4 h-4 mr-2" /> Create Candidate Account</>}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {created && (
-        <Card className="border-emerald-200 shadow-sm rounded-2xl overflow-hidden bg-emerald-50/60">
-          <CardHeader className="pb-3 border-b border-emerald-100">
-            <CardTitle className="text-emerald-700 text-base font-bold">✅ Candidate Account Created</CardTitle>
-          </CardHeader>
-          <CardContent className="p-5 space-y-3">
-            <p className="text-slate-600 text-sm font-medium">Share these credentials with the candidate:</p>
-            <div className="bg-white border border-slate-200 rounded-xl p-4 font-mono text-sm space-y-1.5 shadow-sm">
-              <p><span className="text-slate-400">Portal URL:</span> <span className="text-slate-800 font-semibold">{window.location.origin}/interview-login</span></p>
-              <p><span className="text-slate-400">Username:</span> <span className="text-emerald-700 font-bold">{created.credentials?.username}</span></p>
-              <p><span className="text-slate-400">Password:</span> <span className="text-emerald-700 font-bold">{created.credentials?.password}</span></p>
-            </div>
-            <p className="text-slate-400 text-xs">⚠️ Store these credentials safely. Password cannot be recovered — only reset.</p>
-            <Button size="sm" variant="outline" onClick={() => setCreated(null)} className="h-8 px-4 rounded-xl border-slate-200 text-slate-500 hover:bg-white">Dismiss</Button>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
@@ -806,5 +634,6 @@ function Field({ label, value, onChange, type = "text", placeholder = "", min }:
         className="h-10 rounded-xl bg-slate-50 border-slate-200 text-slate-900 placeholder:text-slate-400 mt-1 focus:bg-white transition-all"
       />
     </div>
+
   );
 }

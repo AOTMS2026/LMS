@@ -81,6 +81,7 @@ export function LiveClassManager() {
 
     const [selectedDate, setSelectedDate] = useState('');
     const [selectedTime, setSelectedTime] = useState('');
+    const [selectedEndTime, setSelectedEndTime] = useState('');
 
     const { data: courseBatches = [], isLoading: isLoadingBatches } = useCourseBatches(formData.courseId);
 
@@ -160,6 +161,15 @@ export function LiveClassManager() {
             const selectedCourse = (courses as Course[]).find(c => c.id === formData.courseId);
             const batchId = selectedCourse?.assigned_batch_id;
 
+            // Calculate duration from start to end time
+            const calcDuration = () => {
+                if (!selectedEndTime) return 60;
+                const [sh, sm] = selectedTime.split(':').map(Number);
+                const [eh, em] = selectedEndTime.split(':').map(Number);
+                const diff = (eh * 60 + em) - (sh * 60 + sm);
+                return diff > 0 ? diff : 60;
+            };
+
             await createMeeting.mutateAsync({
                 ...formData,
                 startTime: (() => {
@@ -167,7 +177,13 @@ export function LiveClassManager() {
                     const [hours, minutes] = selectedTime.split(':').map(Number);
                     return new Date(year, month - 1, day, hours, minutes).toISOString();
                 })(),
-                duration: 1440, // Increased duration to effectively remove the "ending concept"
+                end_time: selectedEndTime ? (() => {
+                    const [year, month, day] = selectedDate.split('-').map(Number);
+                    const [hours, minutes] = selectedEndTime.split(':').map(Number);
+                    return new Date(year, month - 1, day, hours, minutes).toISOString();
+                })() : null,
+                duration: calcDuration(),
+                duration_minutes: calcDuration(),
                 target_batch: formData.targetBatch === 'all' ? 'all' : (courseBatches.find(b => b.id === formData.targetBatch)?.batch_type || 'all'),
                 batchId: formData.targetBatch === 'all' ? null : formData.targetBatch,
                 poster_url: finalPosterUrl
@@ -176,6 +192,7 @@ export function LiveClassManager() {
             setFormData({ topic: '', agenda: '', courseId: '', targetBatch: 'all' });
             setSelectedDate('');
             setSelectedTime('');
+            setSelectedEndTime('');
             setPosterFile(null);
             setPosterPreview(null);
             setFinalPosterUrl(null);
@@ -432,52 +449,29 @@ export function LiveClassManager() {
                                                 className="h-11 px-4 rounded-lg border border-slate-200 bg-white pl-10 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all w-full"
                                             />
                                         </div>
-                                        <div className="flex gap-2 w-full">
-                                            <Select 
-                                                value={getParsedTime(selectedTime).h} 
-                                                onValueChange={(val) => setSelectedTime(compileTime24(val, getParsedTime(selectedTime).m, getParsedTime(selectedTime).p))}
-                                            >
-                                                <SelectTrigger className="h-11 flex-1 rounded-lg border-slate-200 bg-white text-sm text-slate-900">
-                                                    <SelectValue placeholder="HH" />
-                                                </SelectTrigger>
-                                                <SelectContent className="max-h-[200px] bg-white z-50">
-                                                    {Array.from({length: 12}, (_, i) => String(i === 0 ? 12 : i).padStart(2, '0')).map(hr => (
-                                                        <SelectItem key={hr} value={hr}>{hr}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Select 
-                                                value={getParsedTime(selectedTime).m} 
-                                                onValueChange={(val) => setSelectedTime(compileTime24(getParsedTime(selectedTime).h, val, getParsedTime(selectedTime).p))}
-                                            >
-                                                <SelectTrigger className="h-11 flex-1 rounded-lg border-slate-200 bg-white text-sm text-slate-900">
-                                                    <SelectValue placeholder="MM" />
-                                                </SelectTrigger>
-                                                <SelectContent className="max-h-[200px] bg-white z-50">
-                                                    {Array.from({length: 60}, (_, i) => String(i).padStart(2, '0')).map(mn => (
-                                                        <SelectItem key={mn} value={mn}>{mn}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Select 
-                                                value={getParsedTime(selectedTime).p} 
-                                                onValueChange={(val) => setSelectedTime(compileTime24(getParsedTime(selectedTime).h, getParsedTime(selectedTime).m, val))}
-                                            >
-                                                <SelectTrigger className="h-11 w-[85px] rounded-lg border-slate-200 bg-white text-sm text-slate-900">
-                                                    <SelectValue placeholder="AM/PM" />
-                                                </SelectTrigger>
-                                                <SelectContent className="bg-white z-50">
-                                                    <SelectItem value="AM">AM</SelectItem>
-                                                    <SelectItem value="PM">PM</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
+                                        <input
+                                            type="time"
+                                            required
+                                            value={selectedTime}
+                                            onChange={(e) => setSelectedTime(e.target.value)}
+                                            className="h-11 px-4 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 w-full focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                                        />
                                     </div>
                                     <p className="text-[9px] font-bold text-slate-400 italic mt-1">This session will start at your local time.</p>
                                 </div>
 
-
-                                {/* Target Selection: Course + Batch Cards */}
+                                {/* End Time */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-widest">End Time (Zoom Class End)</label>
+                                    <input
+                                        type="time"
+                                        value={selectedEndTime}
+                                        onChange={e => setSelectedEndTime(e.target.value)}
+                                        className="h-11 px-4 rounded-lg border border-slate-200 bg-white text-sm text-slate-900 w-full focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                                        placeholder="Select end time"
+                                    />
+                                    <p className="text-[9px] font-bold text-slate-400 italic mt-1">Session disappears from student page after this time.</p>
+                                </div>
                                 <div className="space-y-4">
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-bold uppercase tracking-widest text-[#0075CF]">Select Target Course</label>
@@ -532,14 +526,6 @@ export function LiveClassManager() {
                                                                 : "bg-white border-slate-100 hover:border-slate-200"
                                                         )}
                                                     >
-                                                        <div className={cn(
-                                                            "mb-1 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter",
-                                                            batch.batch_type === 'morning' ? "bg-amber-100 text-amber-700" :
-                                                            batch.batch_type === 'afternoon' ? "bg-blue-100 text-blue-700" :
-                                                            "bg-indigo-100 text-indigo-700"
-                                                        )}>
-                                                            {batch.batch_type}
-                                                        </div>
                                                         <span className={cn("text-[11px] font-bold truncate w-full text-left", formData.targetBatch === batch.id ? "text-primary" : "text-slate-700")}>
                                                             {batch.batch_name}
                                                         </span>
@@ -697,17 +683,8 @@ function BatchStudentPreview({ batchStudents, isLoadingStudents, targetBatch }: 
             
             <div className="bg-white rounded-lg border border-slate-100 p-3 shadow-sm">
                 <div className="flex items-center gap-2 mb-3">
-                    <div className={cn(
-                        "p-1.5 rounded-lg",
-                        targetBatch === 'morning' ? "bg-amber-50 text-amber-600" :
-                        targetBatch === 'afternoon' ? "bg-blue-50 text-blue-600" :
-                        targetBatch === 'evening' ? "bg-indigo-50 text-indigo-600" :
-                        "bg-slate-100 text-slate-600"
-                    )}>
-                        {targetBatch === 'morning' ? <Sun className="w-3.5 h-3.5" /> : 
-                         targetBatch === 'afternoon' ? <Cloud className="w-3.5 h-3.5" /> :
-                         targetBatch === 'evening' ? <Moon className="w-3.5 h-3.5" /> :
-                         <Users className="w-3.5 h-3.5" />}
+                    <div className="p-1.5 rounded-lg bg-slate-100 text-slate-600">
+                        <Users className="w-3.5 h-3.5" />
                     </div>
                     <span className="text-xs font-bold text-slate-600">
                         {batchStudents.length} Students {targetBatch !== 'all' && 'in this session'}
@@ -751,4 +728,3 @@ function BatchStudentPreview({ batchStudents, isLoadingStudents, targetBatch }: 
         </div>
     );
 }
-

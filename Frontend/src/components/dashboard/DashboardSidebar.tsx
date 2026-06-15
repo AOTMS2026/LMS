@@ -176,73 +176,7 @@ export function DashboardSidebar() {
           </SidebarGroup>
         ))}
 
-        {/* ── Certification (last group, conditional unlock) ── */}
-        <SidebarGroup className="p-0">
-          {!collapsed && (
-            <SidebarGroupLabel className="px-4 text-[10px] uppercase font-bold tracking-[0.2em] text-slate-400 p-0 h-auto mb-3">
-              Achievement
-            </SidebarGroupLabel>
-          )}
-          <SidebarGroupContent>
-            <SidebarMenu className="gap-1.5">
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  asChild={hasCertificate}
-                  isActive={isActive(certUrl)}
-                  tooltip={hasCertificate ? "Certification" : "Complete a course to unlock"}
-                  className={cn(
-                    "h-12 px-4 rounded-xl transition-all duration-300 group relative overflow-hidden",
-                    isActive(certUrl)
-                      ? "bg-amber-500 text-white shadow-[0_10px_20px_rgba(245,158,11,0.3)]"
-                      : hasCertificate
-                      ? "hover:bg-amber-50 text-amber-600 hover:text-amber-700 border border-amber-200"
-                      : "opacity-50 cursor-not-allowed text-slate-400 bg-slate-50"
-                  )}
-                >
-                  {hasCertificate ? (
-                    <Link to={certUrl} className="flex items-center gap-3.5 w-full">
-                      <Award
-                        className={cn(
-                          "h-[1.125rem] w-[1.125rem] transition-all duration-300 relative z-10",
-                          isActive(certUrl) ? "text-white scale-110" : "text-amber-500 group-hover:text-amber-700"
-                        )}
-                      />
-                      {!collapsed && (
-                        <motion.span
-                          className={cn(
-                            "font-bold text-xs uppercase tracking-wider z-10",
-                            isActive(certUrl) ? "text-white" : "text-amber-600 group-hover:text-amber-700"
-                          )}
-                          initial={{ opacity: 0, x: -5 }}
-                          animate={{ opacity: 1, x: 0 }}
-                        >
-                          Certification
-                        </motion.span>
-                      )}
-                      {isActive(certUrl) && (
-                        <motion.div
-                          layoutId="active-pill-student-cert"
-                          className="absolute inset-0 bg-amber-500 z-0"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                        />
-                      )}
-                    </Link>
-                  ) : (
-                    <div className="flex items-center gap-3.5 w-full">
-                      <Award className="h-[1.125rem] w-[1.125rem] text-slate-300 relative z-10" />
-                      {!collapsed && (
-                        <span className="font-bold text-xs uppercase tracking-wider text-slate-400 z-10">
-                          Certification
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+
       </SidebarContent>
 
       <SidebarFooter className="p-4 group-data-[collapsible=icon]:p-2 border-t border-slate-50 mt-auto">
