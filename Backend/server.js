@@ -5877,7 +5877,11 @@ app.get('/api/admin/question-bank-summary', authenticateToken, requireInstructor
                 $or: [{ instructor_ids: req.user.id }, { instructor_id: req.user.id }]
             }).select('_id').lean();
             const instrCourseIds = instrCourses.map(c => c._id);
-            matchStage = { $match: { course_id: { $in: instrCourseIds } } };
+            // Include questions created by this instructor OR linked to their courses
+            matchStage = { $match: { $or: [
+                { created_by: req.user.id },
+                { course_id: { $in: instrCourseIds } }
+            ] } };
         }
 
         const banks = await QuestionBank.aggregate([
@@ -7168,9 +7172,18 @@ app.get('/api/data/:table', authenticateToken, async (req, res) => {
             if (table === 'exams' || table === 'exam_schedulings') {
                 query = Object.keys(query).length > 0 ? { $and: [query, courseFilter] } : courseFilter;
                 console.log(`[ACL] Instructor scoped exams to their ${instrCourseIds.length} courses`);
-            } else if (['course_enrollments', 'exam_results', 'live_classes', 'course_modules', 'course_videos', 'course_resources', 'question_bank'].includes(table)) {
+            } else if (['course_enrollments', 'exam_results', 'live_classes', 'course_modules', 'course_videos', 'course_resources'].includes(table)) {
                 query = Object.keys(query).length > 0 ? { $and: [query, courseFilter] } : courseFilter;
                 console.log(`[ACL] Instructor scoped ${table} to their courses`);
+            } else if (table === 'question_bank') {
+                // question_bank: show questions created by this instructor OR linked to their courses
+                // (questions may not have course_id when added via Question Bank UI)
+                const qbFilter = { $or: [
+                    { created_by: req.user.id },
+                    { course_id: { $in: instrCourseIds } }
+                ] };
+                query = Object.keys(query).length > 0 ? { $and: [query, qbFilter] } : qbFilter;
+                console.log(`[ACL] Instructor scoped question_bank to created_by OR their courses`);
             } else if (table === 'resumescans') {
                 // Scope to students enrolled in instructor's courses
                 const enrollments = await Enrollment.find({ course_id: { $in: instrCourseIds } }).select('user_id').lean();
@@ -7671,8 +7684,17 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
                 if (table !== 'course_ratings') req.body.status = 'pending';
             } else if (table === 'question_bank') {
                 // Instructors can create questions, but forced to pending
-                req.body.created_by = req.user.id;
-                req.body.approval_status = 'pending';
+                // Handle both single question (object) and bulk (array) submissions
+                if (Array.isArray(req.body)) {
+                    req.body = req.body.map(q => ({
+                        ...q,
+                        created_by: req.user.id,
+                        approval_status: 'pending'
+                    }));
+                } else {
+                    req.body.created_by = req.user.id;
+                    req.body.approval_status = 'pending';
+                }
             } else if (['exams', 'mock_papers', 'exam_schedules', 'mock_test_configs'].includes(table)) {
                 if (role !== 'instructor') return res.status(403).json({ error: 'Unauthorized to manage exams' });
                 if (table !== 'exam_schedules') {
@@ -7716,9 +7738,15 @@ app.post('/api/data/:table', authenticateToken, async (req, res) => {
         } else {
             // Admin/Manager creation logic
             if (table === 'question_bank') {
-                // Admins/Managers can set status, but default created_by to themselves if not set
-                req.body.created_by = req.body.created_by || req.user.id;
-                // If they didn't provide status, let schema default (pending) or they can set 'approved'
+                // Admins/Managers can set status; handle both single and bulk array
+                if (Array.isArray(req.body)) {
+                    req.body = req.body.map(q => ({
+                        ...q,
+                        created_by: q.created_by || req.user.id
+                    }));
+                } else {
+                    req.body.created_by = req.body.created_by || req.user.id;
+                }
             }
         }
 
