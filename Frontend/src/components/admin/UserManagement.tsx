@@ -609,18 +609,6 @@ export function UserManagement({
                           <DropdownMenuItem onClick={() => handleViewAttendance(user)} className="rounded-xl font-bold text-[13px] py-2.5 cursor-pointer hover:bg-slate-50">
                             <Fingerprint className="mr-3 h-4 w-4 text-blue-500" /> Attendance Records
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleSendEmail(user)}
-                            disabled={sendingEmailId === user.id}
-                            className="rounded-xl font-bold text-[13px] py-2.5 cursor-pointer hover:bg-slate-50"
-                          >
-                            {sendingEmailId === user.id ? (
-                              <Loader2 className="mr-3 h-4 w-4 animate-spin text-primary" />
-                            ) : (
-                              <Mail className="mr-3 h-4 w-4 text-amber-500" />
-                            )}
-                            Send Notification Mail
-                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => {
                             setSelectedUser(user);
                             setNewRole(user.role || "student");
