@@ -575,9 +575,10 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                         created.push({ name: c.name.trim(), email: c.email.trim(), username: finalUsername, password });
                     }
 
-                    // Send via N8N_EMAIL_WEBHOOK_URL2 (interview-credentials workflow)
+                    // Send via n8n email webhook (interview-credentials workflow)
+                    // Uses N8N_EMAIL_WEBHOOK_URL2 if set, falls back to N8N_EMAIL_WEBHOOK_URL
                     try {
-                        const interviewEmailUrl = process.env.N8N_EMAIL_WEBHOOK_URL2;
+                        const interviewEmailUrl = process.env.N8N_EMAIL_WEBHOOK_URL2 || process.env.N8N_EMAIL_WEBHOOK_URL;
                         if (interviewEmailUrl) {
                             await axios.post(interviewEmailUrl, {
                                 email: emailKey,
@@ -588,12 +589,12 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                                 subject: 'Your Interview Exam Credentials – AOTMS LMS',
                                 message: `Hi ${c.name.trim()},\n\nYou have been registered for an Interview Examination on AOTMS LMS.\n\nYour login credentials:\n\nUsername: ${finalUsername}\nPassword: ${password}\n\nPlease keep these credentials safe.\n\nRegards,\nAOTMS LMS Team`
                             }, { timeout: 10000 });
-                            console.log('[Bulk] Email sent to', c.email);
+                            console.log('[Bulk] Email triggered via n8n for', c.email);
                         } else {
-                            console.warn('[Bulk] N8N_EMAIL_WEBHOOK_URL2 not set — email skipped for', c.email);
+                            console.warn('[Bulk] No N8N email webhook URL set — email skipped for', c.email);
                         }
                     } catch (emailErr) {
-                        console.warn('[Bulk] Email failed for', c.email, emailErr.message);
+                        console.warn('[Bulk] Email webhook failed for', c.email, emailErr.message);
                     }
                 } catch (e) {
                     console.error('[Bulk] Failed for', c.email, e.message);
@@ -1151,8 +1152,11 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                 metadata
             });
 
-            // Update attempt violation count
-            await InterviewAttempt.findByIdAndUpdate(attempt_id, { $inc: { tab_switch_count: 1 } });
+            // Update attempt violation count — cap at maxViolations so count never exceeds the limit
+            const currentAttempt = await InterviewAttempt.findById(attempt_id).select('tab_switch_count').lean();
+            if ((currentAttempt?.tab_switch_count || 0) < maxViolations) {
+                await InterviewAttempt.findByIdAndUpdate(attempt_id, { $inc: { tab_switch_count: 1 } });
+            }
 
             // Notify admin in real-time
             io.emit('interview_violation', {
@@ -1401,7 +1405,11 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                     timing: {
                         started_at: a.started_at,
                         submitted_at: a.submitted_at,
-                        time_taken_seconds: a.time_taken_seconds,
+                        // Use server-calculated time (submitted_at - started_at) as authoritative source.
+                // Client-sent time_taken_seconds is only a fallback for edge cases.
+                time_taken_seconds: (a.started_at && a.submitted_at)
+                    ? Math.round((new Date(a.submitted_at) - new Date(a.started_at)) / 1000)
+                    : (a.time_taken_seconds || 0),
                         status: a.status
                     },
                     integrity: {
@@ -1515,7 +1523,9 @@ module.exports = (io, userSockets, sendNotification, cloudinary, authenticateTok
                 score: a.score,
                 percentage: a.percentage,
                 correct_answers: a.correct_answers,
-                time_taken_seconds: a.time_taken_seconds,
+                time_taken_seconds: (a.started_at && a.submitted_at)
+                    ? Math.round((new Date(a.submitted_at) - new Date(a.started_at)) / 1000)
+                    : (a.time_taken_seconds || 0),
                 passed: a.passed
             }));
             if (entries.length > 0) {

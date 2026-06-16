@@ -43,7 +43,7 @@ export default function AdminInterviewMonitor() {
   const [loading,     setLoading]     = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [results,     setResults]     = useState<any[]>([]);
-  const [view,        setView]        = useState<"monitor" | "results" | "leaderboard">("monitor");
+  const [view,        setView]        = useState<"results" | "leaderboard">("results");
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [expandedResult, setExpandedResult] = useState<string | null>(null);
   const { toast } = useToast();
@@ -139,7 +139,7 @@ export default function AdminInterviewMonitor() {
     if (view === "leaderboard") fetchLeaderboard(val);
   };
 
-  const handleViewChange = (v: "monitor" | "results" | "leaderboard") => {
+  const handleViewChange = (v: "results" | "leaderboard") => {
     setView(v);
     if (v === "results"     && selectedExam !== "all") fetchResults(selectedExam);
     if (v === "leaderboard" && selectedExam !== "all") fetchLeaderboard(selectedExam);
@@ -180,7 +180,6 @@ export default function AdminInterviewMonitor() {
   };
 
   const VIEW_TABS = [
-    { key: "monitor",     label: "Monitor",     icon: Eye    },
     { key: "results",     label: "Results",     icon: Shield },
     { key: "leaderboard", label: "Leaderboard", icon: Trophy },
   ] as const;
@@ -243,101 +242,6 @@ export default function AdminInterviewMonitor() {
           </Button>
         </div>
       </div>
-
-      {/* ── MONITOR VIEW ──────────────────────────────────────────────────── */}
-      {view === "monitor" && (
-        <>
-          {displayedAttempts.length === 0 ? (
-            <div className="text-center py-20 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-              <Eye className="w-12 h-12 text-slate-200 mx-auto mb-3" />
-              <p className="text-slate-400 font-semibold text-lg">No active exam sessions right now.</p>
-              <p className="text-slate-300 text-sm mt-1">Active candidates will appear here in real time.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {displayedAttempts.map((a) => {
-                const statusStyle = STATUS_STYLE[a.display_status] || STATUS_STYLE.Active;
-                return (
-                  <Card key={String(a.attempt_id)} className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
-                    <CardHeader className="pb-3 border-b border-slate-50 px-5 pt-5">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="font-bold text-slate-900 text-sm truncate">{a.candidate_name}</p>
-                          <p className="text-slate-400 text-xs truncate font-medium">{a.candidate_email}</p>
-                        </div>
-                        <Badge className={`text-[10px] font-bold border shrink-0 ${statusStyle}`}>
-                          {a.display_status}
-                        </Badge>
-                      </div>
-                      <p className="text-[10px] text-slate-400 font-medium mt-1 truncate">{a.exam_title}</p>
-                    </CardHeader>
-
-                    <CardContent className="p-5 space-y-4">
-                      {/* Progress */}
-                      <div>
-                        <div className="flex justify-between text-xs text-slate-400 mb-1.5 font-medium">
-                          <span>Progress</span>
-                          <span>{a.progress_percent}%</span>
-                        </div>
-                        <Progress value={a.progress_percent} className="h-1.5 bg-slate-100" />
-                      </div>
-
-                      {/* Stats grid */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <StatTile
-                          icon={Clock} label="Time Left"
-                          value={formatTime(a.time_remaining_seconds)}
-                          color="text-slate-900"
-                        />
-                        <StatTile
-                          icon={Eye} label="Tab Switches"
-                          value={String(a.tab_switch_count)}
-                          color={a.tab_switch_count > 0 ? "text-red-600" : "text-slate-900"}
-                          highlight={a.tab_switch_count > 0}
-                        />
-                        <StatTile
-                          icon={Camera} label="Screenshots"
-                          value={String(a.screenshot_count)}
-                          color="text-slate-900"
-                        />
-                        <StatTile
-                          icon={Maximize} label="Fullscreen Viol."
-                          value={String(a.fullscreen_violation_count || 0)}
-                          color={a.fullscreen_violation_count > 0 ? "text-orange-600" : "text-slate-900"}
-                          highlight={a.fullscreen_violation_count > 0}
-                        />
-                        <StatTile
-                          icon={Copy} label="Copy/Paste"
-                          value={String(a.copy_paste_count || 0)}
-                          color={a.copy_paste_count > 0 ? "text-amber-600" : "text-slate-900"}
-                          highlight={a.copy_paste_count > 0}
-                        />
-                        <StatTile
-                          icon={AlertTriangle} label="Total Violations"
-                          value={String((a.tab_switch_count || 0) + (a.fullscreen_violation_count || 0) + (a.copy_paste_count || 0))}
-                          color="text-slate-700"
-                        />
-                      </div>
-
-                      {/* Admin Controls */}
-                      <div className="flex gap-1 flex-wrap pt-1 border-t border-slate-50">
-                        <ControlBtn color="amber"   icon={PauseCircle} label="Pause"
-                          onClick={() => sendControl("pause", a.attempt_id, a.candidate_id)} />
-                        <ControlBtn color="emerald" icon={PlayCircle}  label="Resume"
-                          onClick={() => sendControl("resume", a.attempt_id, a.candidate_id)} />
-                        <ControlBtn color="orange"  icon={StopCircle}  label="Submit"
-                          onClick={() => sendControl("force_submit", a.attempt_id, a.candidate_id)} />
-                        <ControlBtn color="red"     icon={UserX}       label="Block"
-                          onClick={() => sendControl("block_candidate", a.attempt_id, a.candidate_id)} />
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </>
-      )}
 
       {/* ── RESULTS VIEW ──────────────────────────────────────────────────── */}
       {view === "results" && (
