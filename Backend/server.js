@@ -1295,8 +1295,22 @@ app.post('/api/public/enroll', async (req, res) => {
 
 // Migration: uppercase departments + fill missing departments from course enrollments
 // Exam analysis - get all results for a specific exam
-app.get('/api/admin/exams/:examId/analysis', authenticateToken, requireAdminOrManager, async (req, res) => {
+app.get('/api/admin/exams/:examId/analysis', authenticateToken, requireInstructor, async (req, res) => {
     try {
+        const role = await getUserRole(req.user.id);
+        // For instructors: verify this exam belongs to one of their courses
+        if (role === 'instructor') {
+            const exam = await Exam.findById(req.params.examId).select('course_id created_by').lean();
+            if (exam && exam.created_by?.toString() !== req.user.id) {
+                const instrCourses = await Course.find({
+                    $or: [{ instructor_ids: req.user.id }, { instructor_id: req.user.id }]
+                }).select('_id').lean();
+                const instrCourseIds = instrCourses.map(c => c._id.toString());
+                if (exam.course_id && !instrCourseIds.includes(exam.course_id.toString())) {
+                    return res.status(403).json({ error: 'Forbidden: This exam does not belong to your courses' });
+                }
+            }
+        }
         // Get exam to find passing_marks and total_marks
         const exam = await Exam.findById(req.params.examId).select('passing_marks total_marks').lean();
         const passingMarks = exam?.passing_marks || 0;
