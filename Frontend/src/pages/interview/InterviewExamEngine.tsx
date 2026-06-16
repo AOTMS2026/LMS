@@ -40,6 +40,7 @@ export default function InterviewExamEngine() {
   const maxViolations = useRef(3);
   const violationCount = useRef(0);
   const examConfig = useRef<any>(null);
+  const examEnding = useRef(false); // Synchronous flag to block violations during submit/exit
 
   // ─── Admin Real-Time Control via Socket ──────────────────────────────────
   useInterviewSocket({
@@ -133,13 +134,13 @@ export default function InterviewExamEngine() {
     if (!examData) return;
 
     const handleVisibilityChange = () => {
-      if (document.hidden && !submitted && !blocked) logViolation("tab_switch");
+      if (document.hidden && !submitted && !blocked && !examEnding.current) logViolation("tab_switch");
     };
     const handleBlur = () => {
-      if (!submitted && !blocked) logViolation("window_blur");
+      if (!submitted && !blocked && !examEnding.current) logViolation("window_blur");
     };
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement && !submitted && !blocked &&
+      if (!document.fullscreenElement && !submitted && !blocked && !examEnding.current &&
           examConfig.current?.enforce_fullscreen) {
         logViolation("fullscreen_exit");
       }
@@ -245,6 +246,7 @@ export default function InterviewExamEngine() {
   };
 
   const submitExam = async (reason?: string) => {
+    examEnding.current = true; // Block all violation events immediately (synchronous — no re-render delay)
     setSubmitting(true);
     const timeTaken = Math.floor((new Date().getTime() - startTime.getTime()) / 1000);
 
