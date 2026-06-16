@@ -60,7 +60,12 @@ const EnrollmentSchema = new Schema({
     ],
     enrolled_at: { type: Date, default: Date.now },
     completed_at: { type: Date },
-    last_accessed_at: { type: Date }
+    last_accessed_at: { type: Date },
+    // Revoke fields (soft revoke - enrollment stays, access is suspended)
+    is_revoked: { type: Boolean, default: false },
+    revoked_at: { type: Date },
+    revoke_until: { type: Date },   // null = permanent revoke, Date = auto-envoke after this
+    revoked_by: { type: Schema.Types.ObjectId, ref: 'User' }
 });
 // Composite unique index to prevent duplicate enrollments
 EnrollmentSchema.index({ user_id: 1, course_id: 1 }, { unique: true });

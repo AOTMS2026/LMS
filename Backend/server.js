@@ -1343,12 +1343,13 @@ app.get('/api/admin/batches/:batchId/students', authenticateToken, requireAdminO
     } catch (err) { handleError(res, err, 'admin-batch-students'); }
 });
 
-// Get enrollments for a specific user (for revoke dialog)
+// Get enrollments for a specific user (for revoke dialog) - non-revoked active only
 app.get('/api/admin/user-enrollments/:userId', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
         const enrollments = await Enrollment.find({
             user_id: req.params.userId,
-            status: { $in: ['active', 'pending'] }
+            status: { $in: ['active', 'pending'] },
+            is_revoked: { $ne: true }
         }).populate('course_id', 'title').lean();
         res.json(enrollments.map(e => ({
             id: e._id.toString(),
@@ -1358,28 +1359,63 @@ app.get('/api/admin/user-enrollments/:userId', authenticateToken, requireAdminOr
     } catch (err) { handleError(res, err, 'user-enrollments'); }
 });
 
-// Revoke course access for a student (all or specific enrollments)
+// Get revoked enrollments for a specific user (for envoke dialog)
+app.get('/api/admin/user-revoked-courses/:userId', authenticateToken, requireAdminOrManager, async (req, res) => {
+    try {
+        // Auto-expire timed revokes first
+        await Enrollment.updateMany(
+            { user_id: req.params.userId, is_revoked: true, revoke_until: { $lte: new Date() } },
+            { $set: { is_revoked: false, revoked_at: null, revoke_until: null, revoked_by: null } }
+        );
+        const enrollments = await Enrollment.find({
+            user_id: req.params.userId,
+            is_revoked: true
+        }).populate('course_id', 'title').lean();
+        res.json(enrollments.map(e => ({
+            id: e._id.toString(),
+            course_title: e.course_id?.title || 'Unknown Course',
+            revoked_at: e.revoked_at,
+            revoke_until: e.revoke_until || null
+        })));
+    } catch (err) { handleError(res, err, 'user-revoked-courses'); }
+});
+
+// Soft-Revoke course access for a student (keeps enrollment, blocks access)
 app.post('/api/admin/users/:userId/revoke-access', authenticateToken, requireAdminOrManager, async (req, res) => {
     try {
         const { userId } = req.params;
-        const { enrollmentIds, courseId, courseName } = req.body || {};
-        let result;
+        const { enrollmentIds, courseId, courseName, revoke_duration_days } = req.body || {};
 
+        const revokeUntil = revoke_duration_days
+            ? new Date(Date.now() + Number(revoke_duration_days) * 24 * 60 * 60 * 1000)
+            : null;
+
+        let filter = {};
         if (enrollmentIds && enrollmentIds.length > 0) {
-            result = await Enrollment.deleteMany({ _id: { $in: enrollmentIds }, user_id: userId });
+            filter = { _id: { $in: enrollmentIds }, user_id: userId };
         } else if (courseId) {
-            result = await Enrollment.deleteMany({ user_id: userId, course_id: courseId });
+            filter = { user_id: userId, course_id: courseId };
         } else {
-            result = await Enrollment.deleteMany({ user_id: userId, status: { $in: ['active', 'pending'] } });
+            filter = { user_id: userId, status: { $in: ['active', 'pending'] } };
         }
 
-        // Send dashboard notification to student
+        const result = await Enrollment.updateMany(filter, {
+            $set: {
+                is_revoked: true,
+                revoked_at: new Date(),
+                revoked_by: req.user.id,
+                revoke_until: revokeUntil
+            }
+        });
+
         const revokerProfile = await Profile.findOne({ user_id: req.user.id }).select('full_name role').lean();
         const revokerName = revokerProfile?.full_name || 'Admin';
         const revokerRole = revokerProfile?.role || 'admin';
-        const notifMsg = courseId
-            ? `Your access to "${courseName || 'a course'}" has been revoked by ${revokerName} (${revokerRole}). The course is now available in the Course Catalog if you wish to re-enroll.`
-            : `Your course access has been revoked by ${revokerName} (${revokerRole}). Check Course Catalog to re-enroll.`;
+        const durationText = revoke_duration_days ? ` for ${revoke_duration_days} days` : '';
+        const restoreText = revokeUntil ? ` Access will be automatically restored on ${revokeUntil.toDateString()}.` : '';
+        const notifMsg = (courseId || (enrollmentIds && enrollmentIds.length === 1))
+            ? `Your access to \"${courseName || 'a course'}\" has been revoked${durationText} by ${revokerName} (${revokerRole}).${restoreText}`
+            : `Your course access has been revoked${durationText} by ${revokerName} (${revokerRole}).${restoreText}`;
 
         await Notification.create({
             user_id: userId,
@@ -1388,10 +1424,43 @@ app.post('/api/admin/users/:userId/revoke-access', authenticateToken, requireAdm
             type: 'warning',
             read: false,
             created_at: new Date()
-        }).catch(() => {}); // Don't fail if notification model doesn't exist
+        }).catch(() => {});
 
-        res.json({ message: `Revoked access for ${result.deletedCount} enrollments.` });
+        res.json({ message: `Revoked access for ${result.modifiedCount} enrollments.` });
     } catch (err) { handleError(res, err, 'revoke-access'); }
+});
+
+// Envoke (un-revoke) course access for a student
+app.post('/api/admin/users/:userId/envoke-access', authenticateToken, requireAdminOrManager, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { enrollmentIds } = req.body || {};
+
+        let filter = {};
+        if (enrollmentIds && enrollmentIds.length > 0) {
+            filter = { _id: { $in: enrollmentIds }, user_id: userId, is_revoked: true };
+        } else {
+            filter = { user_id: userId, is_revoked: true };
+        }
+
+        const result = await Enrollment.updateMany(filter, {
+            $set: { is_revoked: false, revoked_at: null, revoke_until: null, revoked_by: null }
+        });
+
+        const revokerProfile = await Profile.findOne({ user_id: req.user.id }).select('full_name role').lean();
+        const revokerName = revokerProfile?.full_name || 'Admin';
+
+        await Notification.create({
+            user_id: userId,
+            title: 'Course Access Restored',
+            message: `Your course access has been restored by ${revokerName}. You can now continue your courses.`,
+            type: 'success',
+            read: false,
+            created_at: new Date()
+        }).catch(() => {});
+
+        res.json({ message: `Envoked (restored) access for ${result.modifiedCount} enrollments.` });
+    } catch (err) { handleError(res, err, 'envoke-access'); }
 });
 
 app.post('/api/admin/fix-departments', authenticateToken, async (req, res) => {
@@ -4692,6 +4761,12 @@ app.get('/api/student/my-courses', authenticateToken, async (req, res) => {
             if (sb.course_id) batchMap.set(sb.course_id.toString(), sb.assigned_session);
         });
 
+        // Auto-expire timed revokes for this student
+        await Enrollment.updateMany(
+            { user_id: req.user.id, is_revoked: true, revoke_until: { $lte: new Date() } },
+            { $set: { is_revoked: false, revoked_at: null, revoke_until: null, revoked_by: null } }
+        );
+
         // Filter out enrollments for courses that are missing or deactivated
         const activeEnrollments = enrollments.filter(e => e.course_id && e.course_id.is_active !== false);
 
@@ -4712,7 +4787,7 @@ app.get('/api/student/my-courses', authenticateToken, async (req, res) => {
                 instructor_id: course.instructor_id || (course.instructor_ids && course.instructor_ids.length > 0 ? course.instructor_ids[0]._id : null),
                 instructor_name: (course.instructor_ids && course.instructor_ids.length > 0) ? course.instructor_ids[0].full_name : null,
                 instructor_avatar: (course.instructor_ids && course.instructor_ids.length > 0) ? course.instructor_ids[0].avatar_url : null,
-                enrollmentStatus: e.status, // active, pending, rejected
+                enrollmentStatus: e.is_revoked ? 'revoked' : e.status,
                 progress: e.progress_percentage || 0,
                 enrolled_at: e.enrolled_at,
                 price: course.price,
@@ -4722,7 +4797,11 @@ app.get('/api/student/my-courses', authenticateToken, async (req, res) => {
                 remaining_balance: e.remaining_balance,
                 assigned_session: batchMap.get(courseIdStr) || 'all',
                 // Virtual/Helper fields for UI badges
-                is_active: course.is_active !== false
+                is_active: course.is_active !== false,
+                // Revoke fields
+                is_revoked: e.is_revoked || false,
+                revoked_at: e.revoked_at || null,
+                revoke_until: e.revoke_until || null
             };
         });
 

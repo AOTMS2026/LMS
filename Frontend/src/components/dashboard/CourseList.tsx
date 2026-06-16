@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Play, BookOpen, Clock, Sparkles, ChevronRight, LayoutGrid, Layers, CheckCircle } from "lucide-react";
+import { Play, BookOpen, Clock, Sparkles, ChevronRight, LayoutGrid, Layers, CheckCircle, Ban } from "lucide-react";
 import { useEnrolledCourses, useAvailableCourses, StudentCourse, useStudentBatch } from "@/hooks/useStudentData";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -47,10 +47,13 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
     const { isLoading } = query;
     let { data: courses } = query;
 
-    // Filter available courses to hide already enrolled ones
+    // Filter available courses to hide already enrolled ones + hide revoked courses from catalog
     if (type === 'available' && courses && enrolledQuery.data) {
         const enrolledIds = new Set(enrolledQuery.data.map(c => c.id || c._id));
-        courses = courses.filter(c => !enrolledIds.has(c.id || c._id));
+        const revokedIds = new Set(enrolledQuery.data.filter((c: any) => c.is_revoked).map(c => c.id || c._id));
+        courses = courses.filter(c => !enrolledIds.has(c.id || c._id) || revokedIds.has(c.id || c._id));
+        // Fully hide revoked from catalog (they appear in My Courses with revoked badge)
+        courses = courses.filter(c => !revokedIds.has(c.id || c._id));
     }
 
     // Sort alphabetically by title
@@ -116,6 +119,7 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                         <Card
                             className="pro-card relative flex flex-col h-full overflow-hidden cursor-pointer"
                             onClick={() => {
+                                if ((course as any).is_revoked) return; // Block access to revoked courses
                                 const isTerm2Pending = course.payment_term === 'term2' && course.category === 'remove';
                                 const isApprovedWithBalance = course.category === 'approve' && (course.remaining_balance || 0) > 0;
                                 const isDeactivated = course.enrollmentStatus === 'deactivate';
@@ -142,12 +146,14 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                                             <Badge 
                                                 variant="secondary" 
                                                 className={`border-none backdrop-blur-md gap-1 ${
+                                                    (course as any).is_revoked ? 'bg-rose-600/90 hover:bg-rose-600 text-white' :
                                                     course.enrollmentStatus === 'active' ? 'bg-green-500/80 hover:bg-green-500 text-white' :
                                                     course.enrollmentStatus === 'pending' ? 'bg-amber-500/80 hover:bg-amber-500 text-white' :
                                                     'bg-red-500/80 hover:bg-red-500 text-white'
                                                 }`}
                                             >
-                                                {course.enrollmentStatus === 'active' ? (type === 'available' ? 'Enrolled' : 'Approved') : 
+                                                {(course as any).is_revoked ? <><Ban className="h-3 w-3" /> Revoked</> :
+                                                 course.enrollmentStatus === 'active' ? (type === 'available' ? 'Enrolled' : 'Approved') : 
                                                  course.enrollmentStatus === 'pending' ? 'Pending' : 'Rejected'}
                                             </Badge>
                                         )}
@@ -182,7 +188,18 @@ export function CourseList({ type = 'enrolled', onSelectCourse }: CourseListProp
                                     {type === 'enrolled' ? (
                                         <div className="space-y-4 p-4 bg-muted/30 rounded-2xl border border-border/50 transition-colors group-hover:bg-primary/5 group-hover:border-primary/20">
 
-                                        {course.enrollmentStatus === 'pending' ? (
+                                        {(course as any).is_revoked ? (
+                                            <div className="text-center py-3">
+                                                <Badge variant="secondary" className="bg-rose-100 text-rose-700 hover:bg-rose-200 border-rose-200 gap-1">
+                                                    <Ban className="h-3 w-3" /> Access Revoked
+                                                </Badge>
+                                                <p className="text-xs text-muted-foreground mt-2">
+                                                    {(course as any).revoke_until
+                                                        ? `Access restores on ${new Date((course as any).revoke_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                                        : 'Contact admin to restore access'}
+                                                </p>
+                                            </div>
+                                        ) : course.enrollmentStatus === 'pending' ? (
                                             <div className="text-center py-2">
                                                 <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-200 gap-1">
                                                     Pending Approval

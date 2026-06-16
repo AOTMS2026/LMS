@@ -62,7 +62,10 @@ import {
   ShieldCheck,
   RefreshCw,
   Trash2,
-  BookX
+  BookX,
+  BookCheck,
+  Ban,
+  RotateCcw
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -167,6 +170,12 @@ export function UserManagement({
   const [revokeEnrollments, setRevokeEnrollments] = useState<{id:string; title:string}[]>([]);
   const [revokeLoading, setRevokeLoading] = useState(false);
   const [selectedRevokeIds, setSelectedRevokeIds] = useState<string[]>([]);
+  const [revokeDuration, setRevokeDuration] = useState<string>('permanent');
+  const [showEnvokeDialog, setShowEnvokeDialog] = useState(false);
+  const [envokeEnrollments, setEnvokeEnrollments] = useState<{id:string; title:string; revoke_until:string|null}[]>([]);
+  const [envokeLoading, setEnvokeLoading] = useState(false);
+  const [selectedEnvokeIds, setSelectedEnvokeIds] = useState<string[]>([]);
+  const [envokingAccess, setEnvokingAccess] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [suspensionDays, setSuspensionDays] = useState("7");
   
@@ -625,6 +634,7 @@ export function UserManagement({
                               setSelectedRevokeIds([]);
                               setRevokeEnrollments([]);
                               setRevokeLoading(true);
+                              setRevokeDuration('permanent');
                               setShowRevokeDialog(true);
                               void (async () => {
                                 try {
@@ -640,6 +650,28 @@ export function UserManagement({
                             className="rounded-xl font-bold text-[13px] py-2.5 cursor-pointer hover:bg-orange-50 text-orange-600"
                           >
                             <BookX className="mr-3 h-4 w-4" /> Revoke Course Access
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setSelectedUser(user);
+                              setSelectedEnvokeIds([]);
+                              setEnvokeEnrollments([]);
+                              setEnvokeLoading(true);
+                              setShowEnvokeDialog(true);
+                              void (async () => {
+                                try {
+                                  const d = await fetchWithAuth(`/admin/user-revoked-courses/${user.id}`) as any[];
+                                  setEnvokeEnrollments((d||[]).map((e:any) => ({id: e.id, title: e.course_title || 'Course', revoke_until: e.revoke_until || null})));
+                                } catch (_e) {
+                                  setEnvokeEnrollments([]);
+                                } finally {
+                                  setEnvokeLoading(false);
+                                }
+                              })();
+                            }}
+                            className="rounded-xl font-bold text-[13px] py-2.5 cursor-pointer hover:bg-emerald-50 text-emerald-600"
+                          >
+                            <RotateCcw className="mr-3 h-4 w-4" /> Envoke Course Access
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="my-1.5 bg-slate-100" />
                           {user.approval_status === 'rejected' && (
@@ -1465,14 +1497,14 @@ export function UserManagement({
 
       {/* Revoke Course Access Dialog */}
       <Dialog open={showRevokeDialog} onOpenChange={setShowRevokeDialog}>
-        <DialogContent className="w-[95vw] sm:max-w-md p-0 border-0 rounded-[2rem] shadow-2xl bg-white overflow-hidden">
+        <DialogContent className="w-[95vw] sm:max-w-md p-0 border-0 rounded-[2rem] shadow-2xl bg-white overflow-hidden flex flex-col max-h-[90vh]">
           <DialogHeader className="sr-only"><DialogTitle>Revoke Access</DialogTitle></DialogHeader>
-          <div className="bg-gradient-to-br from-orange-500 to-rose-600 p-8 text-white">
+          <div className="bg-gradient-to-br from-orange-500 to-rose-600 p-8 text-white shrink-0">
             <BookX className="h-10 w-10 mb-3 opacity-80" />
             <h2 className="text-2xl font-black">Revoke Course Access</h2>
             <p className="text-white/70 text-sm mt-1">{selectedUser?.full_name}</p>
           </div>
-          <div className="p-6 space-y-4">
+          <div className="p-6 space-y-4 overflow-y-auto flex-1">
             <p className="text-slate-600 text-sm font-medium">Select which courses to revoke access for <strong>{selectedUser?.full_name}</strong>:</p>
             {revokeLoading ? (
               <div className="flex items-center gap-2 py-4 text-slate-400">
@@ -1497,8 +1529,32 @@ export function UserManagement({
                 })}
               </div>
             )}
+            <div className="space-y-2">
+              <p className="text-slate-600 text-sm font-semibold">Revoke Duration:</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Permanent', value: 'permanent' },
+                  { label: '1 Week', value: '7' },
+                  { label: '2 Weeks', value: '14' },
+                  { label: '1 Month', value: '30' },
+                  { label: '2 Months', value: '60' },
+                  { label: '3 Months', value: '90' },
+                ].map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setRevokeDuration(opt.value)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${revokeDuration === opt.value ? 'bg-orange-500 border-orange-500 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-orange-300'}`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {revokeDuration !== 'permanent' && (
+                <p className="text-xs text-orange-600 font-medium">⏱ Access will auto-restore after {revokeDuration} days.</p>
+              )}
+            </div>
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs font-medium text-orange-700">
-              Can be reversed by re-granting course access from Grant Access section.
+              Course remains in student's "My Courses" with Revoked badge. Use Envoke to restore early.
             </div>
           </div>
           <DialogFooter className="px-6 pb-6 gap-2 flex-wrap">
@@ -1511,9 +1567,11 @@ export function UserManagement({
                 if (!selectedUser || selectedRevokeIds.length === 0) return;
                 setRevokingAccess(true);
                 try {
-                  await fetchWithAuth(`/admin/users/${selectedUser.id}/revoke-access`, { method: 'POST', body: JSON.stringify({ enrollmentIds: selectedRevokeIds }) });
-                  toast.success(`Revoked ${selectedRevokeIds.length} course(s) for ${selectedUser.full_name}.`);
-                  setShowRevokeDialog(false); setSelectedUser(null); setSelectedRevokeIds([]);
+                  const durationDays = revokeDuration === 'permanent' ? null : Number(revokeDuration);
+                  await fetchWithAuth(`/admin/users/${selectedUser.id}/revoke-access`, { method: 'POST', body: JSON.stringify({ enrollmentIds: selectedRevokeIds, revoke_duration_days: durationDays }) });
+                  const durationLabel = revokeDuration === 'permanent' ? 'permanently' : `for ${revokeDuration} days`;
+                  toast.success(`Revoked ${selectedRevokeIds.length} course(s) ${durationLabel} for ${selectedUser.full_name}.`);
+                  setShowRevokeDialog(false); setSelectedUser(null); setSelectedRevokeIds([]); setRevokeDuration('permanent');
                 } catch (_e) {
                   toast.error('Failed to revoke access. Try again.');
                 } finally { setRevokingAccess(false); }
@@ -1528,15 +1586,105 @@ export function UserManagement({
                 if (!selectedUser) return;
                 setRevokingAccess(true);
                 try {
-                  await fetchWithAuth(`/admin/users/${selectedUser.id}/revoke-access`, { method: 'POST' });
-                  toast.success(`All courses revoked for ${selectedUser.full_name}.`);
-                  setShowRevokeDialog(false); setSelectedUser(null); setSelectedRevokeIds([]);
+                  const durationDays = revokeDuration === 'permanent' ? null : Number(revokeDuration);
+                  await fetchWithAuth(`/admin/users/${selectedUser.id}/revoke-access`, { method: 'POST', body: JSON.stringify({ revoke_duration_days: durationDays }) });
+                  const durationLabel = revokeDuration === 'permanent' ? 'permanently' : `for ${revokeDuration} days`;
+                  toast.success(`All courses revoked ${durationLabel} for ${selectedUser.full_name}.`);
+                  setShowRevokeDialog(false); setSelectedUser(null); setSelectedRevokeIds([]); setRevokeDuration('permanent');
                 } catch (_e) {
                   toast.error('Failed to revoke access. Try again.');
                 } finally { setRevokingAccess(false); }
               }}
             >
               {revokingAccess ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>...</> : <><BookX className="mr-2 h-4 w-4"/>Revoke All</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Envoke Course Access Dialog */}
+      <Dialog open={showEnvokeDialog} onOpenChange={setShowEnvokeDialog}>
+        <DialogContent className="w-[95vw] sm:max-w-md p-0 border-0 rounded-[2rem] shadow-2xl bg-white overflow-hidden">
+          <DialogHeader className="sr-only"><DialogTitle>Envoke Access</DialogTitle></DialogHeader>
+          <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-8 text-white">
+            <RotateCcw className="h-10 w-10 mb-3 opacity-80" />
+            <h2 className="text-2xl font-black">Envoke Course Access</h2>
+            <p className="text-white/70 text-sm mt-1">{selectedUser?.full_name}</p>
+          </div>
+          <div className="p-6 space-y-4">
+            <p className="text-slate-600 text-sm font-medium">Select revoked courses to restore access for <strong>{selectedUser?.full_name}</strong>:</p>
+            {envokeLoading ? (
+              <div className="flex items-center gap-2 py-4 text-slate-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="text-sm">Loading revoked courses...</span>
+              </div>
+            ) : envokeEnrollments.length === 0 ? (
+              <p className="text-slate-400 text-sm italic py-2">No revoked courses found for this student.</p>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden max-h-56 overflow-y-auto">
+                {envokeEnrollments.map(e => {
+                  const checked = selectedEnvokeIds.includes(e.id);
+                  return (
+                    <div key={e.id} onClick={() => setSelectedEnvokeIds(prev => checked ? prev.filter(x => x !== e.id) : [...prev, e.id])}
+                      className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b last:border-0 transition-colors ${checked ? 'bg-emerald-50' : 'hover:bg-slate-50'}`}>
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${checked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                        {checked && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-medium text-slate-800 truncate">{e.title}</span>
+                        {e.revoke_until && (
+                          <span className="text-[11px] text-slate-400">Auto-restores: {new Date(e.revoke_until).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        )}
+                        {!e.revoke_until && (
+                          <span className="text-[11px] text-rose-400">Permanent revoke</span>
+                        )}
+                      </div>
+                      <Ban className="h-3.5 w-3.5 text-rose-400 ml-auto shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs font-medium text-emerald-700">
+              Restoring access will immediately allow the student to access the selected courses again.
+            </div>
+          </div>
+          <DialogFooter className="px-6 pb-6 gap-2 flex-wrap">
+            <Button variant="ghost" onClick={() => { setShowEnvokeDialog(false); setSelectedEnvokeIds([]); }} className="rounded-xl">Cancel</Button>
+            <Button
+              disabled={envokingAccess || selectedEnvokeIds.length === 0}
+              variant="outline"
+              className="rounded-xl border-emerald-300 text-emerald-600 hover:bg-emerald-50"
+              onClick={async () => {
+                if (!selectedUser || selectedEnvokeIds.length === 0) return;
+                setEnvokingAccess(true);
+                try {
+                  await fetchWithAuth(`/admin/users/${selectedUser.id}/envoke-access`, { method: 'POST', body: JSON.stringify({ enrollmentIds: selectedEnvokeIds }) });
+                  toast.success(`Restored access to ${selectedEnvokeIds.length} course(s) for ${selectedUser.full_name}.`);
+                  setShowEnvokeDialog(false); setSelectedUser(null); setSelectedEnvokeIds([]);
+                } catch (_e) {
+                  toast.error('Failed to envoke access. Try again.');
+                } finally { setEnvokingAccess(false); }
+              }}
+            >
+              {envokingAccess ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Restoring...</> : <>Envoke Selected ({selectedEnvokeIds.length})</>}
+            </Button>
+            <Button
+              disabled={envokingAccess || envokeEnrollments.length === 0}
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={async () => {
+                if (!selectedUser) return;
+                setEnvokingAccess(true);
+                try {
+                  await fetchWithAuth(`/admin/users/${selectedUser.id}/envoke-access`, { method: 'POST' });
+                  toast.success(`All courses restored for ${selectedUser.full_name}.`);
+                  setShowEnvokeDialog(false); setSelectedUser(null); setSelectedEnvokeIds([]);
+                } catch (_e) {
+                  toast.error('Failed to envoke access. Try again.');
+                } finally { setEnvokingAccess(false); }
+              }}
+            >
+              {envokingAccess ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/>...</> : <><RotateCcw className="mr-2 h-4 w-4"/>Envoke All</>}
             </Button>
           </DialogFooter>
         </DialogContent>
