@@ -23,7 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import alietBanner from "@/assets/aliet_banner.png";
+import alietBanner from "@/assets/aliet_logo.png";
 
 export function InstructorHeader() {
   const { user, signOut } = useAuth();

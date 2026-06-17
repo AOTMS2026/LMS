@@ -19,7 +19,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import alietBanner from "@/assets/aliet_banner.png";
+import alietBanner from "@/assets/aliet_logo.png";
 
 // Pages with light backgrounds that need dark navbar text
 const lightBgPages = [

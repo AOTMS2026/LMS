@@ -890,7 +890,7 @@ export function CourseBuilder({ course, onBack }: CourseBuilderProps) {
                                             <div className="aspect-[16/10] w-full rounded-[1.75rem] overflow-hidden bg-slate-100 shadow-inner group-hover:shadow-2xl transition-all duration-700">
                                                 <img 
                                                     src={course.thumbnail_url.startsWith('http') ? course.thumbnail_url : `/s3/public/${course.thumbnail_url}`} 
-                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-[2000ms]" 
+                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform [transition-duration:2000ms]" 
                                                     alt="Course Thumbnail" 
                                                 />
                                             </div>

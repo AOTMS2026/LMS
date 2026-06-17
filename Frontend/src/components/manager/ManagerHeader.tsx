@@ -23,7 +23,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
-import alietBanner from "@/assets/aliet_banner.png";
+import alietBanner from "@/assets/aliet_logo.png";
 
 export function ManagerHeader() {
   const { user, signOut } = useAuth();

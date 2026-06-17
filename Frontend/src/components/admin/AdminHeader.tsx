@@ -23,7 +23,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useNavigate } from "react-router-dom";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import alietBanner from "@/assets/aliet_banner.png";
+import alietBanner from "@/assets/aliet_logo.png";
 
 export function AdminHeader() {
   const { user, signOut, userRole } = useAuth();

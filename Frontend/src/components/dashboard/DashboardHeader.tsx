@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { useNotifications } from "@/hooks/useNotifications";
-import alietBanner from "@/assets/aliet_banner.png";
+import alietBanner from "@/assets/aliet_logo.png";
 import {
   DropdownMenu,
   DropdownMenuContent,
